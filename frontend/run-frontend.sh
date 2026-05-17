@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 # Warna output
 RED='\033[0;31m'
@@ -6,7 +8,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}🚀 Pintarnya Frontend Setup${NC}\n"
+echo -e "${YELLOW}🚀 KerjaNusa Frontend Setup${NC}\n"
 
 # Check Node.js
 if ! command -v node &> /dev/null; then
@@ -27,6 +29,6 @@ echo -e "${YELLOW}📦 Installing NPM dependencies...${NC}"
 npm install
 
 # Run dev server
-echo -e "\n${GREEN}✅ Setup complete!${NC}"
-echo -e "${GREEN}🌐 Starting server on default Vite port (usually http://localhost:5173)${NC}\n"
+echo -e "\n${GREEN}✅ Setup selesai!${NC}"
+echo -e "${GREEN}🌐 Menjalankan Vite di port default (biasanya http://localhost:5173)${NC}\n"
 npm run dev
