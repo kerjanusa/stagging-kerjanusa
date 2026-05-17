@@ -13,6 +13,9 @@ class AdminService {
     }
   }
 
+  /**
+   * Update one managed user account from the superadmin panel.
+   */
   static async updateUser(userId, payload) {
     try {
       const response = await apiClient.put(`/admin/users/${userId}`, payload);
@@ -22,6 +25,9 @@ class AdminService {
     }
   }
 
+  /**
+   * Ask the backend to send a password-reset link to a selected managed user.
+   */
   static async sendResetLink(userId) {
     try {
       const response = await apiClient.post(`/admin/users/${userId}/send-reset-link`);
@@ -31,6 +37,9 @@ class AdminService {
     }
   }
 
+  /**
+   * Reassign a job to a different recruiter from the admin workspace.
+   */
   static async reassignJob(jobId, recruiterId) {
     try {
       const response = await apiClient.put(`/admin/jobs/${jobId}/reassign`, {
@@ -42,6 +51,9 @@ class AdminService {
     }
   }
 
+  /**
+   * Proxy job updates from the admin panel to the shared jobs endpoint.
+   */
   static async updateJob(jobId, payload) {
     try {
       const response = await apiClient.put(`/jobs/${jobId}`, payload);

@@ -27,18 +27,27 @@ const FORCE_SCROLL_TOP_PATHS = new Set([
   APP_ROUTES.adminDashboard,
 ]);
 
+/**
+ * Menormalkan posisi scroll ke bagian atas agar perpindahan halaman konsisten di semua browser.
+ */
 const scrollWindowToTop = () => {
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
 };
 
+/**
+ * Menampilkan fallback ringan saat chunk route lazy masih dimuat.
+ */
 const AppRouteFallback = () => (
   <main className="app-container">
     <div className="loading">Memuat halaman...</div>
   </main>
 );
 
+/**
+ * Mengatur shell routing, perilaku scroll, dan visibilitas navbar per halaman.
+ */
 function AppLayout() {
   const location = useLocation();
   const shouldForceScrollTop = FORCE_SCROLL_TOP_PATHS.has(location.pathname);
@@ -224,6 +233,9 @@ function AppLayout() {
   );
 }
 
+/**
+ * Menjadi root router untuk seluruh aplikasi React.
+ */
 function App() {
   return (
     <Router>

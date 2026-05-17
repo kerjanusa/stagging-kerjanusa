@@ -1,12 +1,21 @@
 import { create } from 'zustand';
 import AuthService from '../services/authService';
 
+/**
+ * Extract the most useful human-readable error string from a service failure.
+ */
 const getErrorMessage = (error, fallback) =>
   typeof error === 'string' ? error : error?.message || fallback;
 
+/**
+ * Extract backend validation errors into a consistent object shape for forms.
+ */
 const getValidationErrors = (error) =>
   typeof error === 'object' && error?.errors ? error.errors : {};
 
+/**
+ * Centralized auth store for session, validation, and async auth actions.
+ */
 const useAuthStore = create((set) => ({
   user: AuthService.getStoredUser(),
   token: AuthService.getToken(),

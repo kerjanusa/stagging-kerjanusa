@@ -9,6 +9,9 @@ const CANDIDATE_PROFILE_STORAGE_PREFIX = 'candidate_dashboard_profile';
 const CURRENT_CALENDAR_YEAR = new Date().getFullYear();
 const MIN_EXPERIENCE_YEAR = CURRENT_CALENDAR_YEAR - 50;
 
+/**
+ * Create one empty experience item used by the candidate profile form.
+ */
 const createExperienceItem = () => ({
   company: '',
   position: '',
@@ -21,6 +24,10 @@ const createExperienceItem = () => ({
   referenceName: '',
   referencePhone: '',
 });
+
+/**
+ * Create one empty organization-activity item used by the candidate profile form.
+ */
 const createOrganizationActivityItem = () => ({
   organizationName: '',
   role: '',
@@ -29,10 +36,20 @@ const createOrganizationActivityItem = () => ({
   description: '',
 });
 
+/**
+ * Force list-based profile fields to a fixed maximum length of string entries.
+ */
 const normalizeStringList = (items, maxLength) =>
   Array.from({ length: maxLength }, (_, index) => String(items?.[index] || ''));
 
+/**
+ * Normalize arbitrary text input into a trimmed string.
+ */
 const trimText = (value) => String(value || '').trim();
+
+/**
+ * Keep age input numeric and constrained to a sensible range for the profile form.
+ */
 const normalizeAgeValue = (value) => {
   const digitsOnly = String(value ?? '')
     .replace(/[^\d]/g, '')
@@ -50,11 +67,19 @@ const normalizeAgeValue = (value) => {
 
   return String(Math.max(0, Math.min(100, parsedAge)));
 };
+
+/**
+ * Keep salary input numeric-only for storage and form comparison.
+ */
 const normalizeSalaryValue = (value) =>
   String(value ?? '')
     .replace(/[^\d]/g, '')
     .replace(/^0+(?=\d)/, '')
     .slice(0, 12);
+
+/**
+ * Normalize education end-year input while preserving semantic special values.
+ */
 const normalizeEducationEndYearValue = (value) => {
   const normalizedValue = String(value ?? '').trim().toLowerCase();
 
@@ -68,6 +93,10 @@ const normalizeEducationEndYearValue = (value) => {
 
   return normalizeExperienceYearValue(value);
 };
+
+/**
+ * Normalize one year-like value and optionally allow the "current" sentinel.
+ */
 const normalizeExperienceYearValue = (value, { allowCurrent = false } = {}) => {
   const normalizedValue = String(value ?? '').trim().toLowerCase();
 
@@ -93,6 +122,10 @@ const normalizeExperienceYearValue = (value, { allowCurrent = false } = {}) => {
 
   return String(parsedYear);
 };
+
+/**
+ * Combine start and end years into the legacy display range used by the UI.
+ */
 const buildExperienceYearRange = (startYear = '', endYear = '') => {
   const normalizedStartYear = normalizeExperienceYearValue(startYear);
   const normalizedEndYear = normalizeExperienceYearValue(endYear, { allowCurrent: true });
@@ -113,6 +146,10 @@ const buildExperienceYearRange = (startYear = '', endYear = '') => {
     normalizedEndYear === 'current' ? 'Masih bekerja' : normalizedEndYear
   }`;
 };
+
+/**
+ * Parse older free-form year ranges into the newer structured start/end year shape.
+ */
 const parseLegacyExperienceYearRange = (value = '') => {
   const normalizedValue = String(value || '').trim().toLowerCase();
   const matchedYears = normalizedValue.match(/\b(19|20)\d{2}\b/g) || [];
@@ -138,11 +175,25 @@ const parseLegacyExperienceYearRange = (value = '') => {
     endYear: hasCurrentToken ? 'current' : '',
   };
 };
+
+/**
+ * Extract a lowercase file extension from a file name.
+ */
 const getFileExtension = (fileName = '') => String(fileName || '').trim().toLowerCase().split('.').pop() || '';
+
+/**
+ * Restrict demo resume storage to PDF-like file names.
+ */
 const isPdfResumeFileName = (fileName = '') => getFileExtension(fileName) === 'pdf';
 
+/**
+ * Return the first non-empty string in one ordered list.
+ */
 const firstFilledText = (items = []) => items.find((item) => trimText(item)) || '';
 
+/**
+ * Auto-generate a lightweight profile summary when the candidate leaves it blank.
+ */
 const buildAutoProfileSummary = (profile) => {
   const role = trimText(firstFilledText(profile?.preferredRoles));
   const employmentType = trimText(profile?.employmentType);
@@ -177,6 +228,9 @@ const buildAutoProfileSummary = (profile) => {
   return `${summaryParts.join(' ')}.`;
 };
 
+/**
+ * Create the full default candidate profile shape used by the dashboard.
+ */
 export const createCandidateProfile = (user) => ({
   fullName: user?.name || '',
   email: user?.email || '',
@@ -215,6 +269,9 @@ export const createCandidateProfile = (user) => ({
   certificateFiles: [],
 });
 
+/**
+ * Merge stored profile data with defaults while normalizing legacy and free-form fields.
+ */
 export const mergeCandidateProfile = (user, savedProfile) => {
   const baseProfile = createCandidateProfile(user);
 
@@ -296,9 +353,15 @@ export const mergeCandidateProfile = (user, savedProfile) => {
   };
 };
 
+/**
+ * Build the storage key used for one candidate's local profile draft.
+ */
 export const getCandidateProfileStorageKey = (userId) =>
   `${CANDIDATE_PROFILE_STORAGE_PREFIX}:${userId || 'guest'}`;
 
+/**
+ * Resolve the best available candidate profile source from backend data and local draft data.
+ */
 const getCandidateProfileSource = (user, options = {}) => {
   const preferStoredDraft = options.preferStoredDraft ?? true;
   const backendProfile =
@@ -327,10 +390,16 @@ const getCandidateProfileSource = (user, options = {}) => {
   }
 };
 
+/**
+ * Read the current candidate profile view model for one logged-in user.
+ */
 export const readCandidateProfile = (user, options = {}) => {
   return getCandidateProfileSource(user, options);
 };
 
+/**
+ * Normalize and persist one candidate profile draft to local storage.
+ */
 export const saveCandidateProfile = (user, profile) => {
   const normalizedProfile = mergeCandidateProfile(user, {
     ...profile,
@@ -365,9 +434,15 @@ export const saveCandidateProfile = (user, profile) => {
   return normalizedProfile;
 };
 
+/**
+ * Count how many entries in one simple string list are meaningfully filled.
+ */
 export const countFilledItems = (items = []) =>
   items.filter((item) => String(item || '').trim()).length;
 
+/**
+ * Build the candidate profile checklist used by readiness and completeness indicators.
+ */
 export const getCandidateProfileChecklist = (profile) => {
   const hasLatestEducation =
     Boolean(profile.education?.institution?.trim()) || Boolean(profile.education?.major?.trim());
@@ -436,6 +511,9 @@ export const getCandidateProfileChecklist = (profile) => {
   ];
 };
 
+/**
+ * Summarize candidate profile completeness and required-field readiness percentages.
+ */
 export const getCandidateProfileCompletion = (profile) => {
   const checklist = getCandidateProfileChecklist(profile);
   const requiredChecklist = checklist.filter((item) => item.required);
@@ -461,6 +539,9 @@ export const getCandidateProfileCompletion = (profile) => {
   };
 };
 
+/**
+ * Convert profile completion metrics into one short candidate-facing status label.
+ */
 export const getCandidateProfileStatusLabel = (completion) => {
   if (completion.isReady) {
     return 'Siap melamar';
@@ -473,8 +554,14 @@ export const getCandidateProfileStatusLabel = (completion) => {
   return 'Belum siap melamar';
 };
 
+/**
+ * Normalize comparison text used by the candidate job-matching helpers.
+ */
 const normalizeText = (value = '') => String(value).trim().toLowerCase();
 
+/**
+ * Check whether any candidate keyword appears in a normalized text haystack.
+ */
 const includesAnyText = (haystack, needles) => {
   const normalizedHaystack = normalizeText(haystack);
 
@@ -484,6 +571,9 @@ const includesAnyText = (haystack, needles) => {
   });
 };
 
+/**
+ * Score one job against the candidate profile and return a few human-readable reasons.
+ */
 export const getCandidateJobMatchScore = (job, profile) => {
   let score = 0;
   const reasons = [];
@@ -522,6 +612,9 @@ export const getCandidateJobMatchScore = (job, profile) => {
   };
 };
 
+/**
+ * Sort jobs into a candidate-facing recommendation order and annotate match metadata.
+ */
 export const sortCandidateRecommendedJobs = (jobs, profile, applications = []) => {
   const appliedJobIds = new Set(applications.map((application) => Number(application.job_id)));
 
@@ -600,11 +693,17 @@ const APPLICATION_STAGE_META = {
   },
 };
 
+/**
+ * Format the current application stage into the short label shown to candidates.
+ */
 export const formatCandidateApplicationStatus = (status, application = null) =>
   APPLICATION_STAGE_META[getApplicationStage(application || { status })]?.label ||
   getApplicationStageLabel(getApplicationStage(application || { status })) ||
   'Status belum dikenal';
 
+/**
+ * Return the candidate-facing meta block for one application stage.
+ */
 export const getCandidateApplicationMeta = (status, application = null) => {
   const stage = getApplicationStage(application || { status });
 
@@ -617,6 +716,9 @@ export const getCandidateApplicationMeta = (status, application = null) => {
   };
 };
 
+/**
+ * Build the simplified candidate application timeline based on the current stage.
+ */
 export const getCandidateApplicationTimeline = (status, application = null) => {
   const stage = getApplicationStage(application || { status });
   const { progressStep } = getCandidateApplicationMeta(status, application);
@@ -641,9 +743,15 @@ export const getCandidateApplicationTimeline = (status, application = null) => {
   ];
 };
 
+/**
+ * Check whether an application stage is still considered active for the candidate.
+ */
 export const isCandidateApplicationActive = (status, application = null) =>
   isRecruiterApplicationStageActive(getApplicationStage(application || { status }));
 
+/**
+ * Choose a short career-stage label from the candidate's saved profile.
+ */
 export const formatCandidateCareerStage = (profile) => {
   const latestRole = profile.preferredRoles.find((item) => item.trim());
   const hasExperience = profile.experiences.some((item) => item.company?.trim() || item.position?.trim());

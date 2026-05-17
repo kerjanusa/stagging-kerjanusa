@@ -44,6 +44,9 @@ const RECRUITER_MOBILE_BOTTOM_SECTIONS = [
   { value: 'company', label: 'Profil', icon: 'user' },
 ];
 
+/**
+ * Mengubah hash URL recruiter menjadi nama section yang valid untuk dashboard.
+ */
 const resolveRecruiterSectionFromHash = (hash) => {
   const normalizedHash = hash.replace(/^#/, '');
 
@@ -54,16 +57,25 @@ const resolveRecruiterSectionFromHash = (hash) => {
   return 'overview';
 };
 
+/**
+ * Menyusun URL section recruiter dari satu helper agar navigasi hash konsisten.
+ */
 const getRecruiterSectionRoute = (section) =>
   section === 'overview'
     ? APP_ROUTES.recruiterDashboard
     : `${APP_ROUTES.recruiterDashboard}#${section}`;
 
+/**
+ * Memformat nilai uang recruiter ke bentuk rupiah sederhana.
+ */
 const formatCurrency = (value) => {
   const numericValue = Number(value || 0);
   return `Rp ${numericValue.toLocaleString('id-ID')}`;
 };
 
+/**
+ * Memformat tanggal dan waktu untuk daftar lowongan, kandidat, dan aktivitas recruiter.
+ */
 const formatDateTime = (value) => {
   if (!value) {
     return '-';
@@ -82,9 +94,15 @@ const formatDateTime = (value) => {
   }
 };
 
+/**
+ * Membentuk label jumlah tunggal atau jamak untuk ringkasan recruiter.
+ */
 const formatPlural = (count, singularLabel, pluralLabel = singularLabel) =>
   `${count} ${count === 1 ? singularLabel : pluralLabel}`;
 
+/**
+ * Menentukan nama kontak yang ditampilkan pada inbox recruiter.
+ */
 const resolveContactLabel = (contact) => {
   if (!contact) {
     return 'Kontak';
@@ -101,6 +119,9 @@ const resolveContactLabel = (contact) => {
   return contact.name || 'Kandidat';
 };
 
+/**
+ * Memberi arahan singkat untuk item checklist profil company yang belum lengkap.
+ */
 const getRecruiterChecklistGuidance = (item) => {
   if (item.isComplete) {
     return 'Komponen company ini sudah bisa dipakai untuk meyakinkan kandidat.';
@@ -124,6 +145,9 @@ const getRecruiterChecklistGuidance = (item) => {
   }
 };
 
+/**
+ * Menjadi workspace utama recruiter untuk lowongan, kandidat, paket, company profile, dan chat.
+ */
 const RecruiterDashboardPage = () => {
   const location = useLocation();
   const navigate = useNavigate();

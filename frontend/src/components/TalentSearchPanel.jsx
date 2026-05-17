@@ -2,6 +2,9 @@ import '../styles/workspace.css';
 import { formatRecruiterPlanDocuments } from '../utils/recruiterPlans.js';
 import '../styles/collaboration.css';
 
+/**
+ * Merender panel pencarian kandidat recruiter lengkap dengan filter, hasil, dan pagination.
+ */
 const TalentSearchPanel = ({
   plan,
   filters,

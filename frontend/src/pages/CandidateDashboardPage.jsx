@@ -34,6 +34,9 @@ const CANDIDATE_SECTION_OPTIONS = [
 const CONTACT_WHATSAPP_LINK =
   'https://api.whatsapp.com/send?phone=6281286402753&text=Halo%20KerjaNusa';
 
+/**
+ * Mengambil ekstensi file dengan aman untuk validasi dokumen kandidat.
+ */
 const getFileExtension = (fileName = '') => {
   const normalizedFileName = String(fileName || '').trim().toLowerCase();
   const segments = normalizedFileName.split('.');
@@ -41,6 +44,9 @@ const getFileExtension = (fileName = '') => {
   return segments.length > 1 ? segments.pop() || '' : '';
 };
 
+/**
+ * Memastikan file resume yang dipilih memang berupa PDF dari mime type atau nama file.
+ */
 const isPdfResumeFile = (file) => {
   if (!file) {
     return false;
@@ -49,6 +55,9 @@ const isPdfResumeFile = (file) => {
   return file.type === 'application/pdf' || getFileExtension(file.name) === 'pdf';
 };
 
+/**
+ * Mengecek nama file resume yang tersimpan agar hanya PDF yang diterima.
+ */
 const isPdfResumeFileName = (fileName = '') => getFileExtension(fileName) === 'pdf';
 const EARTH_RADIUS_IN_KILOMETERS = 6371;
 const MAX_LOCATION_FALLBACK_DISTANCE_IN_KILOMETERS = 60;
@@ -74,6 +83,10 @@ const EXPERIENCE_YEAR_OPTIONS = Array.from(
   { length: 51 },
   (_, index) => String(CURRENT_CALENDAR_YEAR - index)
 );
+
+/**
+ * Menyediakan template kosong untuk satu entri pengalaman kerja kandidat.
+ */
 const createEmptyExperienceEntry = () => ({
   company: '',
   position: '',
@@ -87,8 +100,14 @@ const createEmptyExperienceEntry = () => ({
   referencePhone: '',
 });
 
+/**
+ * Mengubah derajat menjadi radian untuk perhitungan jarak lokasi kandidat.
+ */
 const toRadians = (value) => (value * Math.PI) / 180;
 
+/**
+ * Menghitung jarak dua titik koordinat dengan rumus haversine.
+ */
 const calculateDistanceInKilometers = (origin, destination) => {
   const latitudeDelta = toRadians(destination.latitude - origin.latitude);
   const longitudeDelta = toRadians(destination.longitude - origin.longitude);
@@ -104,12 +123,18 @@ const calculateDistanceInKilometers = (origin, destination) => {
   return 2 * EARTH_RADIUS_IN_KILOMETERS * Math.asin(Math.sqrt(haversineResult));
 };
 
+/**
+ * Mengubah teks lokasi ke title case agar fallback label lebih rapi di UI.
+ */
 const toTitleCase = (value = '') =>
   String(value || '')
     .trim()
     .toLowerCase()
     .replace(/\b\w/g, (character) => character.toUpperCase());
 
+/**
+ * Menyusun label lokasi fallback dari dataset koordinat lokal.
+ */
 const formatFallbackLocationLabel = (locationName = '') => {
   const normalizedLocationName = String(locationName || '').trim().toLowerCase();
 
@@ -135,6 +160,9 @@ const knownCurrentLocationFallbacks = Object.entries(locationCoordinates).map(
   })
 );
 
+/**
+ * Mengubah kode error geolocation menjadi pesan bantuan yang bisa dibaca kandidat.
+ */
 const getLocationPermissionErrorMessage = (errorCode) => {
   switch (errorCode) {
     case 1:
@@ -148,6 +176,9 @@ const getLocationPermissionErrorMessage = (errorCode) => {
   }
 };
 
+/**
+ * Menormalkan label lokasi hasil reverse geocoding ke bentuk kota/kabupaten yang konsisten.
+ */
 const normalizeDetectedLocationLabel = (value = '') => {
   let normalizedValue = String(value || '').trim();
 
@@ -180,11 +211,17 @@ const normalizeDetectedLocationLabel = (value = '') => {
   return toTitleCase(normalizedValue);
 };
 
+/**
+ * Membuang label lokasi yang terlalu granular untuk dipakai sebagai domisili kandidat.
+ */
 const isTooGranularLocationLabel = (value = '') =>
   /^(kecamatan|kelurahan|desa|dusun|kampung|village|subdistrict)\b/i.test(
     String(value || '').trim()
   );
 
+/**
+ * Memilih kandidat label lokasi terbaik dari payload reverse geocoding.
+ */
 const extractDetectedLocationLabel = (payload) => {
   const address = payload?.address || {};
   const displayNameSegments = String(payload?.display_name || '')
@@ -213,6 +250,9 @@ const extractDetectedLocationLabel = (payload) => {
   return '';
 };
 
+/**
+ * Mencari kota fallback terdekat dari koordinat perangkat bila reverse geocoding kurang spesifik.
+ */
 const findClosestKnownLocation = (coordinates) => {
   const closestKnownLocation = knownCurrentLocationFallbacks
     .map((location) => ({
@@ -234,6 +274,9 @@ const findClosestKnownLocation = (coordinates) => {
   return closestKnownLocation.locationName;
 };
 
+/**
+ * Meminta koordinat perangkat kandidat dengan pengaturan akurasi yang cukup agresif.
+ */
 const requestCurrentCoordinates = () =>
   new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -243,6 +286,9 @@ const requestCurrentCoordinates = () =>
     });
   });
 
+/**
+ * Menjalankan reverse geocoding dari koordinat perangkat ke label lokasi yang lebih manusiawi.
+ */
 const reverseGeocodeCoordinates = async ({ latitude, longitude }) => {
   const reverseGeocodeUrl = new URL('https://nominatim.openstreetmap.org/reverse');
   reverseGeocodeUrl.search = new URLSearchParams({
@@ -267,9 +313,15 @@ const reverseGeocodeCoordinates = async ({ latitude, longitude }) => {
   return response.json();
 };
 
+/**
+ * Menghitung jumlah entri pengalaman yang benar-benar terisi oleh kandidat.
+ */
 const countFilledExperienceEntries = (experiences = []) =>
   experiences.filter((item) => item?.company?.trim() || item?.position?.trim()).length;
 
+/**
+ * Menentukan berapa banyak kartu pengalaman yang perlu dibuka di UI kandidat.
+ */
 const getVisibleExperienceCount = (profile) =>
   Math.min(
     MAX_VISIBLE_EXPERIENCE_ENTRIES,
@@ -279,17 +331,26 @@ const getVisibleExperienceCount = (profile) =>
     )
   );
 
+/**
+ * Menyaring input usia agar hanya berisi maksimal tiga digit angka.
+ */
 const normalizeAgeInput = (value = '') =>
   String(value ?? '')
     .replace(/[^\d]/g, '')
     .slice(0, 3);
 
+/**
+ * Menormalkan input gaji menjadi angka bersih tanpa separator UI.
+ */
 const normalizeSalaryInputValue = (value = '') =>
   String(value ?? '')
     .replace(/[^\d]/g, '')
     .replace(/^0+(?=\d)/, '')
     .slice(0, 12);
 
+/**
+ * Menambahkan separator ribuan pada input ekspektasi gaji kandidat.
+ */
 const formatAccountingCurrencyValue = (value = '') => {
   const normalizedValue = normalizeSalaryInputValue(value);
 
@@ -300,6 +361,9 @@ const formatAccountingCurrencyValue = (value = '') => {
   return Number.parseInt(normalizedValue, 10).toLocaleString('id-ID');
 };
 
+/**
+ * Membangun label rentang tahun pengalaman atau pendidikan untuk preview profil.
+ */
 const buildYearRangeLabel = (startYear = '', endYear = '', currentLabel = 'Masih bekerja') => {
   const normalizedStartYear = String(startYear || '').trim();
   const normalizedEndYear = String(endYear || '').trim();
@@ -321,6 +385,9 @@ const buildYearRangeLabel = (startYear = '', endYear = '', currentLabel = 'Masih
   }`;
 };
 
+/**
+ * Memastikan file foto profil menggunakan tipe mime yang diizinkan.
+ */
 const isSupportedProfilePhotoFile = (file) =>
   Boolean(file && PROFILE_PHOTO_ALLOWED_TYPES.has(String(file.type || '').toLowerCase()));
 
@@ -385,6 +452,9 @@ const CANDIDATE_EDUCATION_LEVEL_OPTIONS = [
   'S3 - Doktor',
 ];
 
+/**
+ * Mengubah hash URL kandidat menjadi nama tab dashboard yang valid.
+ */
 const resolveCandidateSectionFromHash = (hash) => {
   if (hash === '#profile') {
     return 'profile';
@@ -405,11 +475,17 @@ const resolveCandidateSectionFromHash = (hash) => {
   return 'overview';
 };
 
+/**
+ * Menyusun URL section kandidat agar perpindahan tab konsisten di satu helper.
+ */
 const getCandidateSectionRoute = (section) =>
   section === 'overview'
     ? APP_ROUTES.candidateDashboard
     : `${APP_ROUTES.candidateDashboard}#${section}`;
 
+/**
+ * Memformat timestamp untuk riwayat aktivitas, aplikasi, dan chat kandidat.
+ */
 const formatDateTime = (value) => {
   if (!value) {
     return '-';
@@ -428,11 +504,17 @@ const formatDateTime = (value) => {
   }
 };
 
+/**
+ * Memformat nilai mata uang ke bentuk rupiah standar untuk detail lowongan.
+ */
 const formatCurrency = (value) => {
   const numericValue = Number(value || 0);
   return `Rp ${numericValue.toLocaleString('id-ID')}`;
 };
 
+/**
+ * Menyingkat angka gaji menjadi format jutaan yang padat untuk kartu lowongan.
+ */
 const formatCompactSalaryValue = (value) => {
   const numericValue = Number(value || 0);
 
@@ -446,9 +528,15 @@ const formatCompactSalaryValue = (value) => {
   })}jt`;
 };
 
+/**
+ * Menggabungkan gaji minimum dan maksimum ke satu label singkat.
+ */
 const formatCompactSalaryRange = (minimumValue, maximumValue) =>
   `Rp ${formatCompactSalaryValue(minimumValue)} - ${formatCompactSalaryValue(maximumValue)}`;
 
+/**
+ * Mengubah skor match kandidat dari backend ke persentase 0 sampai 100 untuk badge UI.
+ */
 const formatCandidateJobScorePercent = (job) => {
   const rawScore = Number(job?.candidate_match?.score || 0);
 
@@ -459,9 +547,15 @@ const formatCandidateJobScorePercent = (job) => {
   return Math.min(100, Math.round((rawScore / 10) * 100));
 };
 
+/**
+ * Menyederhanakan label level pengalaman agar lebih ringkas pada kartu rekomendasi.
+ */
 const formatCompactExperienceLevel = (value = '') =>
   String(formatExperienceLevel(value)).replace(/\s*\(.*?\)/g, '').trim() || '-';
 
+/**
+ * Membuat inisial avatar dari nama kandidat atau kontak.
+ */
 const buildInitials = (value = '') =>
   String(value)
     .trim()
@@ -470,6 +564,9 @@ const buildInitials = (value = '') =>
     .map((segment) => segment.charAt(0).toUpperCase())
     .join('') || 'KN';
 
+/**
+ * Memotong deskripsi lowongan panjang untuk tampilan preview yang lebih padat.
+ */
 const truncateJobDescription = (description = '', maxLength = 132) => {
   const normalizedDescription = String(description || '').trim();
 
@@ -480,15 +577,24 @@ const truncateJobDescription = (description = '', maxLength = 132) => {
   return `${normalizedDescription.slice(0, maxLength).trim()}...`;
 };
 
+/**
+ * Mengambil item pertama yang terisi dari daftar field kandidat.
+ */
 const firstFilledItem = (items = [], fallback = '-') =>
   items.find((item) => String(item || '').trim()) || fallback;
 
+/**
+ * Menyusun satu item checklist dengan status dan label tindakan lanjut.
+ */
 const createChecklistStatusItem = (label, isComplete, pendingAction = 'Lengkapi') => ({
   label,
   isComplete,
   actionLabel: isComplete ? 'Siap' : pendingAction,
 });
 
+/**
+ * Membangun section checklist utama yang dipakai di dashboard kesiapan kandidat.
+ */
 const buildCandidateDashboardChecklistSections = (profile, completion) => {
   const checklistLookup = Object.fromEntries(
     completion.checklist.map((item) => [item.key, item])
@@ -547,6 +653,9 @@ const buildCandidateDashboardChecklistSections = (profile, completion) => {
   }));
 };
 
+/**
+ * Menjadi workspace utama kandidat untuk profil, lowongan, lamaran, dan komunikasi.
+ */
 const CandidateDashboardPage = () => {
   const location = useLocation();
   const navigate = useNavigate();

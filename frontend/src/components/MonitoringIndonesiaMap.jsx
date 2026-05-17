@@ -24,6 +24,9 @@ const MARKER_COLLISION_GAP = 10;
 const MARKER_OFFSET_STEP = 18;
 const MARKER_OFFSET_RING_COUNT = 7;
 
+/**
+ * Mengubah koordinat lintang bujur menjadi titik x/y relatif di kanvas peta.
+ */
 const projectGeoPoint = (latitude, longitude) => {
   const usableWidth = MAP_VIEWBOX.width - MAP_VIEWBOX.paddingX * 2;
   const usableHeight = MAP_VIEWBOX.height - MAP_VIEWBOX.paddingY * 2;
@@ -40,6 +43,9 @@ const projectGeoPoint = (latitude, longitude) => {
   };
 };
 
+/**
+ * Menentukan ukuran marker berdasarkan intensitas sinyal lokasi yang dirangkum.
+ */
 const getMarkerSize = (totalSignals) => {
   if (totalSignals >= 16) {
     return 26;
@@ -56,6 +62,9 @@ const getMarkerSize = (totalSignals) => {
   return 16;
 };
 
+/**
+ * Menggabungkan beberapa alias lokasi menjadi caption singkat di panel detail.
+ */
 const formatAliases = (aliases = []) => {
   if (aliases.length <= 1) {
     return '';
@@ -64,8 +73,14 @@ const formatAliases = (aliases = []) => {
   return aliases.slice(0, 3).join(', ');
 };
 
+/**
+ * Membatasi nilai numerik agar tetap berada di area render yang aman.
+ */
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
+/**
+ * Menyusun kandidat offset marker agar hotspot yang berdekatan tidak saling menimpa.
+ */
 const buildMarkerOffsetCandidates = () =>
   [{ x: 0, y: 0 }].concat(
     Array.from({ length: MARKER_OFFSET_RING_COUNT }, (_, ringIndex) => {
@@ -85,9 +100,15 @@ const buildMarkerOffsetCandidates = () =>
     }).flat()
   );
 
+/**
+ * Menghitung jarak aman minimal antara dua marker berdasarkan ukuran visualnya.
+ */
 const getMarkerClearance = (markerSize, placedMarkerSize) =>
   (markerSize + placedMarkerSize) / 2 + MARKER_COLLISION_GAP;
 
+/**
+ * Memproyeksikan semua titik monitoring sekaligus mencari offset terbaik per marker.
+ */
 const buildProjectedPoints = (points) => {
   const placedMarkers = [];
   const offsetCandidates = buildMarkerOffsetCandidates();
@@ -164,6 +185,9 @@ const buildProjectedPoints = (points) => {
   });
 };
 
+/**
+ * Merender peta monitoring Indonesia untuk dashboard superadmin dengan marker interaktif.
+ */
 const MonitoringIndonesiaMap = ({
   points = [],
   selectedPointKey = '',

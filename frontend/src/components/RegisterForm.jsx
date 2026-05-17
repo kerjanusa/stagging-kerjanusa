@@ -3,8 +3,14 @@ import useAuth from '../hooks/useAuth';
 import PasswordField from './PasswordField';
 import '../styles/authForm.css';
 
+/**
+ * Membatasi pilihan role form register hanya pada jalur kandidat atau recruiter.
+ */
 const normalizeRole = (role) => (role === 'candidate' ? 'candidate' : 'recruiter');
 
+/**
+ * Menyediakan form register umum untuk kandidat dan recruiter dengan validasi dari auth store.
+ */
 const RegisterForm = ({ onSuccess, defaultRole = 'recruiter' }) => {
   const resolvedDefaultRole = normalizeRole(defaultRole);
   const [formData, setFormData] = useState({
@@ -31,6 +37,9 @@ const RegisterForm = ({ onSuccess, defaultRole = 'recruiter' }) => {
     });
   }, [resolvedDefaultRole]);
 
+  /**
+   * Menyimpan perubahan field lalu membersihkan pesan error yang sudah tidak relevan.
+   */
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -44,6 +53,9 @@ const RegisterForm = ({ onSuccess, defaultRole = 'recruiter' }) => {
     }
   };
 
+  /**
+   * Mengirim payload pendaftaran ke auth store tanpa logika tambahan di komponen.
+   */
   const handleSubmit = async (event) => {
     event.preventDefault();
 

@@ -5,8 +5,14 @@ import { shouldUseMockData } from '../utils/mockMode';
 const MOCK_JOBS_STORAGE_KEY = 'mock_jobs';
 const MOCK_USERS_STORAGE_KEY = 'mock_auth_users';
 
+/**
+ * Normalize free-text filters and searchable fields to one lowercase comparison format.
+ */
 const normalizeText = (value = '') => String(value).trim().toLowerCase();
 
+/**
+ * Backfill missing mock-job fields so demo data matches the current backend contract.
+ */
 const normalizeMockJob = (job) => ({
   ...job,
   workflow_status: job.workflow_status || (job.status === 'active' ? 'active' : 'draft'),
@@ -20,6 +26,9 @@ const normalizeMockJob = (job) => ({
     : [],
 });
 
+/**
+ * Load stored mock users so job payloads can be hydrated with recruiter information.
+ */
 const getStoredMockUsers = () => {
   const storedUsers = localStorage.getItem(MOCK_USERS_STORAGE_KEY);
 
@@ -35,6 +44,9 @@ const getStoredMockUsers = () => {
   }
 };
 
+/**
+ * Attach recruiter metadata to a mock job using the stored demo user list.
+ */
 const hydrateMockRecruiter = (job, users = []) => {
   const recruiterUser = users.find((user) => Number(user.id) === Number(job.recruiter_id));
   const recruiterName =
@@ -53,6 +65,9 @@ const hydrateMockRecruiter = (job, users = []) => {
   };
 };
 
+/**
+ * Load mock jobs from storage or seed them from static demo data on first use.
+ */
 const getStoredMockJobs = () => {
   const users = getStoredMockUsers();
   const storedJobs = localStorage.getItem(MOCK_JOBS_STORAGE_KEY);
@@ -75,10 +90,16 @@ const getStoredMockJobs = () => {
   return mockJobs.map((job) => hydrateMockRecruiter(normalizeMockJob(job), users));
 };
 
+/**
+ * Persist the current mock job list to local storage.
+ */
 const saveMockJobs = (jobs) => {
   localStorage.setItem(MOCK_JOBS_STORAGE_KEY, JSON.stringify(jobs));
 };
 
+/**
+ * Apply the public job-search filters used by the frontend demo experience.
+ */
 const filterMockJobs = (jobs, filters = {}) => {
   const searchTerm = normalizeText(filters.search);
   const locationTerm = normalizeText(filters.location);
@@ -119,6 +140,9 @@ const filterMockJobs = (jobs, filters = {}) => {
   });
 };
 
+/**
+ * Package a mock job list into the same pagination shape returned by the backend.
+ */
 const paginateMockJobs = (jobs, page = 1, perPage = 15) => {
   const total = jobs.length;
   const currentPage = Math.max(1, Number(page) || 1);
@@ -137,8 +161,14 @@ const paginateMockJobs = (jobs, page = 1, perPage = 15) => {
   };
 };
 
+/**
+ * Compute the next integer identifier for a new demo job.
+ */
 const getNextJobId = (jobs) => jobs.reduce((largestId, job) => Math.max(largestId, job.id), 0) + 1;
 
+/**
+ * Load the current demo user from browser session storage.
+ */
 const getCurrentMockUser = () => {
   const storedUser = localStorage.getItem('user');
   return storedUser ? JSON.parse(storedUser) : null;

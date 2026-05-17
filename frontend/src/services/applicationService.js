@@ -38,6 +38,9 @@ const DEFAULT_MOCK_APPLICATIONS = [
   },
 ];
 
+/**
+ * Keep application lists ordered by the newest submission timestamp first.
+ */
 const sortApplicationsByAppliedAt = (applications) =>
   [...applications].sort(
     (firstApplication, secondApplication) =>
@@ -45,6 +48,9 @@ const sortApplicationsByAppliedAt = (applications) =>
       new Date(firstApplication.applied_at || firstApplication.created_at || 0).getTime()
   );
 
+/**
+ * Load the current mock job catalog used to enrich demo applications.
+ */
 const getStoredMockJobs = () => {
   const storedJobs = localStorage.getItem(MOCK_JOBS_STORAGE_KEY);
 
@@ -60,6 +66,9 @@ const getStoredMockJobs = () => {
   }
 };
 
+/**
+ * Load mock users so candidate and recruiter details can be attached to applications.
+ */
 const getStoredMockUsers = () => {
   const storedUsers = localStorage.getItem(MOCK_USERS_STORAGE_KEY);
 
@@ -75,6 +84,9 @@ const getStoredMockUsers = () => {
   }
 };
 
+/**
+ * Expand a raw demo application into the richer payload shape used by the UI.
+ */
 const enrichMockApplication = (application) => {
   const jobs = getStoredMockJobs();
   const users = getStoredMockUsers();
@@ -95,6 +107,9 @@ const enrichMockApplication = (application) => {
   };
 };
 
+/**
+ * Load stored demo applications or seed the default set on first use.
+ */
 const getStoredMockApplications = () => {
   const storedApplications = localStorage.getItem(MOCK_APPLICATIONS_STORAGE_KEY);
 
@@ -111,15 +126,24 @@ const getStoredMockApplications = () => {
   }
 };
 
+/**
+ * Persist the demo application list to browser storage.
+ */
 const saveMockApplications = (applications) => {
   localStorage.setItem(MOCK_APPLICATIONS_STORAGE_KEY, JSON.stringify(applications));
 };
 
+/**
+ * Load the currently authenticated demo user from browser storage.
+ */
 const getCurrentMockUser = () => {
   const storedUser = localStorage.getItem('user');
   return storedUser ? JSON.parse(storedUser) : null;
 };
 
+/**
+ * Normalize screening answers so the frontend only keeps complete question-answer pairs.
+ */
 const sanitizeScreeningAnswers = (answers = []) =>
   (Array.isArray(answers) ? answers : [])
     .map((answer) => ({
@@ -129,6 +153,9 @@ const sanitizeScreeningAnswers = (answers = []) =>
     }))
     .filter((answer) => answer.question && answer.answer);
 
+/**
+ * Build the screening summary block expected by recruiter and candidate views.
+ */
 const buildScreeningSummary = (application, job) => {
   const questions = Array.isArray(job?.quiz_screening_questions) ? job.quiz_screening_questions : [];
   const screeningAnswers = sanitizeScreeningAnswers(application?.screening_answers || []);

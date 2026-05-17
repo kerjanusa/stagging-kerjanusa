@@ -59,6 +59,9 @@ const workflowSteps = [
   },
 ];
 
+/**
+ * Menampilkan halaman tentang produk, positioning, dan CTA recruiter KerjaNusa.
+ */
 const AboutPage = () => {
   return (
     <main className="about-page">

@@ -3,15 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Requests\Auth\ChangePasswordRequest;
+use App\Requests\Auth\ForgotPasswordRequest;
+use App\Requests\Auth\LoginRequest;
+use App\Requests\Auth\RegisterRequest;
+use App\Requests\Auth\ResetPasswordRequest;
+use App\Requests\Auth\UpdateProfileRequest;
+use App\Services\AuditLogService;
 use App\Services\AuthService;
+use App\Services\SecurityEventService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AuthController extends Controller
 {
@@ -19,41 +25,31 @@ class AuthController extends Controller
     private const RESET_PASSWORD_SUCCESS_MESSAGE = 'Password berhasil diubah. Silakan login dengan password baru Anda.';
     private const RESET_PASSWORD_INVALID_MESSAGE = 'Link reset tidak valid atau sudah kedaluwarsa. Silakan minta link baru.';
 
-    public function __construct(private AuthService $authService)
+    /**
+     * Wire auth orchestration plus audit and security logging dependencies.
+     */
+    public function __construct(
+        private AuthService $authService,
+        private AuditLogService $auditLogService,
+        private SecurityEventService $securityEventService,
+    )
     {
     }
 
     /**
      * Register a new user
      */
-    public function register(Request $request): JsonResponse
+    public function register(RegisterRequest $request): JsonResponse
     {
-        $request->merge([
-            'email' => User::normalizeEmail($request->input('email')),
-            'phone' => User::normalizePhone($request->input('phone')),
-        ]);
-
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => ['required', PasswordRule::min(8)->letters()->numbers()],
-            'password_confirmation' => 'required|same:password',
-            'role' => ['required', Rule::in(User::PUBLIC_REGISTRATION_ROLES)],
-            'phone' => ['required', 'string', 'max:32', Rule::unique('users', 'phone')],
-        ], [
-            'name.required' => 'Nama wajib diisi.',
-            'email.required' => 'Email wajib diisi.',
-            'email.email' => 'Format email tidak valid.',
-            'email.unique' => 'Email sudah digunakan. Gunakan email lain.',
-            'password.required' => 'Password wajib diisi.',
-            'password_confirmation.required' => 'Konfirmasi password wajib diisi.',
-            'password_confirmation.same' => 'Konfirmasi password harus sama dengan password.',
-            'phone.required' => 'Nomor telepon wajib diisi.',
-            'phone.unique' => 'Nomor telepon sudah digunakan. Gunakan nomor telepon lain.',
-        ]);
+        $validated = $request->validated();
 
         $user = $this->authService->register($validated);
         $token = $this->authService->createToken($user);
+        $this->auditLogService->record('auth.register_succeeded', [
+            'action' => 'register',
+            'step' => 'create_user',
+            'result' => 'success',
+        ], $user, AuthService::class);
 
         return response()->json([
             'message' => 'User registered successfully',
@@ -65,24 +61,21 @@ class AuthController extends Controller
     /**
      * Login user
      */
-    public function login(Request $request): JsonResponse
+    public function login(LoginRequest $request): JsonResponse
     {
-        $request->merge([
-            'email' => User::normalizeEmail($request->input('email')),
-        ]);
-
-        $validated = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ], [
-            'email.required' => 'Email wajib diisi.',
-            'email.email' => 'Format email tidak valid.',
-            'password.required' => 'Password wajib diisi.',
-        ]);
+        $validated = $request->validated();
 
         $user = $this->authService->getUserByEmail($validated['email']);
+        $identifierHash = $this->hashIdentifier($validated['email']);
 
         if (!$user) {
+            $this->securityEventService->record('auth.login_failed', [
+                'action' => 'login',
+                'step' => 'find_user',
+                'identifier_hash' => $identifierHash,
+                'result' => 'failed',
+            ], null, 'warning', AuthService::class);
+
             return response()->json([
                 'message' => 'Email tidak terdaftar.',
                 'errors' => [
@@ -92,6 +85,14 @@ class AuthController extends Controller
         }
 
         if (!Hash::check($validated['password'], $user->password)) {
+            $this->securityEventService->record('auth.login_failed', [
+                'action' => 'login',
+                'step' => 'verify_password',
+                'identifier_hash' => $identifierHash,
+                'target_user_id' => $user->id,
+                'result' => 'failed',
+            ], null, 'warning', AuthService::class);
+
             return response()->json([
                 'message' => 'Password salah. Periksa kembali password Anda.',
                 'errors' => [
@@ -101,6 +102,12 @@ class AuthController extends Controller
         }
 
         if (!$user->isActive()) {
+            $this->securityEventService->record('auth.login_blocked_suspended', [
+                'action' => 'login',
+                'step' => 'ensure_user_active',
+                'result' => 'denied',
+            ], $user, 'warning', AuthService::class);
+
             return response()->json([
                 'message' => 'Akun Anda sedang dinonaktifkan. Hubungi superadmin KerjaNusa untuk bantuan lebih lanjut.',
                 'reason' => 'account_suspended',
@@ -108,6 +115,11 @@ class AuthController extends Controller
         }
 
         $token = $this->authService->createToken($user);
+        $this->auditLogService->record('auth.login_succeeded', [
+            'action' => 'login',
+            'step' => 'create_token',
+            'result' => 'success',
+        ], $user, AuthService::class);
 
         return response()->json([
             'message' => 'Login successful',
@@ -119,22 +131,19 @@ class AuthController extends Controller
     /**
      * Send forgot-password link
      */
-    public function forgotPassword(Request $request): JsonResponse
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        $request->merge([
-            'email' => User::normalizeEmail($request->input('email')),
-        ]);
-
-        $validated = $request->validate([
-            'email' => 'required|email',
-        ], [
-            'email.required' => 'Email wajib diisi.',
-            'email.email' => 'Format email tidak valid.',
-        ]);
+        $validated = $request->validated();
 
         PasswordBroker::sendResetLink([
             'email' => $validated['email'],
         ]);
+        $this->auditLogService->record('auth.password_reset_requested', [
+            'action' => 'forgot_password',
+            'step' => 'send_reset_link',
+            'identifier_hash' => $this->hashIdentifier($validated['email']),
+            'result' => 'accepted',
+        ], null, AuthService::class);
 
         return response()->json([
             'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
@@ -144,25 +153,9 @@ class AuthController extends Controller
     /**
      * Reset password using email token
      */
-    public function resetPassword(Request $request): JsonResponse
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
     {
-        $request->merge([
-            'email' => User::normalizeEmail($request->input('email')),
-        ]);
-
-        $validated = $request->validate([
-            'token' => 'required|string',
-            'email' => 'required|email',
-            'password' => ['required', PasswordRule::min(8)->letters()->numbers()],
-            'password_confirmation' => 'required|same:password',
-        ], [
-            'token.required' => 'Token reset password wajib ada.',
-            'email.required' => 'Email wajib diisi.',
-            'email.email' => 'Format email tidak valid.',
-            'password.required' => 'Password baru wajib diisi.',
-            'password_confirmation.required' => 'Konfirmasi password wajib diisi.',
-            'password_confirmation.same' => 'Konfirmasi password harus sama dengan password baru.',
-        ]);
+        $validated = $request->validated();
 
         $status = PasswordBroker::reset(
             [
@@ -184,10 +177,24 @@ class AuthController extends Controller
         );
 
         if ($status === PasswordBroker::PASSWORD_RESET) {
+            $this->auditLogService->record('auth.password_reset_succeeded', [
+                'action' => 'reset_password',
+                'step' => 'reset_password',
+                'identifier_hash' => $this->hashIdentifier($validated['email']),
+                'result' => 'success',
+            ], null, AuthService::class);
+
             return response()->json([
                 'message' => self::RESET_PASSWORD_SUCCESS_MESSAGE,
             ]);
         }
+
+        $this->securityEventService->record('auth.password_reset_failed', [
+            'action' => 'reset_password',
+            'step' => 'validate_reset_token',
+            'identifier_hash' => $this->hashIdentifier($validated['email']),
+            'result' => 'failed',
+        ], null, 'warning', AuthService::class);
 
         return response()->json([
             'message' => self::RESET_PASSWORD_INVALID_MESSAGE,
@@ -202,7 +209,13 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
+        $user = $request->user();
         $request->user()->currentAccessToken()->delete();
+        $this->auditLogService->record('auth.logout_succeeded', [
+            'action' => 'logout',
+            'step' => 'delete_current_token',
+            'result' => 'success',
+        ], $user, AuthService::class);
 
         return response()->json([
             'message' => 'Logout successful',
@@ -222,22 +235,9 @@ class AuthController extends Controller
     /**
      * Update user profile
      */
-    public function updateProfile(Request $request): JsonResponse
+    public function updateProfile(UpdateProfileRequest $request): JsonResponse
     {
-        $request->merge([
-            'phone' => User::normalizePhone($request->input('phone')),
-        ]);
-
-        $validated = $request->validate([
-            'name' => 'nullable|string|max:255',
-            'company_name' => 'nullable|string|max:255',
-            'phone' => ['nullable', 'string', 'max:32', Rule::unique('users', 'phone')->ignore($request->user()->id)],
-            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'candidate_profile' => 'nullable|array',
-            'recruiter_profile' => 'nullable|array',
-        ], [
-            'phone.unique' => 'Nomor telepon sudah digunakan. Gunakan nomor telepon lain.',
-        ]);
+        $validated = $request->validated();
 
         $success = $this->authService->updateProfile($request->user()->id, $validated);
 
@@ -246,6 +246,13 @@ class AuthController extends Controller
                 'message' => 'Failed to update profile',
             ], 400);
         }
+
+        $this->auditLogService->record('user.profile_updated', [
+            'action' => 'update_profile',
+            'step' => 'persist_profile',
+            'changed_fields' => array_keys($validated),
+            'result' => 'success',
+        ], $request->user(), AuthService::class);
 
         return response()->json([
             'message' => 'Profile updated successfully',
@@ -256,13 +263,9 @@ class AuthController extends Controller
     /**
      * Change password
      */
-    public function changePassword(Request $request): JsonResponse
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'old_password' => 'required|string',
-            'new_password' => ['required', PasswordRule::min(8)->letters()->numbers()],
-            'new_password_confirmation' => 'required|same:new_password',
-        ]);
+        $validated = $request->validated();
 
         $success = $this->authService->changePassword(
             $request->user()->id,
@@ -271,13 +274,43 @@ class AuthController extends Controller
         );
 
         if (!$success) {
+            $this->securityEventService->record('auth.password_change_failed', [
+                'action' => 'change_password',
+                'step' => 'verify_current_password',
+                'result' => 'failed',
+            ], $request->user(), 'warning', AuthService::class);
+
             return response()->json([
                 'message' => 'Failed to change password',
             ], 400);
         }
 
+        $this->auditLogService->record('auth.password_changed', [
+            'action' => 'change_password',
+            'step' => 'persist_new_password',
+            'result' => 'success',
+        ], $request->user(), AuthService::class);
+
         return response()->json([
             'message' => 'Password changed successfully',
         ]);
+    }
+
+    /**
+     * Hash a user-supplied identifier so controllers can log it without exposing the raw value.
+     */
+    private function hashIdentifier(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalizedValue = trim(mb_strtolower($value));
+
+        if ($normalizedValue === '') {
+            return null;
+        }
+
+        return hash('sha256', $normalizedValue);
     }
 }

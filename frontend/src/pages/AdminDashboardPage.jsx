@@ -29,6 +29,9 @@ const PAGE_SIZE = 5;
 
 const numberFormatter = new Intl.NumberFormat('id-ID');
 
+/**
+ * Mengubah hash URL dashboard menjadi nama section yang valid untuk UI admin.
+ */
 const resolveSectionFromHash = (hash) => {
   const normalizedHash = hash.replace(/^#/, '');
   const normalizedValue = normalizedHash === 'moderasi' ? 'moderation' : normalizedHash;
@@ -40,11 +43,17 @@ const resolveSectionFromHash = (hash) => {
   return 'monitoring';
 };
 
+/**
+ * Membangun URL section admin agar navigasi hash tetap konsisten dari satu helper.
+ */
 const getSectionRoute = (section) =>
   section === 'monitoring'
     ? APP_ROUTES.adminDashboard
     : `${APP_ROUTES.adminDashboard}#${section === 'moderation' ? 'moderasi' : section}`;
 
+/**
+ * Memformat timestamp lengkap untuk kartu, tabel, dan panel monitoring admin.
+ */
 const formatDateTime = (value) => {
   if (!value) {
     return '-';
@@ -63,6 +72,9 @@ const formatDateTime = (value) => {
   }
 };
 
+/**
+ * Memformat tanggal singkat yang dipakai di daftar dan metadata admin.
+ */
 const formatDateShort = (value) => {
   if (!value) {
     return '-';
@@ -79,6 +91,9 @@ const formatDateShort = (value) => {
   }
 };
 
+/**
+ * Membuat label hari singkat untuk grafik 7 hari terakhir.
+ */
 const formatDayLabel = (value) => {
   if (!value) {
     return '-';
@@ -94,6 +109,9 @@ const formatDayLabel = (value) => {
   }
 };
 
+/**
+ * Menyingkat angka besar ke format ribuan atau jutaan agar kartu metric tetap ringkas.
+ */
 const formatCompactNumber = (value = 0) => {
   const numericValue = Number(value || 0);
 
@@ -108,8 +126,14 @@ const formatCompactNumber = (value = 0) => {
   return numberFormatter.format(numericValue);
 };
 
+/**
+ * Mengubah nilai numerik menjadi persentase dengan satu digit desimal.
+ */
 const formatPercentage = (value = 0) => `${Number(value || 0).toFixed(1)}%`;
 
+/**
+ * Membuat inisial dua huruf sebagai fallback avatar admin list.
+ */
 const getInitials = (value = '') =>
   value
     .split(' ')
@@ -118,6 +142,9 @@ const getInitials = (value = '') =>
     .map((part) => part[0]?.toUpperCase() || '')
     .join('') || 'SA';
 
+/**
+ * Mengunduh data tabular sederhana sebagai CSV dari browser tanpa roundtrip backend.
+ */
 const downloadCsv = (filename, rows) => {
   if (typeof window === 'undefined' || !Array.isArray(rows) || rows.length === 0) {
     return;
@@ -140,8 +167,14 @@ const downloadCsv = (filename, rows) => {
   window.URL.revokeObjectURL(url);
 };
 
+/**
+ * Menormalkan teks pencarian agar filter admin lebih tahan terhadap variasi input.
+ */
 const normalizeText = (value = '') => String(value || '').trim().toLowerCase();
 
+/**
+ * Memastikan lokasi monitoring punya nilai yang layak dipetakan ke marker Indonesia.
+ */
 const isMappableMonitoringLocation = (value = '') => {
   const normalizedValue = normalizeText(value);
 
@@ -152,8 +185,14 @@ const isMappableMonitoringLocation = (value = '') => {
   );
 };
 
+/**
+ * Merapikan label lokasi monitoring sebelum dikirim ke layer peta.
+ */
 const getMonitoringLocationLabel = (value = '') => String(value || '').trim();
 
+/**
+ * Mengelompokkan timestamp mentah ke bucket tujuh hari terakhir untuk analitik ringan.
+ */
 const buildLast7DaySeries = (items = []) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -194,6 +233,9 @@ const buildLast7DaySeries = (items = []) => {
   return buckets;
 };
 
+/**
+ * Membangun path SVG line chart dari data analitik harian.
+ */
 const createAnalyticsLinePath = (points, width = 640, height = 260, padding = 22) => {
   if (!points.length) {
     return '';
@@ -213,6 +255,9 @@ const createAnalyticsLinePath = (points, width = 640, height = 260, padding = 22
     .join(' ');
 };
 
+/**
+ * Membuat badge pertumbuhan positif atau negatif untuk kartu insight admin.
+ */
 const getGrowthBadge = (value, positivePrefix = '+') => {
   const numericValue = Number(value || 0);
   const isPositive = numericValue >= 0;
@@ -223,6 +268,9 @@ const getGrowthBadge = (value, positivePrefix = '+') => {
   };
 };
 
+/**
+ * Menghitung persentase progres aman dengan pembatasan 0 sampai 100.
+ */
 const getProgressValue = (value = 0, total = 0) => {
   const safeTotal = Number(total || 0);
 
@@ -233,9 +281,15 @@ const getProgressValue = (value = 0, total = 0) => {
   return Math.max(0, Math.min(100, Number(((Number(value || 0) / safeTotal) * 100).toFixed(1))));
 };
 
+/**
+ * Menghitung jumlah halaman pagination dari total item yang tersedia.
+ */
 const getTotalPages = (totalItems, pageSize = PAGE_SIZE) =>
   Math.max(1, Math.ceil(Number(totalItems || 0) / pageSize));
 
+/**
+ * Menyusun daftar tombol pagination yang padat dengan ellipsis bila halaman terlalu banyak.
+ */
 const buildPaginationItems = (page, totalPages) => {
   if (totalPages <= 5) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -252,6 +306,9 @@ const buildPaginationItems = (page, totalPages) => {
   return [1, 'ellipsis', page - 1, page, page + 1, 'ellipsis-right', totalPages];
 };
 
+/**
+ * Menghitung umur data dalam satuan hari untuk badge freshness dan moderation.
+ */
 const getAgeInDays = (value) => {
   if (!value) {
     return 0;
@@ -266,6 +323,9 @@ const getAgeInDays = (value) => {
   return Math.max(0, Math.floor((Date.now() - timestamp) / 86400000));
 };
 
+/**
+ * Mengubah status akun backend menjadi label singkat untuk tabel admin.
+ */
 const formatAccountStatus = (status) => {
   switch (status) {
     case 'suspended':
@@ -276,6 +336,9 @@ const formatAccountStatus = (status) => {
   }
 };
 
+/**
+ * Menerjemahkan stage lamaran backend menjadi label yang dibaca tim admin.
+ */
 const formatApplicationStage = (stage) => {
   switch (stage) {
     case 'reviewing':
@@ -298,6 +361,9 @@ const formatApplicationStage = (stage) => {
   }
 };
 
+/**
+ * Menentukan label status lowongan gabungan dari workflow recruiter dan status backend.
+ */
 const formatJobStatus = (job) => {
   if (job?.workflow_status === 'active' && job?.status === 'active') {
     return 'Aktif';
@@ -318,6 +384,9 @@ const formatJobStatus = (job) => {
   return 'Review';
 };
 
+/**
+ * Menyusun tone status kandidat untuk badge moderasi dan directory admin.
+ */
 const getCandidateAdminStatus = (candidate) => {
   if (candidate.account_status === 'suspended') {
     return {
@@ -342,6 +411,9 @@ const getCandidateAdminStatus = (candidate) => {
   };
 };
 
+/**
+ * Menentukan state verifikasi recruiter untuk tampilan directory admin.
+ */
 const getRecruiterAdminStatus = (recruiter) => {
   if (recruiter.account_status === 'suspended') {
     return {
@@ -366,6 +438,9 @@ const getRecruiterAdminStatus = (recruiter) => {
   };
 };
 
+/**
+ * Menentukan status visual lowongan pada dashboard admin.
+ */
 const getJobAdminStatus = (job) => {
   if (job.workflow_status === 'filled') {
     return {
@@ -406,6 +481,9 @@ const getJobAdminStatus = (job) => {
   };
 };
 
+/**
+ * Menyediakan ikon SVG terpusat untuk berbagai section dan aksi admin.
+ */
 const AdminIcon = ({ name, className = '' }) => {
   const props = {
     viewBox: '0 0 24 24',
@@ -592,6 +670,9 @@ const AdminIcon = ({ name, className = '' }) => {
   }
 };
 
+/**
+ * Merender grid metric admin dari konfigurasi kartu yang sudah dipersiapkan caller.
+ */
 const SectionMetrics = ({ cards }) => (
   <div className="superadmin-metric-grid">
     {cards.map((card) => (
@@ -637,6 +718,9 @@ const SectionMetrics = ({ cards }) => (
   </div>
 );
 
+/**
+ * Menyediakan komponen pagination kecil yang dipakai ulang di banyak tabel admin.
+ */
 const Pagination = ({ label, page, totalItems, pageSize = PAGE_SIZE, onPageChange }) => {
   const totalPages = getTotalPages(totalItems, pageSize);
   const items = buildPaginationItems(page, totalPages);
@@ -682,6 +766,9 @@ const Pagination = ({ label, page, totalItems, pageSize = PAGE_SIZE, onPageChang
   );
 };
 
+/**
+ * Menjadi pusat kendali superadmin untuk monitoring, moderasi, analytics, dan inbox platform.
+ */
 const AdminDashboardPage = () => {
   const location = useLocation();
   const navigate = useNavigate();

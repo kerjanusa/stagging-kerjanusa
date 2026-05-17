@@ -6,6 +6,9 @@ import '../styles/navbar.css';
 
 const CONTACT_EMAIL = 'Kerjanusacompany@gmail.com';
 
+/**
+ * Mengubah kode role internal menjadi label UI yang lebih mudah dipahami user.
+ */
 const resolveUserRoleLabel = (role) => {
   if (role === 'candidate') {
     return 'Pelamar';
@@ -22,6 +25,9 @@ const resolveUserRoleLabel = (role) => {
   return 'Pengguna';
 };
 
+/**
+ * Menyediakan navbar publik dan navbar sesi login ringan untuk halaman non-dashboard.
+ */
 const Navbar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -67,20 +73,29 @@ const Navbar = () => {
     document.addEventListener('mousedown', handleOutsidePointer);
 
     return () => {
-      document.removeEventListener('mousedown', handleOutsidePointer);
+    document.removeEventListener('mousedown', handleOutsidePointer);
     };
   }, [isContactOpen]);
 
+  /**
+   * Menutup seluruh panel mobile dan popover kontak agar navigasi kembali bersih.
+   */
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
     setIsContactOpen(false);
   };
 
+  /**
+   * Menjalankan logout dari navbar setelah state UI lokal ditutup.
+   */
   const handleLogout = () => {
     closeMobileMenu();
     logout();
   };
 
+  /**
+   * Membuka atau menutup panel kontak singkat pada navbar guest.
+   */
   const handleContactToggle = () => {
     setIsContactOpen((currentValue) => !currentValue);
   };

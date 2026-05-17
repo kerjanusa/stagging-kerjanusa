@@ -2,6 +2,9 @@ import { useLayoutEffect } from 'react';
 
 const REVEAL_SELECTOR = '[data-reveal]';
 
+/**
+ * Register scroll-based reveal animations for elements marked with the shared reveal attribute.
+ */
 const useScrollReveal = (routeKey) => {
   useLayoutEffect(() => {
     if (typeof window === 'undefined') {

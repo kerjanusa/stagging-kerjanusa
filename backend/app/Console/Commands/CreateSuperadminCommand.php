@@ -22,6 +22,9 @@ class CreateSuperadminCommand extends Command
      */
     protected $description = 'Create a new superadmin account or promote an existing user into superadmin.';
 
+    /**
+     * Membuat akun superadmin baru atau mempromosikan user lama dengan kredensial terbaru.
+     */
     public function handle(): int
     {
         $email = User::normalizeEmail((string) $this->argument('email'));

@@ -28,6 +28,9 @@ export const RECRUITER_PLAN_OPTIONS = [
   },
 ];
 
+/**
+ * Normalize arbitrary package input to one known recruiter plan code.
+ */
 export const normalizeRecruiterPlanCode = (value) => {
   const normalizedValue = String(value || '').trim().toLowerCase();
 
@@ -38,10 +41,16 @@ export const normalizeRecruiterPlanCode = (value) => {
   return 'starter';
 };
 
+/**
+ * Resolve one recruiter plan configuration object by code.
+ */
 export const getRecruiterPlanConfig = (planCode) =>
   RECRUITER_PLAN_OPTIONS.find((plan) => plan.code === normalizeRecruiterPlanCode(planCode)) ||
   RECRUITER_PLAN_OPTIONS[0];
 
+/**
+ * Merge stored recruiter profile data with normalized plan metadata and credits.
+ */
 export const mergeRecruiterPlanData = (profile = {}) => {
   const planConfig = getRecruiterPlanConfig(profile.plan_code);
 
@@ -53,6 +62,9 @@ export const mergeRecruiterPlanData = (profile = {}) => {
   };
 };
 
+/**
+ * Build the short document-visibility summary shown in recruiter package UI.
+ */
 export const formatRecruiterPlanDocuments = (planCode) => {
   const plan = getRecruiterPlanConfig(planCode);
 

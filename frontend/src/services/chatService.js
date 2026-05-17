@@ -6,6 +6,9 @@ const MOCK_USERS_STORAGE_KEY = 'mock_auth_users';
 const MOCK_APPLICATIONS_STORAGE_KEY = 'mock_job_applications';
 const MOCK_JOBS_STORAGE_KEY = 'mock_jobs';
 
+/**
+ * Read and parse JSON from local storage while returning a safe fallback on failure.
+ */
 const readStoredJson = (storageKey, fallbackValue) => {
   try {
     const rawValue = localStorage.getItem(storageKey);
@@ -15,6 +18,9 @@ const readStoredJson = (storageKey, fallbackValue) => {
   }
 };
 
+/**
+ * Load the current authenticated user from browser storage for mock chat flows.
+ */
 const getCurrentUser = () => {
   try {
     return JSON.parse(localStorage.getItem('user') || 'null');
@@ -23,10 +29,22 @@ const getCurrentUser = () => {
   }
 };
 
+/**
+ * Load mock users available to the demo chat layer.
+ */
 const getMockUsers = () => readStoredJson(MOCK_USERS_STORAGE_KEY, []);
+/**
+ * Load mock applications used to validate candidate-recruiter chat access.
+ */
 const getMockApplications = () => readStoredJson(MOCK_APPLICATIONS_STORAGE_KEY, []);
+/**
+ * Load mock jobs used to resolve chat job context and recruiter ownership.
+ */
 const getMockJobs = () => readStoredJson(MOCK_JOBS_STORAGE_KEY, []);
 
+/**
+ * Load demo chat messages or seed a small starter conversation set.
+ */
 const getMockMessages = () => {
   const storedMessages = readStoredJson(MOCK_CHAT_STORAGE_KEY, null);
 
@@ -59,10 +77,16 @@ const getMockMessages = () => {
   return seedMessages;
 };
 
+/**
+ * Persist the full mock chat history to browser storage.
+ */
 const saveMockMessages = (messages) => {
   localStorage.setItem(MOCK_CHAT_STORAGE_KEY, JSON.stringify(messages));
 };
 
+/**
+ * Reduce a user record to the public shape needed by chat payloads.
+ */
 const presentUser = (user) => {
   if (!user) {
     return null;
@@ -77,6 +101,9 @@ const presentUser = (user) => {
   };
 };
 
+/**
+ * Decide whether two demo users are allowed to communicate in chat.
+ */
 const canCommunicateMock = (currentUser, counterpart) => {
   if (!currentUser || !counterpart || Number(currentUser.id) === Number(counterpart.id)) {
     return false;
@@ -115,6 +142,9 @@ const canCommunicateMock = (currentUser, counterpart) => {
   return false;
 };
 
+/**
+ * Convert a raw mock message into the API-style payload consumed by the chat UI.
+ */
 const presentMessage = (message, currentUser) => {
   const users = getMockUsers();
   const jobs = getMockJobs();
@@ -140,6 +170,9 @@ const presentMessage = (message, currentUser) => {
 };
 
 class ChatService {
+  /**
+   * Return grouped conversation threads for the current user.
+   */
   static async getThreads() {
     if (shouldUseMockData) {
       const currentUser = getCurrentUser();
@@ -196,6 +229,9 @@ class ChatService {
     }
   }
 
+  /**
+   * Return all messageable contacts, optionally filtered by a search term.
+   */
   static async getContacts(search = '') {
     if (shouldUseMockData) {
       const currentUser = getCurrentUser();
@@ -228,6 +264,9 @@ class ChatService {
     }
   }
 
+  /**
+   * Return the conversation history with one counterpart and mark inbound messages as read.
+   */
   static async getConversation(userId) {
     if (shouldUseMockData) {
       const currentUser = getCurrentUser();
@@ -260,6 +299,9 @@ class ChatService {
     }
   }
 
+  /**
+   * Send one outbound message using either mock storage or the live chat endpoint.
+   */
   static async sendMessage(payload) {
     if (shouldUseMockData) {
       const currentUser = getCurrentUser();

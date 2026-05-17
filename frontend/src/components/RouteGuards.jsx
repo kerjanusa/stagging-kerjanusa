@@ -8,6 +8,9 @@ import {
   normalizeUserRole,
 } from '../utils/routeHelpers.js';
 
+/**
+ * Mengarahkan user yang sudah login ke halaman yang paling relevan dan mencegah akses ke guest page.
+ */
 const GuestRoute = ({ children }) => {
   const { user } = useAuth();
   const pendingApplyIntent = readCandidateApplyIntent();
@@ -23,6 +26,9 @@ const GuestRoute = ({ children }) => {
   return children;
 };
 
+/**
+ * Memastikan route hanya bisa dibuka user yang sudah login dan memiliki role yang diizinkan.
+ */
 const ProtectedRoute = ({ children, allowedRoles = [], loginRole }) => {
   const { user } = useAuth();
 

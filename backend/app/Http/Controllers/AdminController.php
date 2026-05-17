@@ -5,17 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\Job;
 use App\Models\User;
 use App\Services\AdminService;
+use App\Services\AuditLogService;
+use App\Services\AdminValidationService;
 use App\Services\JobService;
 use App\Services\RecruiterPlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password as PasswordBroker;
-use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
+    /**
+     * Wire admin-facing services used by the superadmin panel endpoints.
+     */
     public function __construct(
         private AdminService $adminService,
+        private AuditLogService $auditLogService,
+        private AdminValidationService $adminValidationService,
         private JobService $jobService,
         private RecruiterPlanService $recruiterPlanService,
     )
@@ -45,18 +51,7 @@ class AdminController extends Controller
             ], 404);
         }
 
-        $validated = $request->validate([
-            'name' => 'nullable|string|max:255',
-            'email' => ['nullable', 'email', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone' => ['nullable', 'string', 'max:32', Rule::unique('users', 'phone')->ignore($user->id)],
-            'company_name' => 'nullable|string|max:255',
-            'account_status' => ['nullable', Rule::in(User::ACCOUNT_STATUSES)],
-            'account_status_reason' => 'nullable|string|max:1000',
-            'verification_status' => ['nullable', Rule::in(['pending', 'verified'])],
-            'verification_notes' => 'nullable|string|max:1000',
-            'plan_code' => ['nullable', Rule::in(collect($this->recruiterPlanService->getPlanCatalog())->pluck('code')->all())],
-            'kn_credit' => 'nullable|integer|min:0',
-        ]);
+        $validated = $this->adminValidationService->validateUpdateUser($request, $user);
 
         $nextAccountStatus = $validated['account_status'] ?? $user->account_status;
         $nextAccountStatusReason = array_key_exists('account_status_reason', $validated)
@@ -111,6 +106,14 @@ class AdminController extends Controller
         }
 
         $user->save();
+        $this->auditLogService->record('admin.user_updated', [
+            'action' => 'admin_update_user',
+            'step' => 'persist_user_changes',
+            'target_type' => 'user',
+            'target_id' => $user->id,
+            'changed_fields' => array_keys($validated),
+            'result' => 'success',
+        ], $request->user(), AdminService::class);
 
         return response()->json([
             'message' => 'Akun user berhasil diperbarui.',
@@ -121,7 +124,7 @@ class AdminController extends Controller
     /**
      * Send a reset-password email to the selected user.
      */
-    public function sendResetLink(int $userId): JsonResponse
+    public function sendResetLink(Request $request, int $userId): JsonResponse
     {
         $user = User::find($userId);
 
@@ -141,6 +144,14 @@ class AdminController extends Controller
             ], 422);
         }
 
+        $this->auditLogService->record('admin.user_reset_link_sent', [
+            'action' => 'admin_send_reset_link',
+            'step' => 'send_reset_link',
+            'target_type' => 'user',
+            'target_id' => $user->id,
+            'result' => 'success',
+        ], $request->user(), AdminService::class);
+
         return response()->json([
             'message' => 'Link reset password berhasil dikirim.',
         ]);
@@ -159,16 +170,7 @@ class AdminController extends Controller
             ], 404);
         }
 
-        $validated = $request->validate([
-            'recruiter_id' => [
-                'required',
-                'integer',
-                Rule::exists('users', 'id')->where(function ($query) {
-                    $query->where('role', User::ROLE_RECRUITER)
-                        ->where('account_status', User::STATUS_ACTIVE);
-                }),
-            ],
-        ]);
+        $validated = $this->adminValidationService->validateReassignJob($request);
 
         $success = $this->jobService->reassignJob($jobId, $validated['recruiter_id']);
 
@@ -177,6 +179,15 @@ class AdminController extends Controller
                 'message' => 'Lowongan belum berhasil dipindahkan.',
             ], 422);
         }
+
+        $this->auditLogService->record('admin.job_reassigned', [
+            'action' => 'admin_reassign_job',
+            'step' => 'persist_job_reassignment',
+            'target_type' => 'job',
+            'target_id' => $jobId,
+            'new_recruiter_id' => $validated['recruiter_id'],
+            'result' => 'success',
+        ], $request->user(), JobService::class);
 
         return response()->json([
             'message' => 'Lowongan berhasil dipindahkan ke recruiter baru.',

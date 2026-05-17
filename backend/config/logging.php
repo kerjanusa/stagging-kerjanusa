@@ -42,6 +42,26 @@ return [
             'processors' => [PsrLogMessageProcessor::class],
         ],
 
+        'audit' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_AUDIT_LEVEL', 'info'),
+            'handler' => StreamHandler::class,
+            'with' => [
+                'stream' => 'php://stderr',
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
+        ],
+
+        'security' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_SECURITY_LEVEL', 'warning'),
+            'handler' => StreamHandler::class,
+            'with' => [
+                'stream' => 'php://stderr',
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
+        ],
+
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,

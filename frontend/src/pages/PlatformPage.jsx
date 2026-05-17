@@ -43,6 +43,9 @@ const FOOTER_LINKS = {
   services: ['Cari Lowongan', 'Untuk Perusahaan', 'Rekrutmen Global', 'Bantuan'],
 };
 
+/**
+ * Menyajikan halaman profil platform dan nilai utama perusahaan dalam format editorial.
+ */
 const PlatformPage = () => {
   return (
     <main className="platform-page" aria-label="Tentang KerjaNusa">

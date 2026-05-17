@@ -2,19 +2,31 @@
 
 namespace App\Services;
 
-use App\Models\Application;
 use App\Models\Job;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
-use Throwable;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
 class MessageService
 {
+    /**
+     * Wire chat access, presentation, and logging dependencies.
+     */
+    public function __construct(
+        private MessageAccessService $messageAccessService,
+        private MessagePresenter $messagePresenter,
+        private ServiceActivityLogService $serviceActivityLogService,
+    )
+    {
+    }
+
+    /**
+     * Fail fast when the messages table is missing instead of mutating schema at runtime.
+     */
     private function ensureMessagesTableExists(): void
     {
         static $schemaReady = false;
@@ -28,33 +40,28 @@ class MessageService
             return;
         }
 
-        try {
-            Schema::create('messages', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('sender_id')->constrained('users')->cascadeOnDelete();
-                $table->foreignId('recipient_id')->constrained('users')->cascadeOnDelete();
-                $table->foreignId('job_id')->nullable()->constrained('jobs')->nullOnDelete();
-                $table->text('body');
-                $table->timestamp('read_at')->nullable();
-                $table->timestamps();
+        $context = [
+            'action' => 'chat',
+            'step' => 'ensure_messages_table_exists',
+            'request_id' => request()->attributes->get('request_id'),
+        ];
 
-                $table->index(['sender_id', 'recipient_id']);
-                $table->index(['recipient_id', 'read_at']);
-                $table->index(['job_id', 'created_at']);
-            });
-        } catch (Throwable $exception) {
-            if (!Schema::hasTable('messages')) {
-                throw ValidationException::withMessages([
-                    'chat' => [
-                        'Layanan chat belum aktif karena storage pesan belum siap. Sinkronkan migrasi production untuk tabel messages.',
-                    ],
-                ]);
-            }
-        }
+        Log::error('Chat message storage is unavailable because the messages table is missing.', $context);
+        $this->serviceActivityLogService->error(
+            $this,
+            'message_service.storage_unavailable',
+            $context
+        );
 
-        $schemaReady = true;
+        throw new ServiceUnavailableHttpException(
+            null,
+            'Layanan chat belum aktif karena storage pesan belum siap. Sinkronkan migrasi production untuk tabel messages.'
+        );
     }
 
+    /**
+     * Return grouped conversation threads for the authenticated chat user.
+     */
     public function listThreads(User $user): array
     {
         $this->ensureMessagesTableExists();
@@ -74,37 +81,19 @@ class MessageService
                     ? (string) $message->recipient_id
                     : (string) $message->sender_id;
             })
-            ->map(function (Collection $threadMessages, string $counterpartId) use ($user) {
-                /** @var Message $latestMessage */
-                $latestMessage = $threadMessages->first();
-                $counterpart = $latestMessage->sender_id === $user->id
-                    ? $latestMessage->recipient
-                    : $latestMessage->sender;
-
-                return [
-                    'contact' => $this->presentUser($counterpart),
-                    'job' => $latestMessage->job ? [
-                        'id' => $latestMessage->job->id,
-                        'title' => $latestMessage->job->title,
-                    ] : null,
-                    'last_message' => $latestMessage->body,
-                    'updated_at' => optional($latestMessage->created_at)->toIso8601String(),
-                    'unread_count' => $threadMessages
-                        ->where('recipient_id', $user->id)
-                        ->whereNull('read_at')
-                        ->count(),
-                    'message_count' => $threadMessages->count(),
-                ];
-            })
+            ->map(fn ($threadMessages) => $this->messagePresenter->presentThread($threadMessages, $user))
             ->sortByDesc('updated_at')
             ->values()
             ->all();
     }
 
+    /**
+     * Load the full conversation between two users and mark inbound messages as read.
+     */
     public function getConversation(User $user, User $counterpart): array
     {
         $this->ensureMessagesTableExists();
-        $this->assertCanCommunicate($user, $counterpart);
+        $this->messageAccessService->assertCanCommunicate($user, $counterpart);
 
         Message::query()
             ->where('sender_id', $counterpart->id)
@@ -125,51 +114,18 @@ class MessageService
             })
             ->orderBy('created_at')
             ->get()
-            ->map(fn (Message $message) => $this->presentMessage($message, $user))
+            ->map(fn (Message $message) => $this->messagePresenter->presentMessage($message, $user))
             ->values()
             ->all();
     }
 
+    /**
+     * Return the contacts this user is allowed to chat with, optionally filtered by search.
+     */
     public function getAvailableContacts(User $user, ?string $search = null): array
     {
         $normalizedSearch = strtolower(trim((string) $search));
-        $contactQuery = User::query()
-            ->where('account_status', User::STATUS_ACTIVE)
-            ->where('id', '!=', $user->id);
-
-        if ($user->hasRole(User::ROLE_SUPERADMIN)) {
-            $contactQuery->whereIn('role', [User::ROLE_RECRUITER, User::ROLE_CANDIDATE]);
-        } elseif ($user->hasRole(User::ROLE_RECRUITER)) {
-            $candidateIds = Application::query()
-                ->whereHas('job', fn (Builder $query) => $query->where('recruiter_id', $user->id))
-                ->distinct()
-                ->pluck('candidate_id')
-                ->all();
-            $contactQuery->where(function (Builder $query) use ($candidateIds) {
-                $query->where('role', User::ROLE_SUPERADMIN);
-
-                if (!empty($candidateIds)) {
-                    $query->orWhereIn('id', $candidateIds);
-                }
-            });
-        } else {
-            $recruiterIds = Job::query()
-                ->whereIn('id', Application::query()
-                    ->where('candidate_id', $user->id)
-                    ->pluck('job_id')
-                    ->all()
-                )
-                ->distinct()
-                ->pluck('recruiter_id')
-                ->all();
-            $contactQuery->where(function (Builder $query) use ($recruiterIds) {
-                $query->where('role', User::ROLE_SUPERADMIN);
-
-                if (!empty($recruiterIds)) {
-                    $query->orWhereIn('id', $recruiterIds);
-                }
-            });
-        }
+        $contactQuery = $this->messageAccessService->buildAvailableContactsQuery($user);
 
         return $contactQuery
             ->orderBy('role')
@@ -189,17 +145,20 @@ class MessageService
 
                 return str_contains($haystack, $normalizedSearch);
             })
-            ->map(fn (User $contact) => $this->presentUser($contact))
+            ->map(fn (User $contact) => $this->messagePresenter->presentUser($contact))
             ->values()
             ->all();
     }
 
+    /**
+     * Persist a new chat message after validating recipient and optional job context.
+     */
     public function sendMessage(User $sender, array $payload): Message
     {
         $this->ensureMessagesTableExists();
 
         $recipient = User::findOrFail($payload['recipient_id']);
-        $this->assertCanCommunicate($sender, $recipient);
+        $this->messageAccessService->assertCanCommunicate($sender, $recipient);
 
         $messageBody = trim((string) $payload['body']);
 
@@ -220,7 +179,7 @@ class MessageService
                 ]);
             }
 
-            if (!$this->canReferenceJob($sender, $recipient, $job)) {
+            if (!$this->messageAccessService->canReferenceJob($sender, $recipient, $job)) {
                 throw ValidationException::withMessages([
                     'job_id' => ['Anda tidak bisa memakai lowongan ini sebagai konteks percakapan.'],
                 ]);
@@ -235,98 +194,11 @@ class MessageService
         ])->load(['sender', 'recipient', 'job']);
     }
 
+    /**
+     * Delegate one message payload to the presenter used by chat responses.
+     */
     public function presentMessage(Message $message, User $viewer): array
     {
-        return [
-            'id' => $message->id,
-            'body' => $message->body,
-            'created_at' => optional($message->created_at)->toIso8601String(),
-            'read_at' => optional($message->read_at)->toIso8601String(),
-            'is_mine' => $message->sender_id === $viewer->id,
-            'sender' => $this->presentUser($message->sender),
-            'recipient' => $this->presentUser($message->recipient),
-            'job' => $message->job ? [
-                'id' => $message->job->id,
-                'title' => $message->job->title,
-            ] : null,
-        ];
-    }
-
-    public function assertCanCommunicate(User $sender, User $recipient): void
-    {
-        if ($sender->id === $recipient->id) {
-            throw ValidationException::withMessages([
-                'recipient_id' => ['Tidak bisa mengirim pesan ke akun sendiri.'],
-            ]);
-        }
-
-        if (!$this->canCommunicate($sender, $recipient)) {
-            throw ValidationException::withMessages([
-                'recipient_id' => ['Anda belum memiliki akses percakapan dengan pengguna ini.'],
-            ]);
-        }
-    }
-
-    private function canCommunicate(User $sender, User $recipient): bool
-    {
-        if ($sender->hasRole(User::ROLE_SUPERADMIN) || $recipient->hasRole(User::ROLE_SUPERADMIN)) {
-            return true;
-        }
-
-        if ($sender->hasRole(User::ROLE_RECRUITER) && $recipient->hasRole(User::ROLE_CANDIDATE)) {
-            return Application::query()
-                ->where('candidate_id', $recipient->id)
-                ->whereHas('job', fn (Builder $query) => $query->where('recruiter_id', $sender->id))
-                ->exists();
-        }
-
-        if ($sender->hasRole(User::ROLE_CANDIDATE) && $recipient->hasRole(User::ROLE_RECRUITER)) {
-            return Application::query()
-                ->where('candidate_id', $sender->id)
-                ->whereHas('job', fn (Builder $query) => $query->where('recruiter_id', $recipient->id))
-                ->exists();
-        }
-
-        return false;
-    }
-
-    private function canReferenceJob(User $sender, User $recipient, Job $job): bool
-    {
-        if ($sender->hasRole(User::ROLE_SUPERADMIN) || $recipient->hasRole(User::ROLE_SUPERADMIN)) {
-            return true;
-        }
-
-        if ($sender->hasRole(User::ROLE_RECRUITER)) {
-            return $job->recruiter_id === $sender->id
-                && Application::query()
-                    ->where('job_id', $job->id)
-                    ->where('candidate_id', $recipient->id)
-                    ->exists();
-        }
-
-        if ($sender->hasRole(User::ROLE_CANDIDATE)) {
-            return $job->recruiter_id === $recipient->id
-                && Application::query()
-                    ->where('job_id', $job->id)
-                    ->where('candidate_id', $sender->id)
-                    ->exists();
-        }
-
-        return false;
-    }
-
-    private function presentUser(?User $user): ?array
-    {
-        if (!$user) {
-            return null;
-        }
-
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'role' => $user->role,
-            'email' => $user->email,
-            'company_name' => $user->company_name,
-        ];
+        return $this->messagePresenter->presentMessage($message, $viewer);
     }
 }

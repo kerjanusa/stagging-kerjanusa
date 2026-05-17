@@ -26,8 +26,14 @@ import '../styles/jobList.css';
 
 const EARTH_RADIUS_IN_KILOMETERS = 6371;
 
+/**
+ * Mengubah derajat geografis menjadi radian untuk perhitungan jarak.
+ */
 const toRadians = (value) => (value * Math.PI) / 180;
 
+/**
+ * Menghitung jarak antar dua titik koordinat memakai rumus haversine.
+ */
 const calculateDistanceInKilometers = (origin, destination) => {
   const latitudeDelta = toRadians(destination.latitude - origin.latitude);
   const longitudeDelta = toRadians(destination.longitude - origin.longitude);
@@ -43,6 +49,9 @@ const calculateDistanceInKilometers = (origin, destination) => {
   return 2 * EARTH_RADIUS_IN_KILOMETERS * Math.asin(Math.sqrt(haversineResult));
 };
 
+/**
+ * Memformat jarak dalam kilometer menjadi label meter atau kilometer yang ramah UI.
+ */
 const formatDistance = (distanceInKilometers) => {
   if (distanceInKilometers < 1) {
     return `${Math.round(distanceInKilometers * 1000)} m`;
@@ -51,6 +60,9 @@ const formatDistance = (distanceInKilometers) => {
   return `${distanceInKilometers.toFixed(1)} km`;
 };
 
+/**
+ * Mengubah kode error geolocation browser menjadi pesan bantuan yang bisa dibaca user.
+ */
 const getLocationPermissionErrorMessage = (errorCode) => {
   switch (errorCode) {
     case 1:
@@ -64,6 +76,9 @@ const getLocationPermissionErrorMessage = (errorCode) => {
   }
 };
 
+/**
+ * Menyiapkan payload jawaban awal untuk setiap pertanyaan screening di modal apply.
+ */
 const buildInitialScreeningAnswers = (job) =>
   Array.isArray(job?.quiz_screening_questions)
     ? job.quiz_screening_questions.map((question) => ({

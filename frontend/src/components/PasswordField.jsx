@@ -1,5 +1,8 @@
 import { useState } from 'react';
 
+/**
+ * Merender ikon mata terbuka atau tertutup sesuai status visibilitas password.
+ */
 const PasswordVisibilityIcon = ({ isVisible }) => {
   const iconProps = {
     viewBox: '0 0 24 24',
@@ -29,6 +32,9 @@ const PasswordVisibilityIcon = ({ isVisible }) => {
   );
 };
 
+/**
+ * Membungkus input password dengan tombol toggle agar field bisa ditampilkan atau disembunyikan.
+ */
 const PasswordField = ({
   id,
   name,

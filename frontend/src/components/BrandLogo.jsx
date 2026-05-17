@@ -1,3 +1,6 @@
+/**
+ * Menampilkan logo brand ringkas yang dipakai di shell autentikasi.
+ */
 const BrandLogo = () => {
   return (
     <div className="auth-brand-logo">

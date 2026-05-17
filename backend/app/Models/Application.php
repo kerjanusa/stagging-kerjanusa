@@ -56,11 +56,17 @@ class Application extends Model
         'updated_at' => 'datetime',
     ];
 
+    /**
+     * Return the job this application belongs to.
+     */
     public function job()
     {
         return $this->belongsTo(Job::class);
     }
 
+    /**
+     * Return the candidate that submitted this application.
+     */
     public function candidate()
     {
         return $this->belongsTo(User::class, 'candidate_id');

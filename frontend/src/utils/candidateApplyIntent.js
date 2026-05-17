@@ -2,6 +2,9 @@ const CANDIDATE_APPLY_INTENT_STORAGE_KEY = 'candidate_apply_intent';
 const CANDIDATE_APPLY_INTENT_TTL_MS = 30 * 60 * 1000;
 const ALLOWED_FILTER_KEYS = ['search', 'job_type', 'experience_level', 'location'];
 
+/**
+ * Return sessionStorage only when the code runs in a browser context.
+ */
 const getSessionStorage = () => {
   if (typeof window === 'undefined') {
     return null;
@@ -10,8 +13,14 @@ const getSessionStorage = () => {
   return window.sessionStorage;
 };
 
+/**
+ * Normalize one optional string field into a trimmed value.
+ */
 const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
 
+/**
+ * Persist only the allowed filter keys used by the apply-intent flow.
+ */
 const normalizeFilters = (filters) =>
   ALLOWED_FILTER_KEYS.reduce((normalizedFilters, key) => {
     const nextValue = normalizeString(filters?.[key]);
@@ -23,6 +32,9 @@ const normalizeFilters = (filters) =>
     return normalizedFilters;
   }, {});
 
+/**
+ * Remove any stored apply intent when it is invalid, stale, or consumed.
+ */
 const clearStoredValue = () => {
   const storage = getSessionStorage();
 
@@ -37,6 +49,9 @@ const clearStoredValue = () => {
   }
 };
 
+/**
+ * Read the saved apply intent when it is still valid and within the configured TTL.
+ */
 export const readCandidateApplyIntent = () => {
   const storage = getSessionStorage();
 
@@ -82,6 +97,9 @@ export const readCandidateApplyIntent = () => {
   }
 };
 
+/**
+ * Save enough navigation state to bring a candidate back to the job they intended to apply for.
+ */
 export const saveCandidateApplyIntent = (intent) => {
   const storage = getSessionStorage();
 

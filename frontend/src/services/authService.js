@@ -42,6 +42,9 @@ const defaultMockUsers = [
   },
 ];
 
+/**
+ * Normalize one auth user payload so role values stay consistent across mock and API flows.
+ */
 const normalizeAuthUser = (user) => {
   if (!user || typeof user !== 'object') {
     return user;
@@ -53,8 +56,14 @@ const normalizeAuthUser = (user) => {
   };
 };
 
+/**
+ * Remove the transient password field before user data is persisted to session storage.
+ */
 const stripPassword = ({ password, ...user }) => normalizeAuthUser(user);
 
+/**
+ * Restore the seeded demo password for built-in demo accounts when stored data drifts.
+ */
 const syncDemoUserPassword = (user) => {
   const normalizedUser = normalizeAuthUser(user);
 
@@ -78,6 +87,9 @@ const syncDemoUserPassword = (user) => {
   };
 };
 
+/**
+ * Load mock auth users from storage and upgrade them with any missing seeded accounts.
+ */
 const getMockUsers = () => {
   const storedUsers = localStorage.getItem(MOCK_USERS_STORAGE_KEY);
 
@@ -112,6 +124,9 @@ const getMockUsers = () => {
   return defaultMockUsers;
 };
 
+/**
+ * Persist mock auth users back to storage after role normalization.
+ */
 const saveMockUsers = (users) => {
   localStorage.setItem(
     MOCK_USERS_STORAGE_KEY,
@@ -119,6 +134,9 @@ const saveMockUsers = (users) => {
   );
 };
 
+/**
+ * Load mock password-reset tokens from storage.
+ */
 const getMockPasswordResetTokens = () => {
   const storedTokens = localStorage.getItem(MOCK_PASSWORD_RESET_STORAGE_KEY);
 
@@ -134,13 +152,22 @@ const getMockPasswordResetTokens = () => {
   }
 };
 
+/**
+ * Persist the mock password-reset token list to storage.
+ */
 const saveMockPasswordResetTokens = (tokens) => {
   localStorage.setItem(MOCK_PASSWORD_RESET_STORAGE_KEY, JSON.stringify(tokens));
 };
 
+/**
+ * Generate a unique demo reset token that behaves like an emailed reset link.
+ */
 const buildMockResetToken = () =>
   `mock-reset-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 
+/**
+ * Persist a mock login session and return the synthetic auth token.
+ */
 const persistMockSession = (user) => {
   const sessionToken = `mock-token-${user.id}`;
   const normalizedUser = stripPassword(user);
@@ -150,6 +177,9 @@ const persistMockSession = (user) => {
   return sessionToken;
 };
 
+/**
+ * Persist the authenticated API session payload to browser storage.
+ */
 const persistApiSession = (user, token) => {
   const normalizedUser = normalizeAuthUser(user);
 

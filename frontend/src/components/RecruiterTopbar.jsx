@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { APP_ROUTES } from '../utils/routeHelpers.js';
 
+/**
+ * Merender navigasi utama recruiter beserta shortcut paket, profil, dan logout.
+ */
 const RecruiterTopbar = ({
   sections,
   activeSection,
@@ -20,10 +23,16 @@ const RecruiterTopbar = ({
     setIsMobileMenuOpen(false);
   }, [location.hash, location.pathname]);
 
+  /**
+   * Menutup panel navigasi mobile ketika user berpindah aksi.
+   */
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
   };
 
+  /**
+   * Memastikan perpindahan section dimulai dari posisi scroll paling atas.
+   */
   const scrollToTop = () => {
     if (typeof window === 'undefined') {
       return;
@@ -32,23 +41,35 @@ const RecruiterTopbar = ({
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   };
 
+  /**
+   * Menangani klik logo recruiter sekaligus merapikan state UI mobile.
+   */
   const handleBrandClick = () => {
     closeMobileMenu();
     scrollToTop();
     onBrandClick?.();
   };
 
+  /**
+   * Menjalankan perpindahan section recruiter dari topbar.
+   */
   const handleSectionClick = (section) => {
     closeMobileMenu();
     scrollToTop();
     onSectionSelect?.(section);
   };
 
+  /**
+   * Menutup menu saat user kembali ke website publik.
+   */
   const handleHomeClick = () => {
     closeMobileMenu();
     scrollToTop();
   };
 
+  /**
+   * Menutup menu lalu meneruskan aksi logout ke parent.
+   */
   const handleLogoutClick = () => {
     closeMobileMenu();
     onLogout?.();

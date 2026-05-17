@@ -4,6 +4,9 @@ import useAuth from '../hooks/useAuth';
 import PasswordField from './PasswordField';
 import '../styles/authForm.css';
 
+/**
+ * Menyediakan form login umum dengan wiring error state dari auth store.
+ */
 const LoginForm = ({
   onSuccess,
   emailPlaceholder = 'Email recruiter / company',
@@ -15,8 +18,14 @@ const LoginForm = ({
   const { login, isLoading, error, validationErrors, clearError } = useAuth();
 
   const hasFieldErrors = Object.keys(validationErrors || {}).length > 0;
+  /**
+   * Mengambil error pertama untuk field tertentu agar input cukup membaca satu sumber pesan.
+   */
   const getFieldError = (fieldName) => validationErrors?.[fieldName]?.[0] || '';
 
+  /**
+   * Menyimpan perubahan email lalu membersihkan feedback lama yang sudah tidak relevan.
+   */
   const handleEmailChange = (value) => {
     setEmail(value);
 
@@ -25,6 +34,9 @@ const LoginForm = ({
     }
   };
 
+  /**
+   * Menyimpan perubahan password lalu mereset pesan error yang sudah basi.
+   */
   const handlePasswordChange = (value) => {
     setPassword(value);
 
@@ -33,6 +45,9 @@ const LoginForm = ({
     }
   };
 
+  /**
+   * Mengirim kredensial login ke auth store dan meneruskan hasil sukses ke parent bila ada.
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {

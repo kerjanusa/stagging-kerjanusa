@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react';
 import ChatService from '../services/chatService.js';
 
+/**
+ * Manage chat threads, contacts, messages, and request state around the chat service layer.
+ */
 const useChat = () => {
   const [threads, setThreads] = useState([]);
   const [contacts, setContacts] = useState([]);
@@ -11,6 +14,9 @@ const useChat = () => {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [error, setError] = useState(null);
 
+  /**
+   * Load the conversation thread list for the current user.
+   */
   const loadThreads = useCallback(async () => {
     setIsLoadingThreads(true);
     setError(null);
@@ -27,6 +33,9 @@ const useChat = () => {
     }
   }, []);
 
+  /**
+   * Load all reachable chat contacts for the current user.
+   */
   const loadContacts = useCallback(async (search = '') => {
     setIsLoadingContacts(true);
     setError(null);
@@ -43,6 +52,9 @@ const useChat = () => {
     }
   }, []);
 
+  /**
+   * Load the full message history with one selected counterpart.
+   */
   const loadConversation = useCallback(async (userId) => {
     setIsLoadingMessages(true);
     setError(null);
@@ -59,6 +71,9 @@ const useChat = () => {
     }
   }, []);
 
+  /**
+   * Send one chat message and optimistically append the returned payload to local state.
+   */
   const sendMessage = useCallback(async (payload) => {
     setIsSendingMessage(true);
     setError(null);

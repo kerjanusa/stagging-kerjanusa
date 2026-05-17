@@ -303,6 +303,9 @@ const DEFAULT_ADDRESS_BOOK = [
   },
 ];
 
+/**
+ * Menyiapkan state kosong untuk form alamat recruiter.
+ */
 const getInitialAddressForm = () => ({
   type: 'pusat',
   label: '',
@@ -314,6 +317,9 @@ const getInitialAddressForm = () => ({
   detail: '',
 });
 
+/**
+ * Mengubah teks bebas menjadi slug sederhana untuk id lokal dan key UI.
+ */
 const slugifyValue = (value = '') =>
   value
     .toString()
@@ -322,11 +328,17 @@ const slugifyValue = (value = '') =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
+/**
+ * Menggabungkan detail alamat menjadi satu string ringkas untuk preview penempatan.
+ */
 const buildAddressSummary = (address) =>
   [address.detail, address.subdistrict, address.district, address.city, address.province]
     .filter(Boolean)
     .join(', ');
 
+/**
+ * Menormalkan satu item alamat agar selalu punya shape yang siap dipakai form dan dropdown.
+ */
 const createAddressEntry = (address) => ({
   id: address.id || `address-${slugifyValue(address.label || 'baru')}`,
   type: address.type || 'cabang',
@@ -340,6 +352,9 @@ const createAddressEntry = (address) => ({
   summary: address.summary || buildAddressSummary(address),
 });
 
+/**
+ * Menggabungkan buku alamat tersimpan dengan lokasi lowongan agar tidak ada penempatan yang terlewat.
+ */
 const mergeAddressBook = (addresses, locations) => {
   const existingMap = new Map(
     addresses.map((address) => [address.label.trim().toLowerCase(), createAddressEntry(address)])
@@ -551,6 +566,9 @@ const FIELD_METADATA = {
 const FOCUSABLE_FIELD_SELECTOR =
   'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])';
 
+/**
+ * Menyusun detail error validasi berdasarkan urutan field dan step form agar lebih mudah diarahkan.
+ */
 const buildValidationIssueDetails = (errors) => {
   const orderedFields = [
     ...FIELD_NAVIGATION_ORDER.filter((fieldName) => errors[fieldName]),
@@ -573,6 +591,9 @@ const buildValidationIssueDetails = (errors) => {
 
 const DIGIT_ONLY_FIELDS = new Set(['salary_min', 'salary_max', 'openings_count']);
 
+/**
+ * Membatasi input angka hanya ke digit yang valid untuk field numerik.
+ */
 const normalizeDigitInput = (value = '') => {
   const digitOnlyValue = String(value).replace(/\D/g, '');
 
@@ -583,6 +604,9 @@ const normalizeDigitInput = (value = '') => {
   return digitOnlyValue.replace(/^0+(?=\d)/, '') || '0';
 };
 
+/**
+ * Menambahkan pemisah ribuan untuk field angka yang sedang ditampilkan di form.
+ */
 const formatNumericFieldValue = (value = '') => {
   if (value === '' || value === null || value === undefined) {
     return '';
@@ -597,6 +621,9 @@ const formatNumericFieldValue = (value = '') => {
   return new Intl.NumberFormat('id-ID').format(numericValue);
 };
 
+/**
+ * Menampilkan angka salary dalam format rupiah untuk preview lowongan.
+ */
 const formatCurrency = (value) => {
   if (value === '' || value === null || value === undefined) {
     return '-';
@@ -615,14 +642,23 @@ const formatCurrency = (value) => {
   }).format(numericValue);
 };
 
+/**
+ * Memecah daftar referensi skill tambahan dari input teks recruiter.
+ */
 const splitCustomSkillReferences = (value = '') =>
   String(value)
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
 
+/**
+ * Menyamakan bentuk key referensi agar pencocokan custom skill lebih stabil.
+ */
 const normalizeReferenceKey = (value = '') => String(value).trim().toLowerCase();
 
+/**
+ * Menyimpan sebagian state dashboard recruiter agar pengalaman kembali ke halaman tetap halus.
+ */
 const persistRecruiterDashboardState = (partialState) => {
   if (typeof window === 'undefined') {
     return;
@@ -643,6 +679,9 @@ const persistRecruiterDashboardState = (partialState) => {
   }
 };
 
+/**
+ * Mengambil pesan error paling relevan dari response pembuatan lowongan.
+ */
 const getCreateJobErrorMessage = (error) => {
   if (error?.errors && typeof error.errors === 'object') {
     const firstFieldError = Object.values(error.errors).flat().find(Boolean);
@@ -658,6 +697,9 @@ const getCreateJobErrorMessage = (error) => {
   return error?.message || 'Gagal membuat lowongan. Periksa kembali isi form Anda.';
 };
 
+/**
+ * Menggabungkan pertanyaan screening bawaan dan custom menjadi payload backend yang seragam.
+ */
 const buildScreeningQuestionPayload = (selectedQuestions, customQuestions) => [
   ...selectedQuestions.map((question) => ({
     id: question.id,
@@ -677,6 +719,9 @@ const buildScreeningQuestionPayload = (selectedQuestions, customQuestions) => [
   })),
 ];
 
+/**
+ * Menjadi wizard pembuatan lowongan recruiter dari detail job sampai preview publikasi.
+ */
 const RecruiterJobCreatePage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();

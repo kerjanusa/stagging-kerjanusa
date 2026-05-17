@@ -8,6 +8,7 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\RecruiterWorkspaceController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
@@ -23,15 +24,7 @@ use Illuminate\Support\Facades\Schema;
 */
 
 // Public routes
-$databaseHealthResponder = function () {
-    $databaseHost = (string) env('DB_HOST', '');
-    $databasePort = (string) env('DB_PORT', '');
-    $databaseName = (string) env('DB_DATABASE', '');
-    $databaseUsername = (string) env('DB_USERNAME', '');
-    $databasePassword = env('DB_PASSWORD');
-    $databaseUrl = env('DATABASE_URL');
-    $databaseSslMode = (string) env('DB_SSLMODE', '');
-
+$databaseHealthResponder = function (Request $request) {
     try {
         DB::connection()->getPdo();
         DB::select('select 1');
@@ -55,58 +48,37 @@ $databaseHealthResponder = function () {
             }
         }
 
+        if (!empty($missingTables)) {
+            Log::warning('Database health check reported an incomplete schema.', [
+                'action' => 'health_check',
+                'step' => 'verify_required_tables',
+                'missing_tables' => $missingTables,
+                'connection' => config('database.default'),
+                'request_id' => $request->attributes->get('request_id'),
+            ]);
+        }
+
         return response()->json([
-            'status' => empty($missingTables) ? 'ok' : 'warning',
+            'status' => empty($missingTables) ? 'ok' : 'error',
             'database' => empty($missingTables) ? 'ready' : 'schema_incomplete',
-            'connection' => config('database.default'),
-            'env' => [
-                'database_url_present' => filled($databaseUrl),
-                'db_host_present' => filled($databaseHost),
-                'db_host_supabase' => filled($databaseHost) && str_contains($databaseHost, '.supabase.com'),
-                'db_port' => $databasePort,
-                'db_database_present' => filled($databaseName),
-                'db_username_present' => filled($databaseUsername),
-                'db_username_postgres' => str_starts_with($databaseUsername, 'postgres'),
-                'db_password_present' => filled($databasePassword),
-                'db_sslmode' => $databaseSslMode,
-            ],
-            'tables' => $tables,
-            'missing_tables' => $missingTables,
+            'timestamp' => now()->toIso8601String(),
+            'schema_ready' => empty($missingTables),
         ], empty($missingTables) ? 200 : 500);
     } catch (\Throwable $exception) {
-        $exceptionMessage = $exception->getMessage();
-        $errorHint = 'unknown';
-
-        if (str_contains($exceptionMessage, 'password authentication failed')) {
-            $errorHint = 'invalid_credentials';
-        } elseif (str_contains($exceptionMessage, 'could not translate host name')) {
-            $errorHint = 'invalid_host';
-        } elseif (str_contains($exceptionMessage, 'Connection refused')) {
-            $errorHint = 'connection_refused';
-        } elseif (str_contains($exceptionMessage, 'could not find driver')) {
-            $errorHint = 'missing_driver';
-        } elseif (str_contains($exceptionMessage, 'SSL')) {
-            $errorHint = 'ssl_error';
-        }
+        Log::error('Database health check failed.', [
+            'action' => 'health_check',
+            'step' => 'connect_database',
+            'connection' => config('database.default'),
+            'exception_class' => $exception::class,
+            'error_message' => $exception->getMessage(),
+            'request_id' => $request->attributes->get('request_id'),
+        ]);
 
         return response()->json([
             'status' => 'error',
             'database' => 'unavailable',
-            'connection' => config('database.default'),
             'message' => 'Database connection failed.',
-            'exception' => class_basename($exception),
-            'error_hint' => $errorHint,
-            'env' => [
-                'database_url_present' => filled($databaseUrl),
-                'db_host_present' => filled($databaseHost),
-                'db_host_supabase' => filled($databaseHost) && str_contains($databaseHost, '.supabase.com'),
-                'db_port' => $databasePort,
-                'db_database_present' => filled($databaseName),
-                'db_username_present' => filled($databaseUsername),
-                'db_username_postgres' => str_starts_with($databaseUsername, 'postgres'),
-                'db_password_present' => filled($databasePassword),
-                'db_sslmode' => $databaseSslMode,
-            ],
+            'timestamp' => now()->toIso8601String(),
         ], 500);
     }
 };
@@ -121,7 +93,7 @@ Route::get('/health', $databaseHealthResponder);
 Route::get('/health/database', $databaseHealthResponder);
 
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:6,1');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1');
 

@@ -3,33 +3,31 @@
 namespace App\Http\Controllers;
 
 use App\Models\Application;
-use App\Models\Job;
-use App\Models\User;
+use App\Requests\Application\StoreApplicationRequest;
+use App\Requests\Application\UpdateApplicationStatusRequest;
+use App\Services\ApplicationAuthorizationService;
 use App\Services\ApplicationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class ApplicationController extends Controller
 {
-    public function __construct(private ApplicationService $applicationService)
+    /**
+     * Wire application orchestration and authorization helpers for API actions.
+     */
+    public function __construct(
+        private ApplicationService $applicationService,
+        private ApplicationAuthorizationService $applicationAuthorizationService,
+    )
     {
     }
 
     /**
      * Apply for a job
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreApplicationRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'job_id' => 'required|integer|exists:jobs,id',
-            'cover_letter' => 'nullable|string',
-            'screening_answers' => 'nullable|array',
-            'screening_answers.*.question_id' => 'nullable|string|max:100',
-            'screening_answers.*.question' => 'required_with:screening_answers|string|max:500',
-            'screening_answers.*.answer' => 'required_with:screening_answers|string|max:1000',
-            'video_intro_url' => 'nullable|url|max:2048',
-        ]);
+        $validated = $request->validated();
 
         $application = $this->applicationService->applyForJob(
             $validated['job_id'],
@@ -85,7 +83,7 @@ class ApplicationController extends Controller
             ], 404);
         }
 
-        if (!$this->canManageJobApplications($request->user(), $job)) {
+        if (!$this->applicationAuthorizationService->canManageJobApplications($request->user(), $job)) {
             return response()->json([
                 'message' => 'Forbidden',
             ], 403);
@@ -112,12 +110,9 @@ class ApplicationController extends Controller
     /**
      * Update application status
      */
-    public function updateStatus(Request $request, int $applicationId): JsonResponse
+    public function updateStatus(UpdateApplicationStatusRequest $request, int $applicationId): JsonResponse
     {
-        $validated = $request->validate([
-            'status' => ['nullable', Rule::in(Application::STATUSES)],
-            'stage' => ['nullable', Rule::in(Application::STAGES)],
-        ]);
+        $validated = $request->validated();
 
         if (!filled($validated['status'] ?? null) && !filled($validated['stage'] ?? null)) {
             return response()->json([
@@ -133,7 +128,7 @@ class ApplicationController extends Controller
             ], 404);
         }
 
-        if (!$this->canManageJobApplications($request->user(), $application->job)) {
+        if (!$this->applicationAuthorizationService->canManageJobApplications($request->user(), $application->job)) {
             return response()->json([
                 'message' => 'Forbidden',
             ], 403);
@@ -188,7 +183,7 @@ class ApplicationController extends Controller
             ], 404);
         }
 
-        if (!$this->canViewApplication($request->user(), $application)) {
+        if (!$this->applicationAuthorizationService->canView($request->user(), $application)) {
             return response()->json([
                 'message' => 'Forbidden',
             ], 403);
@@ -197,29 +192,5 @@ class ApplicationController extends Controller
         return response()->json([
             'data' => $this->applicationService->presentApplication($application, $request->user()),
         ]);
-    }
-
-    private function canManageJobApplications(User $user, ?Job $job): bool
-    {
-        if (!$job) {
-            return false;
-        }
-
-        return $user->hasRole(User::ROLE_SUPERADMIN)
-            || ($user->hasRole(User::ROLE_RECRUITER) && $job->recruiter_id === $user->id);
-    }
-
-    private function canViewApplication(User $user, Application $application): bool
-    {
-        if ($user->hasRole(User::ROLE_SUPERADMIN)) {
-            return true;
-        }
-
-        if ($user->hasRole(User::ROLE_CANDIDATE)) {
-            return $application->candidate_id === $user->id;
-        }
-
-        return $user->hasRole(User::ROLE_RECRUITER)
-            && $application->job?->recruiter_id === $user->id;
     }
 }

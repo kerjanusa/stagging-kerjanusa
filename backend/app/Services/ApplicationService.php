@@ -6,12 +6,17 @@ use App\Models\Application;
 use App\Models\Job;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 class ApplicationService
 {
-    public function __construct(private RecruiterPlanService $recruiterPlanService)
+    /**
+     * Wire helpers for application presentation and service-level logging.
+     */
+    public function __construct(
+        private CandidateDocumentAccessService $candidateDocumentAccessService,
+        private ServiceActivityLogService $serviceActivityLogService,
+    )
     {
     }
 
@@ -53,6 +58,15 @@ class ApplicationService
     {
         $job = Job::find($jobId);
         if (!$job || $job->status !== Job::STATUS_ACTIVE) {
+            $this->serviceActivityLogService->warning($this, 'application_service.apply_rejected', [
+                'action' => 'apply_for_job',
+                'job_id' => $jobId,
+                'candidate_id' => $candidateId,
+                'job_found' => (bool) $job,
+                'job_status' => $job?->status,
+                'result' => 'job_unavailable',
+            ]);
+
             return false;
         }
 
@@ -61,13 +75,20 @@ class ApplicationService
             ->exists();
 
         if ($existingApplication) {
+            $this->serviceActivityLogService->warning($this, 'application_service.apply_rejected', [
+                'action' => 'apply_for_job',
+                'job_id' => $jobId,
+                'candidate_id' => $candidateId,
+                'result' => 'already_applied',
+            ]);
+
             return false;
         }
 
         $screeningAnswers = $this->sanitizeScreeningAnswers($data['screening_answers'] ?? []);
         $this->validateScreeningSubmission($job, $screeningAnswers, $data['video_intro_url'] ?? null);
 
-        return Application::create([
+        $application = Application::create([
             'job_id' => $jobId,
             'candidate_id' => $candidateId,
             'cover_letter' => $data['cover_letter'] ?? null,
@@ -77,6 +98,18 @@ class ApplicationService
             'stage' => Application::STAGE_APPLIED,
             'applied_at' => now(),
         ]);
+
+        $this->serviceActivityLogService->info($this, 'application_service.application_created', [
+            'action' => 'apply_for_job',
+            'application_id' => $application->id,
+            'job_id' => $jobId,
+            'candidate_id' => $candidateId,
+            'screening_answer_count' => count($screeningAnswers),
+            'has_video_intro_url' => filled($data['video_intro_url'] ?? null),
+            'result' => 'success',
+        ]);
+
+        return $application;
     }
 
     /**
@@ -93,6 +126,15 @@ class ApplicationService
             ->orderByDesc('applied_at')
             ->orderByDesc('created_at')
             ->paginate($perPage);
+
+        $this->serviceActivityLogService->debug($this, 'application_service.candidate_applications_loaded', [
+            'action' => 'get_candidate_applications',
+            'candidate_id' => $candidateId,
+            'per_page' => $perPage,
+            'total' => $applications->total(),
+            'page' => $applications->currentPage(),
+            'result' => 'success',
+        ], $viewer);
 
         return $this->transformApplicationPaginator($applications, $viewer);
     }
@@ -111,6 +153,15 @@ class ApplicationService
             ->latest()
             ->paginate($perPage);
 
+        $this->serviceActivityLogService->debug($this, 'application_service.job_applications_loaded', [
+            'action' => 'get_job_applications',
+            'job_id' => $jobId,
+            'per_page' => $perPage,
+            'total' => $applications->total(),
+            'page' => $applications->currentPage(),
+            'result' => 'success',
+        ], $viewer);
+
         return $this->transformApplicationPaginator($applications, $viewer);
     }
 
@@ -122,13 +173,38 @@ class ApplicationService
         $application = Application::find($applicationId);
 
         if (!$application) {
+            $this->serviceActivityLogService->warning($this, 'application_service.status_update_rejected', [
+                'action' => 'update_application_status',
+                'application_id' => $applicationId,
+                'target_status' => $status,
+                'result' => 'application_not_found',
+            ]);
+
             return false;
         }
 
-        return $application->update([
+        $updated = $application->update([
             'status' => $status,
             'stage' => $this->mapStatusToStage($status),
         ]);
+
+        $this->serviceActivityLogService->log(
+            $this,
+            $updated ? 'info' : 'warning',
+            $updated
+                ? 'application_service.status_updated'
+                : 'application_service.status_update_failed',
+            [
+                'action' => 'update_application_status',
+                'application_id' => $application->id,
+                'previous_status' => $application->getOriginal('status'),
+                'target_status' => $status,
+                'target_stage' => $this->mapStatusToStage($status),
+                'result' => $updated ? 'success' : 'failed',
+            ]
+        );
+
+        return $updated;
     }
 
     /**
@@ -139,13 +215,38 @@ class ApplicationService
         $application = Application::find($applicationId);
 
         if (!$application) {
+            $this->serviceActivityLogService->warning($this, 'application_service.stage_update_rejected', [
+                'action' => 'update_application_stage',
+                'application_id' => $applicationId,
+                'target_stage' => $stage,
+                'result' => 'application_not_found',
+            ]);
+
             return false;
         }
 
-        return $application->update([
+        $updated = $application->update([
             'stage' => $stage,
             'status' => $this->mapStageToStatus($stage),
         ]);
+
+        $this->serviceActivityLogService->log(
+            $this,
+            $updated ? 'info' : 'warning',
+            $updated
+                ? 'application_service.stage_updated'
+                : 'application_service.stage_update_failed',
+            [
+                'action' => 'update_application_stage',
+                'application_id' => $application->id,
+                'previous_stage' => $application->getOriginal('stage'),
+                'target_stage' => $stage,
+                'target_status' => $this->mapStageToStatus($stage),
+                'result' => $updated ? 'success' : 'failed',
+            ]
+        );
+
+        return $updated;
     }
 
     /**
@@ -158,6 +259,13 @@ class ApplicationService
             ->first();
 
         if (!$application) {
+            $this->serviceActivityLogService->warning($this, 'application_service.withdraw_rejected', [
+                'action' => 'withdraw_candidate_application',
+                'application_id' => $applicationId,
+                'candidate_id' => $candidateId,
+                'result' => 'application_not_found',
+            ]);
+
             return false;
         }
 
@@ -166,13 +274,37 @@ class ApplicationService
             Application::STAGE_REJECTED,
             Application::STAGE_WITHDRAWN,
         ], true)) {
+            $this->serviceActivityLogService->warning($this, 'application_service.withdraw_rejected', [
+                'action' => 'withdraw_candidate_application',
+                'application_id' => $application->id,
+                'candidate_id' => $candidateId,
+                'current_stage' => $application->stage,
+                'result' => 'stage_not_withdrawable',
+            ]);
+
             return false;
         }
 
-        return $application->update([
+        $updated = $application->update([
             'stage' => Application::STAGE_WITHDRAWN,
             'status' => Application::STATUS_WITHDRAWN,
         ]);
+
+        $this->serviceActivityLogService->log(
+            $this,
+            $updated ? 'info' : 'warning',
+            $updated
+                ? 'application_service.withdrawn'
+                : 'application_service.withdraw_failed',
+            [
+                'action' => 'withdraw_candidate_application',
+                'application_id' => $application->id,
+                'candidate_id' => $candidateId,
+                'result' => $updated ? 'success' : 'failed',
+            ]
+        );
+
+        return $updated;
     }
 
     /**
@@ -180,9 +312,20 @@ class ApplicationService
      */
     public function getApplicationById(int $applicationId): ?Application
     {
-        return Application::with(['job.recruiter', 'candidate'])->find($applicationId);
+        $application = Application::with(['job.recruiter', 'candidate'])->find($applicationId);
+
+        $this->serviceActivityLogService->debug($this, 'application_service.application_loaded', [
+            'action' => 'get_application_by_id',
+            'application_id' => $applicationId,
+            'result' => $application ? 'found' : 'not_found',
+        ]);
+
+        return $application;
     }
 
+    /**
+     * Convert one application model into the API payload expected by the frontend.
+     */
     public function presentApplication(Application $application, ?User $viewer = null): array
     {
         $job = $application->job;
@@ -229,10 +372,15 @@ class ApplicationService
                     'company_name' => $job->recruiter->company_name,
                 ] : null,
             ] : null,
-            'candidate' => $candidate ? $this->presentCandidateForViewer($candidate, $viewer) : null,
+            'candidate' => $candidate
+                ? $this->candidateDocumentAccessService->presentCandidateForViewer($candidate, $viewer)
+                : null,
         ];
     }
 
+    /**
+     * Replace paginator items with fully presented application payloads.
+     */
     private function transformApplicationPaginator(
         LengthAwarePaginator $applications,
         ?User $viewer = null
@@ -247,6 +395,9 @@ class ApplicationService
         return $applications;
     }
 
+    /**
+     * Enforce required screening answers and video requirements before submission.
+     */
     private function validateScreeningSubmission(
         Job $job,
         array $screeningAnswers,
@@ -289,6 +440,9 @@ class ApplicationService
         }
     }
 
+    /**
+     * Normalize screening answers so only usable question/answer pairs are stored.
+     */
     private function sanitizeScreeningAnswers(array $answers): array
     {
         return collect($answers)
@@ -307,6 +461,9 @@ class ApplicationService
             ->all();
     }
 
+    /**
+     * Build a lightweight screening completion summary for recruiter-facing views.
+     */
     private function buildScreeningSummary(?Job $job, array $screeningAnswers): array
     {
         $questions = collect($job?->quiz_screening_questions ?? []);
@@ -324,56 +481,6 @@ class ApplicationService
             'answered_questions' => $answeredQuestions,
             'positive_answers' => $positiveAnswers,
             'completion_rate' => $completionRate,
-        ];
-    }
-
-    private function presentCandidateForViewer(User $candidate, ?User $viewer = null): array
-    {
-        $profile = is_array($candidate->candidate_profile) ? $candidate->candidate_profile : [];
-        $documentAccess = [
-            'resume_files_visible' => count(Arr::get($profile, 'resumeFiles', [])),
-            'resume_files_total' => count(Arr::get($profile, 'resumeFiles', [])),
-            'certificate_files_visible' => count(Arr::get($profile, 'certificateFiles', [])),
-            'certificate_files_total' => count(Arr::get($profile, 'certificateFiles', [])),
-            'upgrade_required' => false,
-            'notice' => null,
-        ];
-
-        if ($viewer?->hasRole(User::ROLE_RECRUITER)) {
-            $limits = $this->recruiterPlanService->getVisibleDocumentLimits($viewer);
-            $totalResumeFiles = count(Arr::get($profile, 'resumeFiles', []));
-            $totalCertificateFiles = count(Arr::get($profile, 'certificateFiles', []));
-            $visibleResumeFiles = array_slice(Arr::get($profile, 'resumeFiles', []), 0, $limits['resume_files']);
-            $visibleCertificateFiles = array_slice(
-                Arr::get($profile, 'certificateFiles', []),
-                0,
-                $limits['certificate_files']
-            );
-
-            $profile['resumeFiles'] = $visibleResumeFiles;
-            $profile['certificateFiles'] = $visibleCertificateFiles;
-            $documentAccess = [
-                'resume_files_visible' => count($visibleResumeFiles),
-                'resume_files_total' => $totalResumeFiles,
-                'certificate_files_visible' => count($visibleCertificateFiles),
-                'certificate_files_total' => $totalCertificateFiles,
-                'upgrade_required' => count($visibleResumeFiles) < $totalResumeFiles
-                    || count($visibleCertificateFiles) < $totalCertificateFiles,
-                'notice' => count($visibleResumeFiles) < $totalResumeFiles
-                    || count($visibleCertificateFiles) < $totalCertificateFiles
-                    ? 'Sebagian berkas kandidat disembunyikan sesuai paket recruiter aktif.'
-                    : null,
-            ];
-        }
-
-        return [
-            'id' => $candidate->id,
-            'name' => $candidate->name,
-            'role' => $candidate->role,
-            'email' => $candidate->email,
-            'phone' => $candidate->phone,
-            'candidate_profile' => $profile,
-            'document_access' => $documentAccess,
         ];
     }
 }

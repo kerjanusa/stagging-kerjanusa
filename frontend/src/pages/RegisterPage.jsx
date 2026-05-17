@@ -21,6 +21,9 @@ const REGISTER_COPY = {
   },
 };
 
+/**
+ * Menyediakan shell register dengan copy yang mengikuti role dari query string.
+ */
 const RegisterPage = () => {
   const [searchParams] = useSearchParams();
   const requestedRole = searchParams.get('role');

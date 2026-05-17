@@ -3,16 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Requests\Message\SendMessageRequest;
 use App\Services\MessageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class MessageController extends Controller
 {
+    /**
+     * Wire chat orchestration used by message, thread, and contact endpoints.
+     */
     public function __construct(private MessageService $messageService)
     {
     }
 
+    /**
+     * Return the authenticated user's chat threads with unread and latest-message metadata.
+     */
     public function threads(Request $request): JsonResponse
     {
         return response()->json([
@@ -20,6 +27,9 @@ class MessageController extends Controller
         ]);
     }
 
+    /**
+     * Return the contacts the authenticated user is allowed to message.
+     */
     public function contacts(Request $request): JsonResponse
     {
         return response()->json([
@@ -30,6 +40,9 @@ class MessageController extends Controller
         ]);
     }
 
+    /**
+     * Return the full conversation history between the current user and one counterpart.
+     */
     public function conversation(Request $request, int $userId): JsonResponse
     {
         $counterpart = User::find($userId);
@@ -45,13 +58,12 @@ class MessageController extends Controller
         ]);
     }
 
-    public function send(Request $request): JsonResponse
+    /**
+     * Validate and persist one outbound chat message from the authenticated user.
+     */
+    public function send(SendMessageRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'recipient_id' => 'required|integer|exists:users,id',
-            'body' => 'required|string|max:5000',
-            'job_id' => 'nullable|integer|exists:jobs,id',
-        ]);
+        $validated = $request->validated();
 
         $message = $this->messageService->sendMessage($request->user(), $validated);
 

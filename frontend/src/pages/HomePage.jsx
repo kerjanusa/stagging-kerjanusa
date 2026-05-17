@@ -127,6 +127,9 @@ const heroBenefitItems = [
   'Jangkau 10 juta+ kandidat',
 ];
 
+/**
+ * Menjadi landing utama KerjaNusa dengan CTA yang menyesuaikan peran user aktif.
+ */
 const HomePage = () => {
   const { user } = useAuth();
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
@@ -173,6 +176,9 @@ const HomePage = () => {
         ],
       };
 
+  /**
+   * Membuka atau menutup satu item FAQ agar interaksi accordion tetap sederhana.
+   */
   const toggleFaq = (index) => {
     setOpenFaqIndex((currentIndex) => (currentIndex === index ? null : index));
   };

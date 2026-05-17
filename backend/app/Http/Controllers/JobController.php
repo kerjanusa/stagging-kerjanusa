@@ -3,15 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Models\Job;
-use App\Models\User;
+use App\Requests\Job\StoreJobRequest;
+use App\Requests\Job\UpdateJobRequest;
+use App\Services\JobAuthorizationService;
 use App\Services\JobService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class JobController extends Controller
 {
-    public function __construct(private JobService $jobService)
+    /**
+     * Wire job orchestration and authorization helpers for recruiter and public endpoints.
+     */
+    public function __construct(
+        private JobService $jobService,
+        private JobAuthorizationService $jobAuthorizationService,
+    )
     {
     }
 
@@ -57,33 +64,9 @@ class JobController extends Controller
     /**
      * Memvalidasi input recruiter lalu membuat lowongan baru dengan status aktif.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreJobRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'category' => 'required|string',
-            'salary_min' => 'required|numeric|min:0',
-            'salary_max' => 'required|numeric|gte:salary_min',
-            'location' => 'required|string',
-            'job_type' => ['required', Rule::in(Job::JOB_TYPES)],
-            'experience_level' => ['required', Rule::in(Job::EXPERIENCE_LEVELS)],
-            'work_mode' => ['nullable', Rule::in(Job::WORK_MODES)],
-            'openings_count' => 'nullable|integer|min:0',
-            'interview_type' => ['nullable', Rule::in(Job::INTERVIEW_TYPES)],
-            'interview_note' => 'nullable|string',
-            'video_screening_requirement' => ['nullable', Rule::in(Job::VIDEO_SCREENING_REQUIREMENTS)],
-            'quiz_screening_questions' => 'nullable|array|max:8',
-            'quiz_screening_questions.*.id' => 'nullable|string|max:100',
-            'quiz_screening_questions.*.type' => ['required_with:quiz_screening_questions', Rule::in(['single-choice', 'text'])],
-            'quiz_screening_questions.*.title' => 'required_with:quiz_screening_questions|string|max:255',
-            'quiz_screening_questions.*.question' => 'required_with:quiz_screening_questions|string|max:500',
-            'quiz_screening_questions.*.answers' => 'nullable|array|max:10',
-            'quiz_screening_questions.*.answers.*' => 'nullable|string|max:100',
-            'quiz_screening_questions.*.required' => 'nullable|boolean',
-            'status' => ['nullable', Rule::in(Job::STATUSES)],
-            'workflow_status' => ['nullable', Rule::in(Job::WORKFLOW_STATUSES)],
-        ]);
+        $validated = $request->validated();
 
         $job = $this->jobService->createJob($request->user()->id, $validated);
 
@@ -96,33 +79,9 @@ class JobController extends Controller
     /**
      * Memvalidasi field yang boleh diubah lalu memperbarui lowongan yang dipilih.
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateJobRequest $request, int $id): JsonResponse
     {
-        $validated = $request->validate([
-            'title' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            'category' => 'nullable|string',
-            'salary_min' => 'nullable|numeric|min:0',
-            'salary_max' => 'nullable|numeric',
-            'location' => 'nullable|string',
-            'job_type' => ['nullable', Rule::in(Job::JOB_TYPES)],
-            'experience_level' => ['nullable', Rule::in(Job::EXPERIENCE_LEVELS)],
-            'work_mode' => ['nullable', Rule::in(Job::WORK_MODES)],
-            'openings_count' => 'nullable|integer|min:0',
-            'interview_type' => ['nullable', Rule::in(Job::INTERVIEW_TYPES)],
-            'interview_note' => 'nullable|string',
-            'video_screening_requirement' => ['nullable', Rule::in(Job::VIDEO_SCREENING_REQUIREMENTS)],
-            'quiz_screening_questions' => 'nullable|array|max:8',
-            'quiz_screening_questions.*.id' => 'nullable|string|max:100',
-            'quiz_screening_questions.*.type' => ['required_with:quiz_screening_questions', Rule::in(['single-choice', 'text'])],
-            'quiz_screening_questions.*.title' => 'required_with:quiz_screening_questions|string|max:255',
-            'quiz_screening_questions.*.question' => 'required_with:quiz_screening_questions|string|max:500',
-            'quiz_screening_questions.*.answers' => 'nullable|array|max:10',
-            'quiz_screening_questions.*.answers.*' => 'nullable|string|max:100',
-            'quiz_screening_questions.*.required' => 'nullable|boolean',
-            'status' => ['nullable', Rule::in(Job::STATUSES)],
-            'workflow_status' => ['nullable', Rule::in(Job::WORKFLOW_STATUSES)],
-        ]);
+        $validated = $request->validated();
 
         $job = Job::find($id);
 
@@ -132,7 +91,7 @@ class JobController extends Controller
             ], 404);
         }
 
-        if (!$this->canManageJob($request->user(), $job)) {
+        if (!$this->jobAuthorizationService->canManage($request->user(), $job)) {
             return response()->json([
                 'message' => 'Forbidden',
             ], 403);
@@ -164,7 +123,7 @@ class JobController extends Controller
             ], 404);
         }
 
-        if (!$this->canManageJob($request->user(), $job)) {
+        if (!$this->jobAuthorizationService->canManage($request->user(), $job)) {
             return response()->json([
                 'message' => 'Forbidden',
             ], 403);
@@ -225,7 +184,7 @@ class JobController extends Controller
             ], 404);
         }
 
-        if (!$this->canManageJob($request->user(), $job)) {
+        if (!$this->jobAuthorizationService->canManage($request->user(), $job)) {
             return response()->json([
                 'message' => 'Forbidden',
             ], 403);
@@ -236,11 +195,5 @@ class JobController extends Controller
         return response()->json([
             'data' => $stats,
         ]);
-    }
-
-    private function canManageJob(User $user, Job $job): bool
-    {
-        return $user->hasRole(User::ROLE_SUPERADMIN)
-            || ($user->hasRole(User::ROLE_RECRUITER) && $job->recruiter_id === $user->id);
     }
 }

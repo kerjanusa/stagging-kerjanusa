@@ -10,6 +10,9 @@ import {
 const MOCK_USERS_STORAGE_KEY = 'mock_auth_users';
 const MOCK_APPLICATIONS_STORAGE_KEY = 'mock_job_applications';
 
+/**
+ * Read and parse JSON from local storage while falling back safely on invalid data.
+ */
 const readStoredJson = (storageKey, fallbackValue) => {
   try {
     const rawValue = localStorage.getItem(storageKey);
@@ -19,6 +22,9 @@ const readStoredJson = (storageKey, fallbackValue) => {
   }
 };
 
+/**
+ * Load the current recruiter session from browser storage for demo flows.
+ */
 const getCurrentUser = () => {
   try {
     return JSON.parse(localStorage.getItem('user') || 'null');
@@ -27,14 +33,26 @@ const getCurrentUser = () => {
   }
 };
 
+/**
+ * Load mock users used by recruiter workspace demo features.
+ */
 const getMockUsers = () => readStoredJson(MOCK_USERS_STORAGE_KEY, []);
 
+/**
+ * Persist the updated mock user list after recruiter package changes.
+ */
 const saveMockUsers = (users) => {
   localStorage.setItem(MOCK_USERS_STORAGE_KEY, JSON.stringify(users));
 };
 
+/**
+ * Load mock applications used to compute candidate activity metrics.
+ */
 const getMockApplications = () => readStoredJson(MOCK_APPLICATIONS_STORAGE_KEY, []);
 
+/**
+ * Package a recruiter workspace collection into the same pagination shape as the backend.
+ */
 const paginateItems = (items, page = 1, perPage = 12) => {
   const currentPage = Math.max(1, Number(page) || 1);
   const itemsPerPage = Math.max(1, Number(perPage) || 12);
@@ -52,6 +70,9 @@ const paginateItems = (items, page = 1, perPage = 12) => {
   };
 };
 
+/**
+ * Derive a simple candidate grade from readiness and skill depth in demo mode.
+ */
 const resolveMockCandidateGrade = (candidate) => {
   if ((candidate.profile_readiness_percent || 0) >= 90 && (candidate.skills?.length || 0) >= 3) {
     return 'A';
@@ -64,6 +85,9 @@ const resolveMockCandidateGrade = (candidate) => {
   return 'C';
 };
 
+/**
+ * Build the mock talent-search candidate list with package-aware document visibility.
+ */
 const buildMockTalentCandidates = (recruiter) => {
   const recruiterPlan = mergeRecruiterPlanData(recruiter?.recruiter_profile || {});
   const planConfig = recruiterPlan.plan;
@@ -135,6 +159,9 @@ const buildMockTalentCandidates = (recruiter) => {
 };
 
 class RecruiterWorkspaceService {
+  /**
+   * Return the current recruiter package and the full selectable catalog.
+   */
   static async getPackageOverview() {
     if (shouldUseMockData) {
       const currentUser = getCurrentUser();
@@ -157,6 +184,9 @@ class RecruiterWorkspaceService {
     }
   }
 
+  /**
+   * Persist a recruiter package change and return the refreshed overview payload.
+   */
   static async updatePackage(planCode) {
     const normalizedPlanCode = normalizeRecruiterPlanCode(planCode);
 
@@ -207,6 +237,9 @@ class RecruiterWorkspaceService {
     }
   }
 
+  /**
+   * Search visible candidates using recruiter filters and plan-limited result caps.
+   */
   static async searchTalent(filters = {}, page = 1, perPage = 12) {
     if (shouldUseMockData) {
       const currentUser = getCurrentUser();

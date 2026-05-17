@@ -45,12 +45,21 @@ const RESET_PASSWORD_STEPS = [
   },
 ];
 
+/**
+ * Menyatukan berbagai bentuk error reset password menjadi satu string UI.
+ */
 const getErrorMessage = (error, fallback) =>
   typeof error === 'string' ? error : error?.message || fallback;
 
+/**
+ * Mengambil error validasi terstruktur bila backend mengirim field-level errors.
+ */
 const getValidationErrors = (error) =>
   typeof error === 'object' && error?.errors ? error.errors : {};
 
+/**
+ * Menyediakan flow penggantian password baru dari link reset yang dikirim via email.
+ */
 const ResetPasswordPage = () => {
   const [searchParams] = useSearchParams();
   const [password, setPassword] = useState('');
@@ -86,6 +95,9 @@ const ResetPasswordPage = () => {
   const getFieldError = (fieldName) => validationErrors?.[fieldName]?.[0] || '';
   const hasFieldErrors = Object.keys(validationErrors || {}).length > 0;
 
+  /**
+   * Membersihkan error global dan error validasi saat user mengubah input password.
+   */
   const clearFeedback = () => {
     if (error || hasFieldErrors) {
       setError('');
@@ -93,6 +105,9 @@ const ResetPasswordPage = () => {
     }
   };
 
+  /**
+   * Mengirim token, email, dan password baru ke endpoint reset password frontend service.
+   */
   const handleSubmit = async (event) => {
     event.preventDefault();
 

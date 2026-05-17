@@ -7,15 +7,24 @@ use Illuminate\Notifications\Notification;
 
 class ResetPasswordNotification extends Notification
 {
+    /**
+     * Menyimpan token reset password yang akan dibawa ke link frontend.
+     */
     public function __construct(private readonly string $token)
     {
     }
 
+    /**
+     * Menentukan channel notifikasi reset password yang dipakai aplikasi.
+     */
     public function via(object $notifiable): array
     {
         return ['mail'];
     }
 
+    /**
+     * Menyusun email reset password lengkap dengan link frontend dan masa berlaku token.
+     */
     public function toMail(object $notifiable): MailMessage
     {
         $expireMinutes = (int) config('auth.passwords.'.config('auth.defaults.passwords').'.expire');

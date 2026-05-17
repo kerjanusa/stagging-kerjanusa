@@ -11,6 +11,9 @@ const apiClient = axios.create({
   },
 });
 
+/**
+ * Detect auth endpoints that must never receive an existing bearer token automatically.
+ */
 const isPublicAuthRequest = (url = '') => {
   if (typeof url !== 'string') {
     return false;
@@ -24,6 +27,9 @@ const isPublicAuthRequest = (url = '') => {
   );
 };
 
+/**
+ * Clear the current browser session and redirect the user to the role-appropriate login page.
+ */
 const clearSessionAndRedirectToLogin = () => {
   let userRole = null;
 

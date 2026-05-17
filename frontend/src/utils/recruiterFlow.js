@@ -33,6 +33,9 @@ export const APPLICATION_STAGE_OPTIONS = [
   { value: 'withdrawn', label: 'Dibatalkan kandidat' },
 ];
 
+/**
+ * Create the default recruiter company profile shape used by the dashboard form.
+ */
 const createRecruiterCompanyProfile = (user) => ({
   recruiterName: user?.name || '',
   companyName: user?.company_name || '',
@@ -46,6 +49,9 @@ const createRecruiterCompanyProfile = (user) => ({
   kn_credit: 0,
 });
 
+/**
+ * Merge stored recruiter company data with defaults and normalized package data.
+ */
 const mergeRecruiterCompanyProfile = (user, savedProfile) => {
   const baseProfile = createRecruiterCompanyProfile(user);
 
@@ -62,6 +68,9 @@ const mergeRecruiterCompanyProfile = (user, savedProfile) => {
   });
 };
 
+/**
+ * Read JSON from local storage with a safe fallback for SSR and parse failures.
+ */
 const readStoredJson = (storageKey, fallbackValue) => {
   if (typeof window === 'undefined') {
     return fallbackValue;
@@ -80,6 +89,9 @@ const readStoredJson = (storageKey, fallbackValue) => {
   }
 };
 
+/**
+ * Persist a JSON-serializable value to local storage when running in the browser.
+ */
 const writeStoredJson = (storageKey, value) => {
   if (typeof window === 'undefined') {
     return;
@@ -88,9 +100,15 @@ const writeStoredJson = (storageKey, value) => {
   window.localStorage.setItem(storageKey, JSON.stringify(value));
 };
 
+/**
+ * Build the storage key used for one recruiter's local company-profile draft.
+ */
 export const getRecruiterCompanyProfileStorageKey = (userId) =>
   `${RECRUITER_COMPANY_PROFILE_STORAGE_PREFIX}:${userId || 'guest'}`;
 
+/**
+ * Resolve the recruiter company profile from backend data plus local draft overrides.
+ */
 export const readRecruiterCompanyProfile = (user) =>
   mergeRecruiterCompanyProfile(
     user,
@@ -102,6 +120,9 @@ export const readRecruiterCompanyProfile = (user) =>
     }
   );
 
+/**
+ * Normalize and persist one recruiter company profile draft.
+ */
 export const saveRecruiterCompanyProfile = (user, profile) => {
   const normalizedProfile = mergeRecruiterCompanyProfile(user, {
     ...profile,
@@ -120,6 +141,9 @@ export const saveRecruiterCompanyProfile = (user, profile) => {
   return normalizedProfile;
 };
 
+/**
+ * Build the recruiter company-profile checklist used by readiness indicators.
+ */
 export const getRecruiterCompanyChecklist = (profile) => [
   {
     key: 'companyName',
@@ -165,6 +189,9 @@ export const getRecruiterCompanyChecklist = (profile) => [
   },
 ];
 
+/**
+ * Summarize recruiter company-profile completeness and readiness percentages.
+ */
 export const getRecruiterCompanyCompletion = (profile) => {
   const checklist = getRecruiterCompanyChecklist(profile);
   const requiredChecklist = checklist.filter((item) => item.required);
@@ -188,11 +215,20 @@ export const getRecruiterCompanyCompletion = (profile) => {
   };
 };
 
+/**
+ * Read the locally stored workflow-status overrides for recruiter job cards.
+ */
 const readJobWorkflowMap = () => readStoredJson(RECRUITER_JOB_WORKFLOW_STORAGE_KEY, {});
 
+/**
+ * Format one recruiter job-workflow status into a display label.
+ */
 export const getJobWorkflowLabel = (status) =>
   RECRUITER_JOB_WORKFLOW_OPTIONS.find((option) => option.value === status)?.label || status;
 
+/**
+ * Resolve the effective recruiter workflow status for one job from API or local override state.
+ */
 export const getJobWorkflowStatus = (job) => {
   if (job?.workflow_status) {
     return job.workflow_status;
@@ -208,6 +244,9 @@ export const getJobWorkflowStatus = (job) => {
   return job?.status === 'active' ? 'active' : 'draft';
 };
 
+/**
+ * Persist the recruiter workflow-status override for one job.
+ */
 export const saveJobWorkflowStatus = (jobId, workflowStatus) => {
   const workflowMap = readJobWorkflowMap();
   const nextWorkflowMap = {
@@ -219,14 +258,26 @@ export const saveJobWorkflowStatus = (jobId, workflowStatus) => {
   return nextWorkflowMap;
 };
 
+/**
+ * Map recruiter-facing workflow values back to the legacy backend status field.
+ */
 export const mapJobWorkflowToBackendStatus = (workflowStatus) =>
   workflowStatus === 'active' ? 'active' : 'inactive';
 
+/**
+ * Read the locally stored recruiter application-stage overrides.
+ */
 const readApplicationStageMap = () => readStoredJson(RECRUITER_APPLICATION_STAGE_STORAGE_KEY, {});
 
+/**
+ * Format one recruiter application stage into a display label.
+ */
 export const getApplicationStageLabel = (stage) =>
   APPLICATION_STAGE_OPTIONS.find((option) => option.value === stage)?.label || stage;
 
+/**
+ * Map a legacy application status into the richer recruiter-facing pipeline stage.
+ */
 export const mapApplicationStatusToStage = (status) => {
   switch (String(status || '').trim().toLowerCase()) {
     case 'screening':
@@ -250,6 +301,9 @@ export const mapApplicationStatusToStage = (status) => {
   }
 };
 
+/**
+ * Resolve the effective stage for one application from API data or local recruiter override state.
+ */
 export const getApplicationStage = (application) => {
   if (application?.stage) {
     return application.stage;
@@ -265,6 +319,9 @@ export const getApplicationStage = (application) => {
   return mapApplicationStatusToStage(application?.status);
 };
 
+/**
+ * Persist the recruiter-facing stage override for one application card.
+ */
 export const saveApplicationStage = (applicationId, stage) => {
   const stageMap = readApplicationStageMap();
   const nextStageMap = {
@@ -279,6 +336,9 @@ export const saveApplicationStage = (applicationId, stage) => {
   return nextStageMap;
 };
 
+/**
+ * Map a recruiter-facing application stage back to the legacy backend status enum.
+ */
 export const mapApplicationStageToBackendStatus = (stage) => {
   switch (stage) {
     case 'rejected':
@@ -297,9 +357,15 @@ export const mapApplicationStageToBackendStatus = (stage) => {
   }
 };
 
+/**
+ * Check whether a recruiter pipeline stage still counts as actively in progress.
+ */
 export const isRecruiterApplicationStageActive = (stage) =>
   !['hired', 'rejected', 'withdrawn'].includes(stage);
 
+/**
+ * Return tone and summary metadata for recruiter pipeline stage badges and cards.
+ */
 export const getRecruiterApplicationStageMeta = (stage) => {
   switch (stage) {
     case 'screening':
@@ -346,6 +412,9 @@ export const getRecruiterApplicationStageMeta = (stage) => {
   }
 };
 
+/**
+ * Recommend the next recruiter dashboard action based on profile, jobs, and pipeline activity.
+ */
 export const getRecruiterOverviewNextAction = ({
   companyCompletion,
   jobs,

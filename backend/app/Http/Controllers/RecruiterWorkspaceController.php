@@ -3,14 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Requests\Recruiter\UpdateRecruiterPackageRequest;
 use App\Services\RecruiterPlanService;
 use App\Services\TalentSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class RecruiterWorkspaceController extends Controller
 {
+    /**
+     * Wire recruiter workspace services for plan and talent-search endpoints.
+     */
     public function __construct(
         private RecruiterPlanService $recruiterPlanService,
         private TalentSearchService $talentSearchService,
@@ -18,6 +21,9 @@ class RecruiterWorkspaceController extends Controller
     {
     }
 
+    /**
+     * Return the current recruiter package plus the full selectable catalog.
+     */
     public function package(Request $request): JsonResponse
     {
         return response()->json([
@@ -28,15 +34,12 @@ class RecruiterWorkspaceController extends Controller
         ]);
     }
 
-    public function updatePackage(Request $request): JsonResponse
+    /**
+     * Persist a recruiter package change and return the refreshed package payload.
+     */
+    public function updatePackage(UpdateRecruiterPackageRequest $request): JsonResponse
     {
-        $planCodes = collect($this->recruiterPlanService->getPlanCatalog())
-            ->pluck('code')
-            ->all();
-
-        $validated = $request->validate([
-            'plan_code' => ['required', Rule::in($planCodes)],
-        ]);
+        $validated = $request->validated();
 
         /** @var User $user */
         $user = $request->user();
@@ -55,6 +58,9 @@ class RecruiterWorkspaceController extends Controller
         ]);
     }
 
+    /**
+     * Run recruiter talent search with filters and package-aware pagination limits.
+     */
     public function talentSearch(Request $request): JsonResponse
     {
         $perPage = (int) $request->query('per_page', 12);

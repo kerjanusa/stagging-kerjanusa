@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
 import JobService from '../services/jobService';
 
+/**
+ * Hide backend SQL errors behind a user-facing fallback message when needed.
+ */
 const getJobErrorMessage = (error, fallbackMessage) => {
   const message = typeof error === 'string' ? error : error?.message;
 
@@ -11,6 +14,9 @@ const getJobErrorMessage = (error, fallbackMessage) => {
   return message;
 };
 
+/**
+ * Manage public and recruiter job state around the shared job service layer.
+ */
 const useJobs = () => {
   const [jobs, setJobs] = useState([]);
   const [pagination, setPagination] = useState(null);

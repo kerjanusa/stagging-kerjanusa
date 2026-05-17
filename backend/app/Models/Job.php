@@ -106,11 +106,17 @@ class Job extends Model
         'updated_at' => 'datetime',
     ];
 
+    /**
+     * Return the recruiter that owns this job posting.
+     */
     public function recruiter()
     {
         return $this->belongsTo(User::class, 'recruiter_id');
     }
 
+    /**
+     * Return all applications submitted against this job posting.
+     */
     public function applications()
     {
         return $this->hasMany(Application::class);

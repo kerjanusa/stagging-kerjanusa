@@ -43,6 +43,9 @@ const createStarterPassword = (rawPhone) => {
   return `Kerja${tail}24`;
 };
 
+/**
+ * Menyediakan form pendaftaran recruiter singkat untuk landing page marketing.
+ */
 const LandingRegisterForm = () => {
   const [formData, setFormData] = useState({
     name: '',

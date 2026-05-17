@@ -12,10 +12,19 @@ use Illuminate\Support\Facades\Schema;
 
 class AdminService
 {
-    public function __construct(private RecruiterPlanService $recruiterPlanService)
+    /**
+     * Wire plan helpers and logging for superadmin dashboard aggregation.
+     */
+    public function __construct(
+        private RecruiterPlanService $recruiterPlanService,
+        private ServiceActivityLogService $serviceActivityLogService,
+    )
     {
     }
 
+    /**
+     * Cache and resolve whether a schema column exists on the current database.
+     */
     private function hasColumn(string $table, string $column): bool
     {
         static $columnCache = [];
@@ -31,6 +40,9 @@ class AdminService
         return $columnCache[$table][$column];
     }
 
+    /**
+     * Convert optional scalar values into safe SQL literals for fallback expressions.
+     */
     private function toSqlLiteral(string|int|null $value): string
     {
         if ($value === null) {
@@ -44,6 +56,9 @@ class AdminService
         return "'" . str_replace("'", "''", $value) . "'";
     }
 
+    /**
+     * Select a column when present, or fall back to a synthetic SQL value when absent.
+     */
     private function selectOptionalColumn(string $table, string $column, string $alias, string|int|null $fallback = null)
     {
         if ($this->hasColumn($table, $column)) {
@@ -55,6 +70,9 @@ class AdminService
         return DB::raw(sprintf('%s as %s', $this->toSqlLiteral($fallback), $alias));
     }
 
+    /**
+     * Decode JSON-like payload columns into arrays without throwing on invalid data.
+     */
     private function decodeArrayPayload(mixed $value): array
     {
         if (is_array($value)) {
@@ -70,6 +88,9 @@ class AdminService
         return is_array($decoded) ? $decoded : [];
     }
 
+    /**
+     * Check whether a profile contains all fields needed to be considered "ready".
+     */
     private function extractProfileReadiness(array $profile, array $requiredKeys): bool
     {
         foreach ($requiredKeys as $key) {
@@ -123,6 +144,15 @@ class AdminService
             !$hasApplicationScreeningAnswers ? 'applications.screening_answers' : null,
             !$hasApplicationVideoIntroUrl ? 'applications.video_intro_url' : null,
         ])->filter()->values()->all();
+
+        if (!empty($schemaWarnings)) {
+            $this->serviceActivityLogService->warning($this, 'admin_service.dashboard_schema_warnings_detected', [
+                'action' => 'get_dashboard_data',
+                'schema_warning_count' => count($schemaWarnings),
+                'schema_warnings' => $schemaWarnings,
+                'result' => 'partial_schema',
+            ]);
+        }
 
         $userAggregates = User::query()
             ->selectRaw('COUNT(*) as total_users')
@@ -590,7 +620,7 @@ class AdminService
                 ->all(),
         ];
 
-        return [
+        $dashboardData = [
             'totals' => $totals,
             'growth' => $growth,
             'screening_overview' => $screeningOverview,
@@ -616,5 +646,20 @@ class AdminService
                 'schema_warnings' => $schemaWarnings,
             ],
         ];
+
+        $this->serviceActivityLogService->info($this, 'admin_service.dashboard_loaded', [
+            'action' => 'get_dashboard_data',
+            'schema_warning_count' => count($schemaWarnings),
+            'candidate_row_count' => count($candidateTable),
+            'recruiter_row_count' => count($recruiterTable),
+            'job_row_count' => count($jobs),
+            'application_row_count' => count($applications),
+            'total_users' => (int) ($userAggregates->total_users ?? 0),
+            'total_jobs' => $totals['total_jobs'],
+            'total_applications' => $totals['total_applications'],
+            'result' => 'success',
+        ]);
+
+        return $dashboardData;
     }
 }

@@ -4,6 +4,9 @@ import {
   formatVideoScreeningRequirement,
 } from '../utils/jobFormatters.js';
 
+/**
+ * Menjadikan slug atau kode teknis job menjadi label yang lebih ramah dibaca.
+ */
 const formatDisplayLabel = (value) => {
   if (!value) {
     return '-';
@@ -14,6 +17,9 @@ const formatDisplayLabel = (value) => {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 };
 
+/**
+ * Menampilkan ringkasan lowongan publik lengkap dengan CTA apply.
+ */
 const JobCard = ({
   job,
   index = 0,

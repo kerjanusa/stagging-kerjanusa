@@ -2,6 +2,9 @@ import { useEffect, useRef } from 'react';
 import '../styles/workspace.css';
 import '../styles/collaboration.css';
 
+/**
+ * Memformat timestamp pesan menjadi label waktu singkat yang nyaman dibaca di inbox.
+ */
 const formatMessageTime = (value) => {
   if (!value) {
     return '-';
@@ -19,8 +22,14 @@ const formatMessageTime = (value) => {
   }
 };
 
+/**
+ * Menormalkan string label supaya tampilan thread dan kontak tidak membawa spasi berlebih.
+ */
 const normalizeLabelText = (value) => String(value || '').trim();
 
+/**
+ * Mengambil bagian depan email sebagai fallback label kontak.
+ */
 const getEmailAlias = (value) => {
   const normalizedEmail = normalizeLabelText(value);
 
@@ -31,6 +40,9 @@ const getEmailAlias = (value) => {
   return normalizedEmail.split('@')[0];
 };
 
+/**
+ * Menentukan nama utama yang ditampilkan untuk thread atau kontak berdasarkan role yang aktif.
+ */
 const resolveContactLabel = (contact) => {
   if (!contact) {
     return 'Kontak';
@@ -56,6 +68,9 @@ const resolveContactLabel = (contact) => {
   return normalizedName || normalizedCompany || normalizedEmailAlias || `Pelamar #${contact.id || '-'}`;
 };
 
+/**
+ * Menentukan teks pendamping kontak seperti email atau label akun cadangan.
+ */
 const resolveContactSecondaryText = (contact) => {
   if (!contact) {
     return 'Kontak belum tersedia.';
@@ -80,6 +95,9 @@ const resolveContactSecondaryText = (contact) => {
   return normalizedCompany || `Akun pelamar #${contact.id || '-'}`;
 };
 
+/**
+ * Menyediakan layout inbox generik untuk thread, daftar kontak, dan panel percakapan.
+ */
 const InboxWorkspace = ({
   title,
   description,
@@ -116,6 +134,9 @@ const InboxWorkspace = ({
     return () => window.cancelAnimationFrame(nextFrame);
   }, [messages, selectedContactId]);
 
+  /**
+   * Mengirim draft pesan aktif dari form chat ketika penerima sudah dipilih.
+   */
   const handleSubmit = (event) => {
     event.preventDefault();
 

@@ -23,18 +23,33 @@ export const VIDEO_SCREENING_LABELS = {
   optional: '',
 };
 
+/**
+ * Convert machine-style enum values into a human-readable start-cased fallback label.
+ */
 const startCase = (value = '') =>
   String(value)
     .replace(/[-_]+/g, ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase());
 
+/**
+ * Format a job experience-level enum into a recruiter-friendly label.
+ */
 export const formatExperienceLevel = (value = '') =>
   EXPERIENCE_LEVEL_LABELS[value] || startCase(value) || '-';
 
+/**
+ * Format a work-mode enum into a display label for the UI.
+ */
 export const formatWorkMode = (value = '') => WORK_MODE_LABELS[value] || startCase(value) || '-';
 
+/**
+ * Format an interview-type enum into a display label for the UI.
+ */
 export const formatInterviewType = (value = '') =>
   INTERVIEW_TYPE_LABELS[value] || startCase(value) || '-';
 
+/**
+ * Format the video-screening requirement enum into its short display label.
+ */
 export const formatVideoScreeningRequirement = (value = '') =>
   VIDEO_SCREENING_LABELS[value] || '';

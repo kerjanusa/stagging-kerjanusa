@@ -48,11 +48,30 @@ class RecruiterPlanService
         ],
     ];
 
+    /**
+     * Wire logging used by plan resolution and enforcement helpers.
+     */
+    public function __construct(private ServiceActivityLogService $serviceActivityLogService)
+    {
+    }
+
+    /**
+     * Return the public recruiter package catalog in a frontend-friendly format.
+     */
     public function getPlanCatalog(): array
     {
+        $this->serviceActivityLogService->debug($this, 'recruiter_plan_service.catalog_requested', [
+            'action' => 'get_plan_catalog',
+            'catalog_size' => count(self::PLAN_CATALOG),
+            'result' => 'success',
+        ]);
+
         return array_values(self::PLAN_CATALOG);
     }
 
+    /**
+     * Normalize arbitrary plan input to one known internal plan code.
+     */
     public function normalizePlanCode(?string $planCode): string
     {
         $normalizedPlanCode = strtolower(trim((string) $planCode));
@@ -62,16 +81,30 @@ class RecruiterPlanService
             : self::PLAN_STARTER;
     }
 
+    /**
+     * Resolve the immutable configuration for a normalized plan code.
+     */
     public function getPlanConfig(?string $planCode): array
     {
         return self::PLAN_CATALOG[$this->normalizePlanCode($planCode)];
     }
 
+    /**
+     * Merge recruiter profile data with the active plan configuration and credits.
+     */
     public function getRecruiterPlanContext(User $recruiter): array
     {
         $profile = is_array($recruiter->recruiter_profile) ? $recruiter->recruiter_profile : [];
         $planCode = $this->normalizePlanCode($profile['plan_code'] ?? null);
         $planConfig = $this->getPlanConfig($planCode);
+
+        $this->serviceActivityLogService->debug($this, 'recruiter_plan_service.context_resolved', [
+            'action' => 'get_recruiter_plan_context',
+            'target_user_id' => $recruiter->id,
+            'plan_code' => $planCode,
+            'kn_credit' => max(0, (int) ($profile['kn_credit'] ?? self::DEFAULT_KN_CREDIT)),
+            'result' => 'success',
+        ], $recruiter);
 
         return [
             ...$planConfig,
@@ -79,6 +112,9 @@ class RecruiterPlanService
         ];
     }
 
+    /**
+     * Ensure recruiter profile data always carries normalized plan and credit fields.
+     */
     public function normalizeRecruiterProfile(?array $profile): array
     {
         $currentProfile = is_array($profile) ? $profile : [];
@@ -93,6 +129,9 @@ class RecruiterPlanService
         ];
     }
 
+    /**
+     * Expose the document visibility quota that applies to a recruiter package.
+     */
     public function getVisibleDocumentLimits(User $recruiter): array
     {
         $plan = $this->getRecruiterPlanContext($recruiter);
@@ -103,14 +142,44 @@ class RecruiterPlanService
         ];
     }
 
+    /**
+     * Decide whether a recruiter may activate one more job under the current package.
+     */
     public function canPublishAdditionalJob(User $recruiter, int $currentActiveJobs): bool
     {
         $plan = $this->getRecruiterPlanContext($recruiter);
 
         if ($plan['job_limit'] === null) {
+            $this->serviceActivityLogService->debug($this, 'recruiter_plan_service.job_limit_not_enforced', [
+                'action' => 'can_publish_additional_job',
+                'target_user_id' => $recruiter->id,
+                'plan_code' => $plan['code'] ?? null,
+                'current_active_jobs' => $currentActiveJobs,
+                'result' => 'allowed',
+            ], $recruiter);
+
             return true;
         }
 
-        return $currentActiveJobs < (int) $plan['job_limit'];
+        $canPublish = $currentActiveJobs < (int) $plan['job_limit'];
+
+        $this->serviceActivityLogService->log(
+            $this,
+            $canPublish ? 'debug' : 'warning',
+            $canPublish
+                ? 'recruiter_plan_service.additional_job_allowed'
+                : 'recruiter_plan_service.additional_job_denied',
+            [
+                'action' => 'can_publish_additional_job',
+                'target_user_id' => $recruiter->id,
+                'plan_code' => $plan['code'] ?? null,
+                'current_active_jobs' => $currentActiveJobs,
+                'job_limit' => (int) $plan['job_limit'],
+                'result' => $canPublish ? 'allowed' : 'denied',
+            ],
+            $recruiter
+        );
+
+        return $canPublish;
     }
 }

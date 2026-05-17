@@ -75,6 +75,9 @@ const locationAliases = {
   'parung bogor': 'parung kabupaten bogor',
 };
 
+/**
+ * Menormalkan nama lokasi ke format key rendah huruf kecil yang konsisten.
+ */
 export const normalizeLocationKey = (locationName = '') =>
   String(locationName || '')
     .trim()
@@ -100,6 +103,9 @@ const normalizedCoordinateKeys = Object.keys(normalizedLocationCoordinates).sort
   (firstKey, secondKey) => secondKey.length - firstKey.length
 );
 
+/**
+ * Membangun beberapa variasi nama lokasi agar pencarian koordinat lebih toleran terhadap format input.
+ */
 const buildLocationVariants = (locationName = '') => {
   const rawLocation = String(locationName || '').trim().toLowerCase();
   const normalizedLocation = normalizeLocationKey(rawLocation);
@@ -144,6 +150,9 @@ const buildLocationVariants = (locationName = '') => {
   return Array.from(variants);
 };
 
+/**
+ * Mengambil koordinat kota/kabupaten terbaik dari input lokasi yang sering bervariasi.
+ */
 export const getLocationCoordinates = (locationName) => {
   const directVariants = buildLocationVariants(locationName);
 

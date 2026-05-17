@@ -55,6 +55,9 @@ const LOGIN_ENTRY_COPY = {
   },
 };
 
+/**
+ * Menyediakan shell login dengan copy yang menyesuaikan role tujuan dari query string.
+ */
 const LoginPage = () => {
   const [searchParams] = useSearchParams();
   const [currentSlide, setCurrentSlide] = useState(0);

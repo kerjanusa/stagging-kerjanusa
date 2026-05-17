@@ -60,6 +60,9 @@ const FORGOT_PASSWORD_STEPS = [
   },
 ];
 
+/**
+ * Menyediakan flow permintaan link reset password yang netral untuk semua role.
+ */
 const ForgotPasswordPage = () => {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
@@ -79,6 +82,9 @@ const ForgotPasswordPage = () => {
   const hasFieldErrors = Object.keys(validationErrors || {}).length > 0;
   const getFieldError = (fieldName) => validationErrors?.[fieldName]?.[0] || '';
 
+  /**
+   * Menghapus pesan error lama saat user mulai memperbaiki input email.
+   */
   const clearFeedback = () => {
     if (error || hasFieldErrors) {
       setError('');
@@ -86,6 +92,9 @@ const ForgotPasswordPage = () => {
     }
   };
 
+  /**
+   * Mengirim email ke endpoint forgot password lalu menampilkan status generik yang aman.
+   */
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -117,6 +126,9 @@ const ForgotPasswordPage = () => {
     }
   };
 
+  /**
+   * Mengembalikan panel sukses ke state form kosong agar user bisa mencoba email lain.
+   */
   const handleReset = () => {
     setSubmittedEmail('');
     setSuccessMessage('');
