@@ -8,7 +8,6 @@ import useChat from '../hooks/useChat.js';
 import useJobs from '../hooks/useJobs.js';
 import {
   formatCandidateApplicationStatus,
-  formatCandidateCareerStage,
   getCandidateApplicationMeta,
   getCandidateApplicationTimeline,
   getCandidateProfileCompletion,
@@ -18,21 +17,20 @@ import {
   saveCandidateProfile,
   sortCandidateRecommendedJobs,
 } from '../utils/candidateFlow.js';
-import { saveCandidateApplyIntent } from '../utils/candidateApplyIntent.js';
-import { formatExperienceLevel, formatWorkMode } from '../utils/jobFormatters.js';
-import { APP_ROUTES } from '../utils/routeHelpers.js';
+import {
+  formatExperienceLevel,
+  formatVideoScreeningRequirement,
+  formatWorkMode,
+} from '../utils/jobFormatters.js';
+import { APP_ROUTES, getJobApplyRoute } from '../utils/routeHelpers.js';
 import '../styles/workspace.css';
 
 const CANDIDATE_SECTION_OPTIONS = [
-  { value: 'overview', label: 'Dashboard', mobileLabel: 'Beranda' },
-  { value: 'profile', label: 'Profil Siap Lamar', mobileLabel: 'Profil' },
-  { value: 'jobs', label: 'Lowongan', mobileLabel: 'Lowongan' },
-  { value: 'applications', label: 'Lamaran Saya', mobileLabel: 'Lamaran' },
+  { value: 'profile', label: 'Profil Siap Lamar', mobileLabel: 'Profil Siap Lamar' },
+  { value: 'jobs', label: 'Lowongan Kerja', mobileLabel: 'Lowongan Kerja' },
+  { value: 'applications', label: 'Lamaran Saya', mobileLabel: 'Lamaran Saya' },
   { value: 'messages', label: 'Chat', mobileLabel: 'Chat' },
 ];
-
-const CONTACT_WHATSAPP_LINK =
-  'https://api.whatsapp.com/send?phone=6281286402753&text=Halo%20KerjaNusa';
 
 /**
  * Mengambil ekstensi file dengan aman untuk validasi dokumen kandidat.
@@ -62,9 +60,13 @@ const isPdfResumeFileName = (fileName = '') => getFileExtension(fileName) === 'p
 const EARTH_RADIUS_IN_KILOMETERS = 6371;
 const MAX_LOCATION_FALLBACK_DISTANCE_IN_KILOMETERS = 60;
 const DEFAULT_VISIBLE_EXPERIENCE_ENTRIES = 1;
-const MAX_ADDITIONAL_EXPERIENCE_ENTRIES = 3;
+const MAX_ADDITIONAL_EXPERIENCE_ENTRIES = 2;
 const MAX_VISIBLE_EXPERIENCE_ENTRIES =
   DEFAULT_VISIBLE_EXPERIENCE_ENTRIES + MAX_ADDITIONAL_EXPERIENCE_ENTRIES;
+const DEFAULT_VISIBLE_ORGANIZATION_ENTRIES = 1;
+const MAX_ADDITIONAL_ORGANIZATION_ENTRIES = 2;
+const MAX_VISIBLE_ORGANIZATION_ENTRIES =
+  DEFAULT_VISIBLE_ORGANIZATION_ENTRIES + MAX_ADDITIONAL_ORGANIZATION_ENTRIES;
 const PROFILE_PHOTO_MAX_FILE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 const PROFILE_PHOTO_MAX_DIMENSION_IN_PIXELS = 480;
 const PROFILE_PHOTO_OUTPUT_QUALITY = 0.82;
@@ -97,7 +99,19 @@ const createEmptyExperienceEntry = () => ({
   achievement: '',
   reasonForLeaving: '',
   referenceName: '',
+  referencePosition: '',
   referencePhone: '',
+});
+
+/**
+ * Menyediakan template kosong untuk satu entri organisasi atau relawan kandidat.
+ */
+const createEmptyOrganizationActivityEntry = () => ({
+  organizationName: '',
+  role: '',
+  startYear: '',
+  endYear: '',
+  description: '',
 });
 
 /**
@@ -332,6 +346,26 @@ const getVisibleExperienceCount = (profile) =>
   );
 
 /**
+ * Menghitung jumlah entri organisasi atau relawan yang benar-benar terisi oleh kandidat.
+ */
+const countFilledOrganizationEntries = (organizationActivities = []) =>
+  organizationActivities.filter(
+    (item) => item?.organizationName?.trim() || item?.role?.trim()
+  ).length;
+
+/**
+ * Menentukan berapa banyak kartu organisasi yang perlu dibuka di UI kandidat.
+ */
+const getVisibleOrganizationCount = (profile) =>
+  Math.min(
+    MAX_VISIBLE_ORGANIZATION_ENTRIES,
+    Math.max(
+      DEFAULT_VISIBLE_ORGANIZATION_ENTRIES,
+      countFilledOrganizationEntries(profile?.organizationActivities || [])
+    )
+  );
+
+/**
  * Menyaring input usia agar hanya berisi maksimal tiga digit angka.
  */
 const normalizeAgeInput = (value = '') =>
@@ -453,7 +487,7 @@ const CANDIDATE_EDUCATION_LEVEL_OPTIONS = [
 ];
 
 /**
- * Mengubah hash URL kandidat menjadi nama tab dashboard yang valid.
+ * Mengubah hash URL kandidat menjadi section kandidat yang valid.
  */
 const resolveCandidateSectionFromHash = (hash) => {
   if (hash === '#profile') {
@@ -472,16 +506,13 @@ const resolveCandidateSectionFromHash = (hash) => {
     return 'messages';
   }
 
-  return 'overview';
+  return 'profile';
 };
 
 /**
  * Menyusun URL section kandidat agar perpindahan tab konsisten di satu helper.
  */
-const getCandidateSectionRoute = (section) =>
-  section === 'overview'
-    ? APP_ROUTES.candidateDashboard
-    : `${APP_ROUTES.candidateDashboard}#${section}`;
+const getCandidateSectionRoute = (section) => `${APP_ROUTES.candidateDashboard}#${section}`;
 
 /**
  * Memformat timestamp untuk riwayat aktivitas, aplikasi, dan chat kandidat.
@@ -593,7 +624,7 @@ const createChecklistStatusItem = (label, isComplete, pendingAction = 'Lengkapi'
 });
 
 /**
- * Membangun section checklist utama yang dipakai di dashboard kesiapan kandidat.
+ * Membangun section checklist utama yang dipakai di ringkasan kesiapan kandidat.
  */
 const buildCandidateDashboardChecklistSections = (profile, completion) => {
   const checklistLookup = Object.fromEntries(
@@ -689,6 +720,9 @@ const CandidateDashboardPage = () => {
   const [visibleExperienceCount, setVisibleExperienceCount] = useState(() =>
     getVisibleExperienceCount(readCandidateProfile(user, { preferStoredDraft: false }))
   );
+  const [visibleOrganizationCount, setVisibleOrganizationCount] = useState(() =>
+    getVisibleOrganizationCount(readCandidateProfile(user, { preferStoredDraft: false }))
+  );
   const [feedback, setFeedback] = useState(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -709,6 +743,7 @@ const CandidateDashboardPage = () => {
     const nextProfile = readCandidateProfile(user, { preferStoredDraft: false });
     setProfile(nextProfile);
     setVisibleExperienceCount(getVisibleExperienceCount(nextProfile));
+    setVisibleOrganizationCount(getVisibleOrganizationCount(nextProfile));
   }, [user]);
 
   useEffect(() => {
@@ -750,6 +785,7 @@ const CandidateDashboardPage = () => {
         const nextProfile = readCandidateProfile(freshUser, { preferStoredDraft: false });
         setProfile(nextProfile);
         setVisibleExperienceCount(getVisibleExperienceCount(nextProfile));
+        setVisibleOrganizationCount(getVisibleOrganizationCount(nextProfile));
       })
       .catch(() => {});
 
@@ -767,7 +803,9 @@ const CandidateDashboardPage = () => {
       type: 'success',
       message: location.state.candidateNotice,
     });
-    navigate(`${APP_ROUTES.candidateDashboard}${location.hash}`, { replace: true });
+    navigate(getCandidateSectionRoute(resolveCandidateSectionFromHash(location.hash)), {
+      replace: true,
+    });
   }, [location.hash, location.state, navigate]);
 
   useEffect(() => {
@@ -816,45 +854,6 @@ const CandidateDashboardPage = () => {
     [applications, jobs, persistedProfile]
   );
   const spotlightJobs = recommendedJobs.slice(0, 6);
-  const checklistSections = useMemo(
-    () => buildCandidateDashboardChecklistSections(persistedProfile, completion),
-    [completion, persistedProfile]
-  );
-  const activeApplicationsPreview = useMemo(
-    () => activeApplications.slice(0, 3),
-    [activeApplications]
-  );
-  const recommendedJobsPreview = useMemo(() => recommendedJobs.slice(0, 3), [recommendedJobs]);
-  const recommendedJobsCount = recommendedJobs.length;
-  const overviewHero = useMemo(() => {
-    if (!completion.isReady) {
-      return {
-        title: 'Optimalkan Profil Profesional Anda',
-        description:
-          'Lengkapi data diri Anda untuk meningkatkan peluang dilirik recruiter. Semua indikator di dashboard ini diambil dari profil kandidat, lowongan, dan lamaran aktif pada akun Anda saat ini.',
-        secondaryLabel: 'Buka Profil',
-        secondarySection: 'profile',
-      };
-    }
-
-    if (activeApplications.length > 0) {
-      return {
-        title: 'Pantau Progres Lamaran Profesional Anda',
-        description:
-          'Lamaran aktif, status recruiter, dan peluang lowongan baru kini tersaji dari data akun Anda secara real-time agar tindak lanjut tidak terlewat.',
-        secondaryLabel: 'Lihat Lamaran',
-        secondarySection: 'applications',
-      };
-    }
-
-    return {
-      title: 'Profil Anda Siap Didorong Lebih Jauh',
-      description:
-        'Gunakan profil yang sudah lengkap untuk mulai melamar lowongan yang paling sesuai dengan minat, lokasi, dan keahlian Anda saat ini.',
-      secondaryLabel: 'Buka Profil',
-      secondarySection: 'profile',
-    };
-  }, [activeApplications.length, completion.isReady]);
   const primaryPreferredRole = firstFilledItem(persistedProfile.preferredRoles, 'Belum diisi');
   const primaryPreferredLocation = firstFilledItem(
     persistedProfile.preferredLocations,
@@ -882,16 +881,43 @@ const CandidateDashboardPage = () => {
       : hasStoredResume
         ? 'Preview visual saat ini hanya tersedia untuk file PDF yang baru dipilih.'
         : 'Unggah CV format PDF agar preview visual muncul di sini.';
-  const completionRingRadius = 52;
-  const completionRingCircumference = 2 * Math.PI * completionRingRadius;
-  const completionRingOffset =
-    completionRingCircumference -
-    (completionRingCircumference * completion.completionPercent) / 100;
   const mobileBottomSections = CANDIDATE_SECTION_OPTIONS.filter((section) =>
-    ['overview', 'jobs', 'applications', 'messages'].includes(section.value)
+    ['profile', 'jobs', 'applications', 'messages'].includes(section.value)
   );
+  const jobPreferenceChips = [
+    primaryPreferredRole !== 'Belum diisi' ? `Role incaran: ${primaryPreferredRole}` : '',
+    primaryPreferredLocation !== 'Belum diisi'
+      ? `Lokasi prioritas: ${primaryPreferredLocation}`
+      : '',
+    profile.employmentType ? `Tipe kerja: ${profile.employmentType}` : '',
+    profile.targetIndustry?.trim() ? `Industri target: ${profile.targetIndustry.trim()}` : '',
+  ].filter(Boolean);
+  const jobsReadinessMessage = completion.isReady
+    ? 'Profil inti, CV, dan arah pencarian Anda sudah cukup lengkap untuk mulai kirim lamaran.'
+    : `Masih ada ${completion.missingRequiredItems.length} komponen inti yang perlu dilengkapi sebelum recruiter melihat profil Anda secara utuh.`;
+  const jobsFocusCaption = [
+    primaryPreferredRole !== 'Belum diisi' ? primaryPreferredRole : 'Role belum dipilih',
+    primaryPreferredLocation !== 'Belum diisi' ? primaryPreferredLocation : 'Lokasi belum dipilih',
+    profile.targetIndustry?.trim() || 'Industri target belum diisi',
+  ].join(' • ');
 
   const applicationList = applicationBucket === 'active' ? activeApplications : completedApplications;
+  const applicationsWithScreeningCount = useMemo(
+    () =>
+      applications.filter(
+        (application) => Number(application.screening_summary?.total_questions || 0) > 0
+      ).length,
+    [applications]
+  );
+  const applicationsAdvancedStageCount = useMemo(
+    () =>
+      applications.filter((application) =>
+        ['shortlisted', 'interview', 'offering', 'hired'].includes(
+          application.stage || application.status
+        )
+      ).length,
+    [applications]
+  );
 
   const handleSectionChange = (section) => {
     setActiveSection(section);
@@ -900,18 +926,7 @@ const CandidateDashboardPage = () => {
   };
 
   const handleOpenRecommendedJob = (job) => {
-    saveCandidateApplyIntent({
-      jobId: job.id,
-      page: 1,
-      filters: {
-        search: job.title,
-        experience_level: job.experience_level,
-        location: job.location,
-      },
-      selectedLocation: job.location,
-    });
-
-    navigate(APP_ROUTES.jobs);
+    navigate(getJobApplyRoute(job.id));
   };
 
   const handleLogout = async () => {
@@ -1013,30 +1028,41 @@ const CandidateDashboardPage = () => {
     setFeedback(null);
   };
 
-  const handleOrganizationActivityChange = (field, value) => {
+  const handleOrganizationActivityChange = (index, field, value) => {
     setProfile((currentProfile) => {
-      const nextOrganizationActivity = {
-        ...currentProfile.organizationActivity,
-      };
+      const nextOrganizationActivities = currentProfile.organizationActivities.map(
+        (item, itemIndex) => {
+          if (itemIndex !== index) {
+            return item;
+          }
 
-      if (field === 'startYear') {
-        nextOrganizationActivity.startYear = value;
+          const nextOrganizationActivity = {
+            ...item,
+          };
 
-        if (
-          nextOrganizationActivity.endYear &&
-          nextOrganizationActivity.endYear !== 'current' &&
-          value &&
-          Number(nextOrganizationActivity.endYear) < Number(value)
-        ) {
-          nextOrganizationActivity.endYear = '';
+          if (field === 'startYear') {
+            nextOrganizationActivity.startYear = value;
+
+            if (
+              nextOrganizationActivity.endYear &&
+              nextOrganizationActivity.endYear !== 'current' &&
+              value &&
+              Number(nextOrganizationActivity.endYear) < Number(value)
+            ) {
+              nextOrganizationActivity.endYear = '';
+            }
+          } else {
+            nextOrganizationActivity[field] = value;
+          }
+
+          return nextOrganizationActivity;
         }
-      } else {
-        nextOrganizationActivity[field] = value;
-      }
+      );
 
       return {
         ...currentProfile,
-        organizationActivity: nextOrganizationActivity,
+        organizationActivities: nextOrganizationActivities,
+        organizationActivity: nextOrganizationActivities[0] || createEmptyOrganizationActivityEntry(),
       };
     });
     setFeedback(null);
@@ -1123,10 +1149,52 @@ const CandidateDashboardPage = () => {
     setFeedback(null);
   };
 
+  const handleAddOrganizationEntry = () => {
+    if (visibleOrganizationCount >= MAX_VISIBLE_ORGANIZATION_ENTRIES) {
+      setFeedback({
+        type: 'error',
+        message: `Organisasi atau relawan hanya bisa ditambah maksimal ${MAX_ADDITIONAL_ORGANIZATION_ENTRIES} kali.`,
+      });
+      return;
+    }
+
+    setVisibleOrganizationCount((currentCount) =>
+      Math.min(MAX_VISIBLE_ORGANIZATION_ENTRIES, currentCount + 1)
+    );
+    setFeedback(null);
+  };
+
+  const handleRemoveOrganizationEntry = (index) => {
+    if (index <= 0 || visibleOrganizationCount <= DEFAULT_VISIBLE_ORGANIZATION_ENTRIES) {
+      return;
+    }
+
+    setProfile((currentProfile) => {
+      const nextOrganizationActivities = currentProfile.organizationActivities
+        .filter((_, itemIndex) => itemIndex !== index)
+        .concat(createEmptyOrganizationActivityEntry());
+
+      return {
+        ...currentProfile,
+        organizationActivities: nextOrganizationActivities.slice(
+          0,
+          currentProfile.organizationActivities.length
+        ),
+        organizationActivity: nextOrganizationActivities[0] || createEmptyOrganizationActivityEntry(),
+      };
+    });
+    setVisibleOrganizationCount((currentCount) =>
+      Math.max(DEFAULT_VISIBLE_ORGANIZATION_ENTRIES, currentCount - 1)
+    );
+    setFeedback(null);
+  };
+
   const handleListFieldChange = (field, index, value) => {
     setProfile((currentProfile) => ({
       ...currentProfile,
-      [field]: currentProfile[field].map((item, itemIndex) => (itemIndex === index ? value : item)),
+      [field]: (currentProfile[field] || []).map((item, itemIndex) =>
+        itemIndex === index ? value : item
+      ),
     }));
     setFeedback(null);
   };
@@ -1290,12 +1358,13 @@ const CandidateDashboardPage = () => {
       const syncedCompletion = getCandidateProfileCompletion(syncedProfile);
       setProfile(syncedProfile);
       setVisibleExperienceCount(getVisibleExperienceCount(syncedProfile));
+      setVisibleOrganizationCount(getVisibleOrganizationCount(syncedProfile));
 
       setFeedback({
         type: 'success',
         message: syncedCompletion.isReady
-          ? 'Profil kandidat berhasil disimpan dan sudah siap dipakai untuk melamar.'
-          : 'Profil kandidat berhasil disimpan. Lengkapi checklist minimum agar siap melamar.',
+          ? 'Profil Siap Lamar berhasil disimpan dan sudah siap dipakai untuk melamar.'
+          : 'Profil Siap Lamar berhasil disimpan. Lengkapi checklist minimum agar siap melamar.',
       });
     } catch (error) {
       setFeedback({
@@ -1368,32 +1437,6 @@ const CandidateDashboardPage = () => {
       });
     }
   };
-
-  const profileSummaryCards = [
-    {
-      label: 'Status profil',
-      value: getCandidateProfileStatusLabel(completion),
-      detail: `${completion.completedRequiredItems}/${completion.totalRequiredItems} syarat inti terpenuhi`,
-    },
-    {
-      label: 'Progress profil',
-      value: `${completion.completionPercent}%`,
-      detail: `${completion.completedItems}/${completion.totalItems} komponen terisi`,
-    },
-    {
-      label: 'Lamaran aktif',
-      value: `${activeApplications.length}`,
-      detail: activeApplications.length > 0 ? 'Sedang dipantau recruiter' : 'Belum ada proses aktif',
-    },
-    {
-      label: 'Lowongan cocok',
-      value: `${recommendedJobsCount}`,
-      detail:
-        recommendedJobsCount > 0
-          ? 'Disusun dari minat role, lokasi, dan skill Anda'
-          : 'Lengkapi minat kerja untuk rekomendasi yang lebih akurat',
-    },
-  ];
 
   return (
     <div className="workspace-page workspace-page-candidate">
@@ -1481,327 +1524,16 @@ const CandidateDashboardPage = () => {
           </div>
         )}
 
-        {activeSection === 'overview' && (
-          <section className="workspace-section-stack workspace-candidate-dashboard-overview">
-            <div className="candidate-dashboard-hero-layout">
-              <article className="candidate-dashboard-hero-card" data-reveal>
-                <span className="candidate-dashboard-eyebrow">Candidate Flow</span>
-                <h1>{overviewHero.title}</h1>
-                <p>{overviewHero.description}</p>
-
-                <div className="candidate-dashboard-hero-actions">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => handleSectionChange('jobs')}
-                  >
-                    Cari Lowongan
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => handleSectionChange(overviewHero.secondarySection)}
-                  >
-                    {overviewHero.secondaryLabel}
-                  </button>
-                </div>
-
-                <div className="candidate-dashboard-hero-metadata">
-                  <article className="candidate-dashboard-snapshot-card">
-                    <div className="candidate-dashboard-snapshot-head">
-                      <strong>Posisi utama</strong>
-                      <span>{formatCandidateCareerStage(persistedProfile)}</span>
-                    </div>
-                    <p>
-                      Fokus pencarian Anda saat ini dibaca dari minat role dan pengalaman yang
-                      tersimpan.
-                    </p>
-                    <small>{primaryPreferredRole}</small>
-                  </article>
-
-                  <article className="candidate-dashboard-snapshot-card">
-                    <div className="candidate-dashboard-snapshot-head">
-                      <strong>Lokasi prioritas</strong>
-                      <span>{primaryPreferredLocation}</span>
-                    </div>
-                    <p>
-                      Lengkapi domisili dan lokasi minat agar rekomendasi lowongan makin relevan.
-                    </p>
-                    <small>
-                      {persistedProfile.currentAddress?.trim() || 'Domisili belum diisi'}
-                    </small>
-                  </article>
-                </div>
-              </article>
-
-              <div className="candidate-dashboard-summary-rail">
-                <article
-                  className="candidate-dashboard-mobile-progress-card"
-                  data-reveal
-                  data-reveal-delay="40ms"
-                >
-                  <div className="candidate-dashboard-progress-ring">
-                    <svg
-                      className="candidate-dashboard-progress-svg"
-                      viewBox="0 0 132 132"
-                      aria-hidden="true"
-                    >
-                      <circle
-                        className="candidate-dashboard-progress-track"
-                        cx="66"
-                        cy="66"
-                        r={completionRingRadius}
-                      />
-                      <circle
-                        className="candidate-dashboard-progress-value"
-                        cx="66"
-                        cy="66"
-                        r={completionRingRadius}
-                        strokeDasharray={completionRingCircumference}
-                        strokeDashoffset={completionRingOffset}
-                      />
-                    </svg>
-                    <div className="candidate-dashboard-progress-copy">
-                      <strong>{completion.completionPercent}%</strong>
-                      <span>Selesai</span>
-                    </div>
-                  </div>
-
-                  <strong className="candidate-dashboard-mobile-progress-title">
-                    {getCandidateProfileStatusLabel(completion)}
-                  </strong>
-                  <p className="candidate-dashboard-mobile-progress-caption">
-                    {completion.completedRequiredItems}/{completion.totalRequiredItems} syarat
-                    terpenuhi
-                  </p>
-
-                  <div className="candidate-dashboard-mobile-progress-stats">
-                    <article>
-                      <strong>{activeApplications.length}</strong>
-                      <span>Lamaran aktif</span>
-                    </article>
-                    <article>
-                      <strong>{recommendedJobsCount}</strong>
-                      <span>Lowongan cocok</span>
-                    </article>
-                  </div>
-                </article>
-
-                <div className="candidate-dashboard-summary-grid" data-reveal data-reveal-delay="40ms">
-                  {profileSummaryCards.map((card) => (
-                    <article key={card.label} className="candidate-dashboard-summary-card">
-                      <span>{card.label}</span>
-                      <strong>{card.value}</strong>
-                      <small>{card.detail}</small>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="candidate-dashboard-main-grid">
-              <article className="candidate-dashboard-panel" data-reveal data-reveal-delay="80ms">
-                <div className="candidate-dashboard-panel-head">
-                  <div>
-                    <span className="candidate-dashboard-eyebrow">Checklist Siap Lamar</span>
-                    <h2>Minimum yang harus beres</h2>
-                  </div>
-                  <p>
-                    Semua status di bawah dibangun dari profil kandidat yang tersimpan di akun Anda
-                    saat ini, bukan data contoh.
-                  </p>
-                </div>
-
-                <div className="candidate-dashboard-checklist-groups">
-                  {checklistSections.map((section) => (
-                    <section key={section.id} className="candidate-dashboard-checklist-group">
-                      <div className="candidate-dashboard-checklist-head">
-                        <div>
-                          <h3>{section.title}</h3>
-                          <p>{section.description}</p>
-                        </div>
-                        <strong>
-                          {section.completedItems}/{section.totalItems}
-                        </strong>
-                      </div>
-
-                      <div className="candidate-dashboard-status-list">
-                        {section.items.map((item) => (
-                          <article
-                            key={`${section.id}-${item.label}`}
-                            className={`candidate-dashboard-status-row${
-                              item.isComplete ? ' is-complete' : ' is-missing'
-                            }`}
-                          >
-                            <div>
-                              <strong>{item.label}</strong>
-                              <span>
-                                {item.isComplete
-                                  ? 'Komponen ini sudah aktif dan siap dipakai saat melamar.'
-                                  : 'Lengkapi komponen ini agar recruiter mendapat profil yang utuh.'}
-                              </span>
-                            </div>
-                            <small>{item.actionLabel}</small>
-                          </article>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              </article>
-
-              <div className="candidate-dashboard-side-column">
-                <article
-                  className="candidate-dashboard-panel"
-                  data-reveal
-                  data-reveal-delay="120ms"
-                >
-                  <div className="candidate-dashboard-panel-head">
-                    <div>
-                      <span className="candidate-dashboard-eyebrow">Lamaran Aktif</span>
-                      <h2>Yang sedang bergerak sekarang</h2>
-                    </div>
-                    <p>
-                      Area ini menampilkan proses yang masih berjalan agar tindak lanjut recruiter
-                      tidak terlewat.
-                    </p>
-                  </div>
-
-                  <div className="candidate-dashboard-inline-list">
-                    {activeApplicationsPreview.length === 0 ? (
-                      <article className="candidate-dashboard-inline-card is-empty">
-                        <div className="candidate-dashboard-inline-head">
-                          <strong>Belum ada lamaran aktif</strong>
-                          <span>Mulai dari lowongan teratas</span>
-                        </div>
-                        <p>
-                          Profil siap lamar akan lebih berguna jika langsung dipakai untuk kirim
-                          lamaran pertama.
-                        </p>
-                      </article>
-                    ) : (
-                      activeApplicationsPreview.map((application) => {
-                        const statusMeta = getCandidateApplicationMeta(
-                          application.status,
-                          application
-                        );
-
-                        return (
-                          <article
-                            key={application.id}
-                            className="candidate-dashboard-inline-card"
-                          >
-                            <div className="candidate-dashboard-inline-head">
-                              <strong>{application.job?.title || 'Lowongan'}</strong>
-                              <span>
-                                {formatCandidateApplicationStatus(
-                                  application.status,
-                                  application
-                                )}
-                              </span>
-                            </div>
-                            <p>{statusMeta.nextAction}</p>
-                            <small>
-                              {application.job?.recruiter?.name || 'Recruiter'} •{' '}
-                              {formatDateTime(application.applied_at)}
-                            </small>
-                          </article>
-                        );
-                      })
-                    )}
-                  </div>
-                </article>
-
-                <article
-                  className="candidate-dashboard-panel"
-                  data-reveal
-                  data-reveal-delay="160ms"
-                >
-                  <div className="candidate-dashboard-panel-head">
-                    <div>
-                      <span className="candidate-dashboard-eyebrow">Lowongan Cocok</span>
-                      <h2>Peluang terdekat untuk Anda</h2>
-                    </div>
-                    <p>
-                      Rekomendasi ini dihitung dari role, lokasi, skill, dan histori lamaran yang
-                      tersimpan sekarang.
-                    </p>
-                  </div>
-
-                  <div className="candidate-dashboard-inline-list">
-                    {recommendedJobsPreview.length === 0 ? (
-                      <article className="candidate-dashboard-inline-card is-empty">
-                        <div className="candidate-dashboard-inline-head">
-                          <strong>Belum ada rekomendasi kuat</strong>
-                          <span>Lengkapi minat kerja</span>
-                        </div>
-                        <p>
-                          Tambahkan posisi yang dicari, lokasi prioritas, dan skill utama agar
-                          mesin rekomendasi bisa menyaring lowongan yang lebih relevan.
-                        </p>
-                      </article>
-                    ) : (
-                      recommendedJobsPreview.map((job) => (
-                        <article key={job.id} className="candidate-dashboard-inline-card">
-                          <div className="candidate-dashboard-inline-head">
-                            <strong>{job.title}</strong>
-                            <span>{job.candidate_match.score} poin</span>
-                          </div>
-                          <p>
-                            {job.recruiter?.name || 'Perusahaan'} • {job.location || '-'} •{' '}
-                            {formatWorkMode(job.work_mode)}
-                          </p>
-                          <small>
-                            {job.candidate_match.reasons[0] ||
-                              'Rekomendasi ini diambil dari kecocokan profil Anda.'}
-                          </small>
-                        </article>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="candidate-dashboard-panel-actions">
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => handleSectionChange('jobs')}
-                    >
-                      Buka Semua Lowongan
-                    </button>
-                  </div>
-                </article>
-
-                <aside
-                  className="candidate-dashboard-help-card"
-                  data-reveal
-                  data-reveal-delay="200ms"
-                >
-                  <span className="candidate-dashboard-help-kicker">Butuh bantuan?</span>
-                  <h2>Butuh Bantuan?</h2>
-                  <p>
-                    Tim kami siap membantu menyempurnakan profil Anda untuk menarik perhatian
-                    korporasi besar di Indonesia.
-                  </p>
-                  <a
-                    className="candidate-dashboard-help-button"
-                    href={CONTACT_WHATSAPP_LINK}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Hubungi Konsultan
-                  </a>
-                </aside>
-              </div>
-            </div>
-          </section>
-        )}
-
         {activeSection === 'profile' && (
           <section className="workspace-section-stack candidate-profile-layout">
             <div className="candidate-profile-shell">
               <header className="candidate-profile-hero" data-reveal>
-                <span className="candidate-profile-kicker">Pengaturan Kandidat</span>
-                <h1>Lengkapi Profil Profesional Anda</h1>
+                <span className="candidate-profile-kicker">Profil Siap Lamar</span>
+                <h1>Rapikan profil yang recruiter akan baca lebih dulu</h1>
+                <p>
+                  Susun data diri, pengalaman, keunggulan, dan dokumen inti agar proses melamar
+                  terasa lebih cepat dan lebih meyakinkan.
+                </p>
                 <span className="candidate-profile-divider" />
               </header>
 
@@ -2071,7 +1803,10 @@ const CandidateDashboardPage = () => {
                       <div className="candidate-profile-detail-copy">
                         <div>
                           <h3>Pengalaman Terakhir</h3>
-                          <p>Tuliskan posisi dan perusahaan terakhir Anda.</p>
+                          <p>
+                            Tampilkan maksimal 3 pengalaman paling relevan beserta referensi
+                            kerja yang masih aktif.
+                          </p>
                         </div>
                         <button
                           type="button"
@@ -2215,6 +1950,68 @@ const CandidateDashboardPage = () => {
                                 }
                               />
                             </label>
+                            <label className="candidate-profile-field">
+                              <span>Pencapaian Utama</span>
+                              <textarea
+                                rows="3"
+                                placeholder="Contoh: menaikkan penjualan, mempercepat proses, atau mengelola proyek penting."
+                                value={experienceItem.achievement || ''}
+                                onChange={(event) =>
+                                  handleExperienceChange(
+                                    experienceIndex,
+                                    'achievement',
+                                    event.target.value
+                                  )
+                                }
+                              />
+                            </label>
+                            <div className="candidate-profile-inline-grid">
+                              <label className="candidate-profile-field">
+                                <span>Nama Referensi</span>
+                                <input
+                                  type="text"
+                                  placeholder="Nama lengkap atasan / rekan verifikator"
+                                  value={experienceItem.referenceName || ''}
+                                  onChange={(event) =>
+                                    handleExperienceChange(
+                                      experienceIndex,
+                                      'referenceName',
+                                      event.target.value
+                                    )
+                                  }
+                                />
+                              </label>
+                              <label className="candidate-profile-field">
+                                <span>Jabatan Referensi</span>
+                                <input
+                                  type="text"
+                                  placeholder="Contoh: Supervisor Operasional"
+                                  value={experienceItem.referencePosition || ''}
+                                  onChange={(event) =>
+                                    handleExperienceChange(
+                                      experienceIndex,
+                                      'referencePosition',
+                                      event.target.value
+                                    )
+                                  }
+                                />
+                              </label>
+                            </div>
+                            <label className="candidate-profile-field">
+                              <span>Nomor Kontak Referensi</span>
+                              <input
+                                type="tel"
+                                placeholder="Nomor aktif untuk verifikasi pengalaman"
+                                value={experienceItem.referencePhone || ''}
+                                onChange={(event) =>
+                                  handleExperienceChange(
+                                    experienceIndex,
+                                    'referencePhone',
+                                    event.target.value
+                                  )
+                                }
+                              />
+                            </label>
                             {(experienceItem.startYear || experienceItem.endYear) && (
                               <p className="candidate-profile-experience-period-note">
                                 Rentang: {buildYearRangeLabel(
@@ -2332,101 +2129,315 @@ const CandidateDashboardPage = () => {
                   </div>
                 </div>
 
-                <div className="candidate-profile-form-stack">
-                  <label className="candidate-profile-field">
-                    <span>Nama Organisasi / Komunitas</span>
-                    <input
-                      type="text"
-                      placeholder="Contoh: BEM Fakultas, Komunitas Relawan"
-                      value={profile.organizationActivity.organizationName || ''}
-                      onChange={(event) =>
-                        handleOrganizationActivityChange(
-                          'organizationName',
-                          event.target.value
-                        )
-                      }
-                    />
-                  </label>
+                <div className="candidate-profile-stack">
+                  <section className="candidate-profile-detail-block">
+                    <div className="candidate-profile-detail-head">
+                      <span className="candidate-profile-detail-icon">OR</span>
+                      <div className="candidate-profile-detail-copy">
+                        <div>
+                          <h3>Aktivitas Organisasi & Relawan</h3>
+                          <p>
+                            Tampilkan maksimal 3 pengalaman organisasi, komunitas, atau relawan
+                            yang paling kuat.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="candidate-profile-detail-action"
+                          onClick={handleAddOrganizationEntry}
+                          disabled={visibleOrganizationCount >= MAX_VISIBLE_ORGANIZATION_ENTRIES}
+                        >
+                          {visibleOrganizationCount >= MAX_VISIBLE_ORGANIZATION_ENTRIES
+                            ? 'Maksimal'
+                            : 'Tambah'}
+                        </button>
+                      </div>
+                    </div>
 
-                  <label className="candidate-profile-field">
-                    <span>Peran / Posisi</span>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Koordinator Acara, Volunteer Pendidikan"
-                      value={profile.organizationActivity.role || ''}
-                      onChange={(event) =>
-                        handleOrganizationActivityChange('role', event.target.value)
-                      }
-                    />
-                  </label>
+                    <div className="candidate-profile-form-stack">
+                      {profile.organizationActivities
+                        .slice(0, visibleOrganizationCount)
+                        .map((organizationItem, organizationIndex) => (
+                          <div
+                            key={`candidate-organization-${organizationIndex}`}
+                            className="candidate-profile-experience-entry"
+                          >
+                            {visibleOrganizationCount > 1 && (
+                              <div className="candidate-profile-experience-entry-head">
+                                <strong>
+                                  {organizationIndex === 0
+                                    ? 'Organisasi Utama'
+                                    : `Organisasi ${organizationIndex + 1}`}
+                                </strong>
+                                {organizationIndex > 0 && (
+                                  <button
+                                    type="button"
+                                    className="candidate-profile-experience-remove"
+                                    onClick={() => handleRemoveOrganizationEntry(organizationIndex)}
+                                    aria-label={`Hapus organisasi ${organizationIndex + 1}`}
+                                    title={`Hapus organisasi ${organizationIndex + 1}`}
+                                  >
+                                    -
+                                  </button>
+                                )}
+                              </div>
+                            )}
 
-                  <div className="candidate-profile-inline-grid">
-                    <label className="candidate-profile-field">
-                      <span>Tahun Mulai</span>
-                      <select
-                        value={profile.organizationActivity.startYear || ''}
-                        onChange={(event) =>
-                          handleOrganizationActivityChange('startYear', event.target.value)
-                        }
-                      >
-                        <option value="">Pilih tahun mulai</option>
-                        {EXPERIENCE_YEAR_OPTIONS.map((yearOption) => (
-                          <option key={`organization-start-${yearOption}`} value={yearOption}>
-                            {yearOption}
-                          </option>
+                            <label className="candidate-profile-field">
+                              <span>Nama Organisasi / Komunitas</span>
+                              <input
+                                type="text"
+                                placeholder="Contoh: BEM Fakultas, Komunitas Relawan"
+                                value={organizationItem.organizationName || ''}
+                                onChange={(event) =>
+                                  handleOrganizationActivityChange(
+                                    organizationIndex,
+                                    'organizationName',
+                                    event.target.value
+                                  )
+                                }
+                              />
+                            </label>
+
+                            <label className="candidate-profile-field">
+                              <span>Peran / Posisi</span>
+                              <input
+                                type="text"
+                                placeholder="Contoh: Koordinator Acara, Volunteer Pendidikan"
+                                value={organizationItem.role || ''}
+                                onChange={(event) =>
+                                  handleOrganizationActivityChange(
+                                    organizationIndex,
+                                    'role',
+                                    event.target.value
+                                  )
+                                }
+                              />
+                            </label>
+
+                            <div className="candidate-profile-inline-grid">
+                              <label className="candidate-profile-field">
+                                <span>Tahun Mulai</span>
+                                <select
+                                  value={organizationItem.startYear || ''}
+                                  onChange={(event) =>
+                                    handleOrganizationActivityChange(
+                                      organizationIndex,
+                                      'startYear',
+                                      event.target.value
+                                    )
+                                  }
+                                >
+                                  <option value="">Pilih tahun mulai</option>
+                                  {EXPERIENCE_YEAR_OPTIONS.map((yearOption) => (
+                                    <option
+                                      key={`organization-start-${organizationIndex}-${yearOption}`}
+                                      value={yearOption}
+                                    >
+                                      {yearOption}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="candidate-profile-field">
+                                <span>Tahun Selesai</span>
+                                <select
+                                  value={organizationItem.endYear || ''}
+                                  onChange={(event) =>
+                                    handleOrganizationActivityChange(
+                                      organizationIndex,
+                                      'endYear',
+                                      event.target.value
+                                    )
+                                  }
+                                >
+                                  <option value="">Pilih tahun selesai</option>
+                                  <option value="current">{ORGANIZATION_ACTIVITY_CURRENT_LABEL}</option>
+                                  {EXPERIENCE_YEAR_OPTIONS.filter(
+                                    (yearOption) =>
+                                      !organizationItem.startYear ||
+                                      Number(yearOption) >= Number(organizationItem.startYear)
+                                  ).map((yearOption) => (
+                                    <option
+                                      key={`organization-end-${organizationIndex}-${yearOption}`}
+                                      value={yearOption}
+                                    >
+                                      {yearOption}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+
+                            <label className="candidate-profile-field">
+                              <span>Deskripsi Kegiatan</span>
+                              <textarea
+                                rows="4"
+                                placeholder="Jelaskan kontribusi, kegiatan utama, atau dampak yang Anda berikan."
+                                value={organizationItem.description || ''}
+                                onChange={(event) =>
+                                  handleOrganizationActivityChange(
+                                    organizationIndex,
+                                    'description',
+                                    event.target.value
+                                  )
+                                }
+                              />
+                            </label>
+
+                            {(organizationItem.startYear || organizationItem.endYear) && (
+                              <p className="candidate-profile-experience-period-note">
+                                Rentang:{' '}
+                                {buildYearRangeLabel(
+                                  organizationItem.startYear,
+                                  organizationItem.endYear,
+                                  ORGANIZATION_ACTIVITY_CURRENT_LABEL
+                                )}
+                              </p>
+                            )}
+                          </div>
                         ))}
-                      </select>
-                    </label>
-                    <label className="candidate-profile-field">
-                      <span>Tahun Selesai</span>
-                      <select
-                        value={profile.organizationActivity.endYear || ''}
-                        onChange={(event) =>
-                          handleOrganizationActivityChange('endYear', event.target.value)
-                        }
-                      >
-                        <option value="">Pilih tahun selesai</option>
-                        <option value="current">{ORGANIZATION_ACTIVITY_CURRENT_LABEL}</option>
-                        {EXPERIENCE_YEAR_OPTIONS.filter(
-                          (yearOption) =>
-                            !profile.organizationActivity.startYear ||
-                            Number(yearOption) >= Number(profile.organizationActivity.startYear)
-                        ).map((yearOption) => (
-                          <option key={`organization-end-${yearOption}`} value={yearOption}>
-                            {yearOption}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <label className="candidate-profile-field">
-                    <span>Deskripsi Kegiatan</span>
-                    <textarea
-                      rows="4"
-                      placeholder="Jelaskan kontribusi, kegiatan utama, atau pencapaian Anda saat aktif di organisasi / relawan."
-                      value={profile.organizationActivity.description || ''}
-                      onChange={(event) =>
-                        handleOrganizationActivityChange('description', event.target.value)
-                      }
-                    />
-                  </label>
-
-                  {(profile.organizationActivity.startYear ||
-                    profile.organizationActivity.endYear) && (
-                    <p className="candidate-profile-experience-period-note">
-                      Rentang:{' '}
-                      {buildYearRangeLabel(
-                        profile.organizationActivity.startYear,
-                        profile.organizationActivity.endYear,
-                        ORGANIZATION_ACTIVITY_CURRENT_LABEL
-                      )}
-                    </p>
-                  )}
+                    </div>
+                  </section>
                 </div>
               </article>
 
               <article className="candidate-profile-card" data-reveal data-reveal-delay="200ms">
+                <div className="candidate-profile-card-head">
+                  <div className="candidate-profile-card-title">
+                    <span className="candidate-profile-card-mark" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="m12 4 2.2 4.5 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 9.2l5-.7L12 4Z"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    <h2>Keunggulan, Bakat & Penghargaan</h2>
+                  </div>
+                </div>
+
+                <div className="candidate-profile-stack">
+                  <section className="candidate-profile-detail-block">
+                    <div className="candidate-profile-detail-head">
+                      <span className="candidate-profile-detail-icon">KG</span>
+                      <div className="candidate-profile-detail-copy">
+                        <div>
+                          <h3>Keunggulan Pelamar</h3>
+                          <p>
+                            Tulis 3 nilai jual utama yang paling membedakan Anda saat dibaca HR.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="candidate-profile-form-stack">
+                      {profile.strengths.map((strengthItem, strengthIndex) => (
+                        <label
+                          key={`candidate-strength-${strengthIndex}`}
+                          className="candidate-profile-field"
+                        >
+                          <span>Keunggulan {strengthIndex + 1}</span>
+                          <input
+                            type="text"
+                            placeholder={
+                              strengthIndex === 0
+                                ? 'Contoh: cepat belajar, disiplin, kuat di lapangan'
+                                : 'Tulis keunggulan lain yang paling relevan'
+                            }
+                            value={strengthItem || ''}
+                            onChange={(event) =>
+                              handleListFieldChange('strengths', strengthIndex, event.target.value)
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="candidate-profile-detail-block">
+                    <div className="candidate-profile-detail-head">
+                      <span className="candidate-profile-detail-icon">BK</span>
+                      <div className="candidate-profile-detail-copy">
+                        <div>
+                          <h3>Bakat & Kemampuan</h3>
+                          <p>
+                            Isi kemampuan teknis atau bakat praktis yang paling sering Anda pakai
+                            saat bekerja.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="candidate-profile-inline-grid candidate-profile-multi-grid">
+                      {profile.skills.map((skillItem, skillIndex) => (
+                        <label
+                          key={`candidate-skill-${skillIndex}`}
+                          className="candidate-profile-field"
+                        >
+                          <span>Kemampuan {skillIndex + 1}</span>
+                          <input
+                            type="text"
+                            placeholder={
+                              skillIndex === 0
+                                ? 'Contoh: Excel lanjut, presentasi, negosiasi'
+                                : 'Tulis kemampuan lain jika ada'
+                            }
+                            value={skillItem || ''}
+                            onChange={(event) =>
+                              handleListFieldChange('skills', skillIndex, event.target.value)
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="candidate-profile-detail-block">
+                    <div className="candidate-profile-detail-head">
+                      <span className="candidate-profile-detail-icon">PG</span>
+                      <div className="candidate-profile-detail-copy">
+                        <div>
+                          <h3>Penghargaan</h3>
+                          <p>
+                            Cantumkan maksimal 3 pencapaian, sertifikat, atau apresiasi yang paling
+                            relevan.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="candidate-profile-form-stack">
+                      {profile.achievements.map((achievementItem, achievementIndex) => (
+                        <label
+                          key={`candidate-achievement-${achievementIndex}`}
+                          className="candidate-profile-field"
+                        >
+                          <span>Penghargaan {achievementIndex + 1}</span>
+                          <textarea
+                            rows="3"
+                            placeholder={
+                              achievementIndex === 0
+                                ? 'Contoh: Employee of the Month atau sertifikasi penting.'
+                                : 'Tulis penghargaan lain jika ada'
+                            }
+                            value={achievementItem || ''}
+                            onChange={(event) =>
+                              handleListFieldChange(
+                                'achievements',
+                                achievementIndex,
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              </article>
+
+              <article className="candidate-profile-card" data-reveal data-reveal-delay="240ms">
                 <div className="candidate-profile-card-head">
                   <div className="candidate-profile-card-title">
                     <span className="candidate-profile-card-mark" aria-hidden="true">
@@ -2534,7 +2545,7 @@ const CandidateDashboardPage = () => {
                   className="candidate-profile-secondary-button"
                   onClick={() => handleSectionChange('jobs')}
                 >
-                  Lanjut Cari Lowongan
+                  Lanjut ke Lowongan Kerja
                 </button>
               </div>
             </div>
@@ -2545,13 +2556,70 @@ const CandidateDashboardPage = () => {
           <section className="workspace-section-stack candidate-jobs-layout">
             <div className="candidate-jobs-shell">
               <header className="candidate-jobs-hero" data-reveal>
-                <span className="candidate-jobs-kicker">Lowongan Rekomendasi</span>
-                <h1>Prioritas lowongan untuk Anda</h1>
+                <span className="candidate-jobs-kicker">Lowongan Kerja</span>
+                <h1>Peluang kerja yang paling dekat dengan profil Anda</h1>
                 <p>
-                  Rekomendasi disusun dari posisi incaran, lokasi minat, dan skill utama yang
-                  sudah Anda simpan di profil.
+                  Rekomendasi disusun dari posisi incaran, lokasi minat, skill utama, dan
+                  kesiapan profil yang sudah tersimpan di akun Anda.
                 </p>
               </header>
+
+              <div className="candidate-jobs-context-grid" data-reveal data-reveal-delay="40ms">
+                <article
+                  className={`candidate-jobs-context-card${
+                    completion.isReady ? ' is-ready' : ' is-warning'
+                  }`}
+                >
+                  <div className="candidate-jobs-context-head">
+                    <strong>
+                      {completion.isReady
+                        ? 'Profil siap dipakai melamar'
+                        : 'Lengkapi profil inti terlebih dahulu'}
+                    </strong>
+                    <span>{completion.completionPercent}% selesai</span>
+                  </div>
+                  <p>{jobsReadinessMessage}</p>
+                  <button
+                    type="button"
+                    className="candidate-jobs-context-button"
+                    onClick={() =>
+                      handleSectionChange(completion.isReady ? 'applications' : 'profile')
+                    }
+                  >
+                    {completion.isReady ? 'Buka Lamaran Saya' : 'Lengkapi Profil Siap Lamar'}
+                  </button>
+                </article>
+
+                <article className="candidate-jobs-context-card">
+                  <div className="candidate-jobs-context-head">
+                    <strong>Arah pencarian Anda</strong>
+                    <span>{recommendedJobs.length} peluang cocok</span>
+                  </div>
+                  <p>{jobsFocusCaption}</p>
+                  <div className="candidate-jobs-priority-row">
+                    {jobPreferenceChips.length > 0 ? (
+                      jobPreferenceChips.map((item) => (
+                        <span key={item} className="candidate-jobs-priority-chip">
+                          {item}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="candidate-jobs-priority-chip is-muted">
+                        Isi target pekerjaan dan lokasi agar rekomendasi lebih akurat.
+                      </span>
+                    )}
+                  </div>
+                </article>
+              </div>
+
+              <aside className="candidate-jobs-safety-card" data-reveal data-reveal-delay="80ms">
+                <strong>Waspada penipuan lowongan</strong>
+                <p>
+                  Jangan kirim uang, OTP, atau data sensitif di luar alur resmi KerjaNusa. Jika
+                  ada hal mencurigakan, gunakan chat dengan recruiter atau superadmin dari dalam
+                  platform.
+                </p>
+              </aside>
 
               {jobsError && <div className="error">{jobsError}</div>}
 
@@ -2573,7 +2641,7 @@ const CandidateDashboardPage = () => {
                       className="candidate-jobs-primary-button"
                       onClick={() => handleSectionChange('profile')}
                     >
-                      Lengkapi Profil
+                      Lengkapi Profil Siap Lamar
                     </button>
                   </article>
                 ) : (
@@ -2581,6 +2649,9 @@ const CandidateDashboardPage = () => {
                     const recruiterName =
                       job.recruiter?.company_name || job.recruiter?.name || 'Recruiter Demo';
                     const matchPercent = formatCandidateJobScorePercent(job);
+                    const primaryMatchReason =
+                      job.candidate_match?.reasons?.[0] ||
+                      'Rekomendasi ini diambil dari kecocokan profil Anda.';
 
                     return (
                       <article
@@ -2612,6 +2683,7 @@ const CandidateDashboardPage = () => {
                         </div>
 
                         <p className="candidate-jobs-description">
+                          <span className="candidate-jobs-match-reason">{primaryMatchReason}</span>
                           {truncateJobDescription(job.description)}
                         </p>
 
@@ -2645,12 +2717,8 @@ const CandidateDashboardPage = () => {
               <div className="workspace-panel-heading">
                 <div>
                   <span className="workspace-section-label">Lamaran Saya</span>
-                  <h2>Pusat aktivitas setelah apply</h2>
+                  <h2>Pantau seluruh proses lamaran Anda</h2>
                 </div>
-                <p>
-                  Di sini kandidat melihat proses yang masih aktif, hasil yang sudah selesai, dan
-                  tindakan berikutnya untuk setiap lamaran.
-                </p>
               </div>
 
               {applicationsError && <div className="error">{applicationsError}</div>}
@@ -2673,7 +2741,25 @@ const CandidateDashboardPage = () => {
                   onClick={() => setApplicationBucket('completed')}
                 >
                   Selesai ({completedApplications.length})
-                </button>
+                  </button>
+              </div>
+
+              <div className="workspace-application-summary-grid">
+                <article className="workspace-application-summary-card">
+                  <strong>{activeApplications.length}</strong>
+                  <span>Lamaran aktif</span>
+                  <small>Masih diproses recruiter atau menunggu tindak lanjut.</small>
+                </article>
+                <article className="workspace-application-summary-card">
+                  <strong>{applicationsWithScreeningCount}</strong>
+                  <span>Lamaran dengan screening</span>
+                  <small>Sudah memuat pertanyaan HR yang perlu dipantau hasilnya.</small>
+                </article>
+                <article className="workspace-application-summary-card">
+                  <strong>{applicationsAdvancedStageCount}</strong>
+                  <span>Masuk tahap lanjut</span>
+                  <small>Sudah sampai shortlist, interview, offering, atau hired.</small>
+                </article>
               </div>
 
               {isLoadingApplications ? (
@@ -2683,7 +2769,6 @@ const CandidateDashboardPage = () => {
                   <article className="workspace-subcard">
                     <div className="workspace-subcard-heading">
                       <strong>Belum ada lamaran di kategori ini</strong>
-                      <span>Fokus ke langkah berikutnya</span>
                     </div>
                     <p>
                       {applicationBucket === 'active'
@@ -2702,7 +2787,7 @@ const CandidateDashboardPage = () => {
                       <article key={application.id} className="workspace-subcard workspace-application-card">
                         <div className="workspace-subcard-heading">
                           <div>
-                            <strong>{application.job?.title || 'Lowongan'}</strong>
+                            <strong>{application.job?.title || 'Peluang kerja'}</strong>
                             <span>
                               {application.job?.recruiter?.name || 'Recruiter'} •{' '}
                               {application.job?.location || '-'}
@@ -2716,6 +2801,25 @@ const CandidateDashboardPage = () => {
                         </div>
 
                         <p>{statusMeta.summary}</p>
+
+                        <div className="workspace-chip-wrap workspace-chip-wrap-secondary">
+                          <span className="workspace-chip">
+                            {formatExperienceLevel(application.job?.experience_level)}
+                          </span>
+                          <span className="workspace-chip">
+                            {formatWorkMode(application.job?.work_mode)}
+                          </span>
+                          <span className="workspace-chip workspace-chip-secondary">
+                            {application.job?.location || 'Lokasi belum diatur'}
+                          </span>
+                          {application.job?.video_screening_requirement && (
+                            <span className="workspace-chip workspace-chip-secondary">
+                              {formatVideoScreeningRequirement(
+                                application.job.video_screening_requirement
+                              )}
+                            </span>
+                          )}
+                        </div>
 
                         <div className="workspace-application-timeline">
                           {timeline.map((step) => (
@@ -2733,10 +2837,7 @@ const CandidateDashboardPage = () => {
 
                         <div className="workspace-inline-metadata">
                           <span>Dikirim {formatDateTime(application.applied_at)}</span>
-                          <span>
-                            {formatCurrency(application.job?.salary_min)} -{' '}
-                            {formatCurrency(application.job?.salary_max)}
-                          </span>
+                          <span>Tahap recruiter: {formatCandidateApplicationStatus(application.status, application)}</span>
                         </div>
 
                         {application.cover_letter && (
@@ -2757,20 +2858,6 @@ const CandidateDashboardPage = () => {
                           </div>
                         )}
 
-                        {Array.isArray(application.screening_answers) &&
-                          application.screening_answers.length > 0 && (
-                            <div className="workspace-application-note">
-                              <strong>Jawaban screening</strong>
-                              <div className="workspace-inline-metadata">
-                                {application.screening_answers.map((answer) => (
-                                  <span key={`${application.id}-${answer.question_id || answer.question}`}>
-                                    {answer.question}: {answer.answer}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
                         {application.video_intro_url && (
                           <div className="workspace-application-note">
                             <strong>Video screening</strong>
@@ -2788,7 +2875,7 @@ const CandidateDashboardPage = () => {
                             className="btn btn-outline"
                             onClick={() => handleSectionChange('jobs')}
                           >
-                            Cari Lowongan Serupa
+                            Cari Peluang Serupa
                           </button>
                           {application.job?.recruiter && (
                             <button

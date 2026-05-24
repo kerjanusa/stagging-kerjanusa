@@ -41,8 +41,8 @@ const Navbar = () => {
   const authenticatedLinks =
     user?.role === 'candidate'
       ? [
-          { to: '/candidate', label: 'Info Data Diri' },
-          { to: '/jobs', label: 'Cari Pekerjaan' },
+          { to: '/candidate#profile', label: 'Profil Siap Lamar' },
+          { to: '/jobs', label: 'Lowongan Kerja' },
         ]
       : user?.role === 'superadmin'
         ? [
@@ -51,7 +51,7 @@ const Navbar = () => {
           ]
         : [
             { to: '/recruiter', label: 'Dashboard Company' },
-            { to: '/jobs', label: 'Cari Pekerjaan' },
+            { to: '/jobs', label: 'Lowongan Kerja' },
           ];
 
   useEffect(() => {

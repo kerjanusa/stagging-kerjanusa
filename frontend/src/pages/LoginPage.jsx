@@ -7,15 +7,24 @@ import '../styles/auth.css';
 const loginSlides = [
   {
     src: '/hero-slides/review-1.jpeg',
-    alt: 'Dashboard kandidat dengan video interview dan score total 65 dari 100.',
+    alt: 'Pelamar bisa melihat lowongan dan proses rekrutmen lebih cepat.',
+    heading: 'Proses melamar lebih mudah dan cepat',
+    description: 'Buka akun sekali, simpan profil, lalu kirim lamaran tanpa isi ulang data inti.',
+    pills: ['Lamar lebih cepat', 'Profil sekali isi', 'Status real-time'],
   },
   {
     src: '/hero-slides/review-2.jpeg',
-    alt: 'Dashboard kandidat dengan video interview dan score total 74 dari 100.',
+    alt: 'Pelamar menerima rekomendasi lowongan dari perusahaan terpercaya.',
+    heading: 'Rekomendasi pekerjaan lebih terarah',
+    description: 'Temukan peluang kerja yang lebih dekat dengan keahlian, pengalaman, dan minat karier Anda.',
+    pills: ['Rekomendasi otomatis', 'Perusahaan terpercaya', 'Lowongan diperbarui'],
   },
   {
     src: '/hero-slides/review-3.jpeg',
-    alt: 'Dashboard kandidat dengan video interview dan score total 82 dari 100.',
+    alt: 'Pelamar dapat memantau aktivitas lamaran dari satu area kandidat.',
+    heading: 'Pantau seluruh lamaran dari satu area kandidat',
+    description: 'Simpan lowongan favorit, cek update recruiter, dan lanjutkan proses dari satu tampilan yang nyaman.',
+    pills: ['Simpan lowongan', 'Chat recruiter', 'Update proses rekrutmen'],
   },
 ];
 
@@ -23,7 +32,7 @@ const LOGIN_ENTRY_COPY = {
   default: {
     heading: 'Masuk ke akun Anda',
     description:
-      'Gunakan email dan password untuk membuka dashboard recruiter atau alur kandidat Anda.',
+      'Gunakan email dan password untuk membuka area recruiter atau alur kandidat Anda.',
     registerLabel: 'Belum punya akun?',
     registerTo: '/register?role=recruiter',
     registerCta: 'Daftar di sini',
@@ -38,9 +47,9 @@ const LOGIN_ENTRY_COPY = {
     emailPlaceholder: 'Email recruiter / company',
   },
   candidate: {
-    heading: 'Login Pelamar',
+    heading: 'Masuk ke akun Anda',
     description:
-      'Masuk untuk melihat status lamaran, lowongan aktif, dan aktivitas kandidat Anda.',
+      'Masuk untuk melihat status lamaran, lowongan kerja aktif, dan aktivitas kandidat Anda.',
     registerLabel: 'Belum punya akun pelamar?',
     registerTo: '/register?role=candidate',
     registerCta: 'Daftar di sini',
@@ -87,15 +96,16 @@ const LoginPage = () => {
       <div className="auth-login-layout">
         <section className="auth-showcase" aria-hidden="true" data-reveal>
           <div className="auth-showcase-copy">
-            <div className="auth-showcase-kicker">Keunggulan</div>
+            <div className="auth-showcase-kicker">Keunggulan Pelamar</div>
             <p>
-              HR dapat menilai <span>rekaman video pelamar</span>, memberi catatan, dan
-              memutuskan shortlist lebih cepat dalam satu tampilan.
+              {loginSlides[currentSlide].heading} <span>di KerjaNusa</span> tanpa proses yang
+              berbelit.
             </p>
+            <small className="auth-showcase-summary">{loginSlides[currentSlide].description}</small>
             <div className="auth-showcase-points">
-              <span>Replay jawaban</span>
-              <span>Nilai soft skill</span>
-              <span>Review tim HR</span>
+              {loginSlides[currentSlide].pills.map((pill) => (
+                <span key={pill}>{pill}</span>
+              ))}
             </div>
           </div>
 
@@ -118,9 +128,9 @@ const LoginPage = () => {
                 </div>
 
                 <div className="auth-showcase-carousel-overlay">
-                  <span className="auth-showcase-carousel-pill">Review Kandidat</span>
+                  <span className="auth-showcase-carousel-pill">Area Pelamar</span>
                   <div className="auth-showcase-carousel-caption">
-                    <strong>Video screening aktif</strong>
+                    <strong>{loginSlides[currentSlide].heading}</strong>
                     <span>Slide otomatis setiap 3 detik</span>
                   </div>
                 </div>

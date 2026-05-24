@@ -197,10 +197,10 @@ const HomePage = () => {
         }
       : userRole === 'candidate'
         ? {
-            primary: { label: 'Lihat Lowongan', to: '/jobs' },
-            secondary: { label: 'Info Data Diri', to: '/candidate' },
+            primary: { label: 'Lihat Lowongan Kerja', to: '/jobs' },
+            secondary: { label: 'Profil Siap Lamar', to: '/candidate#profile' },
             supportLinks: [
-              { label: 'Chat Kandidat', to: '/candidate#chat' },
+              { label: 'Chat Kandidat', to: '/candidate#messages' },
               { label: 'Tentang Kami', to: '/platform' },
             ],
           }
