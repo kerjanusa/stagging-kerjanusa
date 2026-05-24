@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Notifications\ResetPasswordNotification;
 use App\Requests\Auth\ChangePasswordRequest;
 use App\Requests\Auth\ForgotPasswordRequest;
 use App\Requests\Auth\LoginRequest;
@@ -136,11 +137,17 @@ class AuthController extends Controller
     {
         $validated = $request->validated();
         $identifierHash = $this->hashIdentifier($validated['email']);
+        $debugResetUser = null;
+        $debugResetToken = null;
 
         try {
             PasswordBroker::sendResetLink([
                 'email' => $validated['email'],
-            ]);
+            ], function (User $user, string $token) use (&$debugResetUser, &$debugResetToken): void {
+                $debugResetUser = $user;
+                $debugResetToken = $token;
+                $user->sendPasswordResetNotification($token);
+            });
         } catch (Throwable $exception) {
             $this->securityEventService->record('auth.password_reset_delivery_failed', [
                 'action' => 'forgot_password',
@@ -153,7 +160,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
-            ]);
+            ] + $this->passwordResetDebugPayload($debugResetUser, $debugResetToken));
         }
 
         $this->auditLogService->record('auth.password_reset_requested', [
@@ -165,7 +172,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
-        ]);
+        ] + $this->passwordResetDebugPayload($debugResetUser, $debugResetToken));
     }
 
     /**
@@ -330,5 +337,30 @@ class AuthController extends Controller
         }
 
         return hash('sha256', $normalizedValue);
+    }
+
+    /**
+     * Expose a staging-only reset URL when email delivery is not dependable.
+     */
+    private function passwordResetDebugPayload(?User $user, ?string $token): array
+    {
+        if (!$this->shouldExposePasswordResetLink() || !$user || !$token) {
+            return [];
+        }
+
+        $notification = new ResetPasswordNotification($token);
+
+        return [
+            'debug_reset_url' => $notification->resetUrl($user),
+            'debug_reset_expires_minutes' => $notification->expireMinutes(),
+        ];
+    }
+
+    /**
+     * Limit debug reset-link exposure to explicitly enabled environments such as staging.
+     */
+    private function shouldExposePasswordResetLink(): bool
+    {
+        return (bool) config('mail.password_reset_expose_link', false);
     }
 }
