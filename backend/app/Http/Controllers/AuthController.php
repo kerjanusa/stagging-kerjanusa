@@ -137,30 +137,33 @@ class AuthController extends Controller
     {
         $validated = $request->validated();
         $identifierHash = $this->hashIdentifier($validated['email']);
+        $broker = PasswordBroker::broker();
+        $candidateUser = $broker->getUser([
+            'email' => $validated['email'],
+        ]);
         $debugResetUser = null;
         $debugResetToken = null;
 
-        try {
-            PasswordBroker::sendResetLink([
-                'email' => $validated['email'],
-            ], function (User $user, string $token) use (&$debugResetUser, &$debugResetToken): void {
-                $debugResetUser = $user;
-                $debugResetToken = $token;
-                $user->sendPasswordResetNotification($token);
-            });
-        } catch (Throwable $exception) {
-            $this->securityEventService->record('auth.password_reset_delivery_failed', [
-                'action' => 'forgot_password',
-                'step' => 'send_reset_link',
-                'identifier_hash' => $identifierHash,
-                'result' => 'degraded',
-                'exception_class' => $exception::class,
-                'exception_message' => $exception->getMessage(),
-            ], null, 'error', AuthService::class);
+        if ($candidateUser instanceof User) {
+            $debugResetUser = $candidateUser;
+            $debugResetToken = $broker->createToken($candidateUser);
 
-            return response()->json([
-                'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
-            ] + $this->passwordResetDebugPayload($debugResetUser, $debugResetToken));
+            try {
+                $candidateUser->sendPasswordResetNotification($debugResetToken);
+            } catch (Throwable $exception) {
+                $this->securityEventService->record('auth.password_reset_delivery_failed', [
+                    'action' => 'forgot_password',
+                    'step' => 'send_reset_link',
+                    'identifier_hash' => $identifierHash,
+                    'result' => 'degraded',
+                    'exception_class' => $exception::class,
+                    'exception_message' => $exception->getMessage(),
+                ], null, 'error', AuthService::class);
+
+                return response()->json([
+                    'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
+                ] + $this->passwordResetDebugPayload($debugResetUser, $debugResetToken));
+            }
         }
 
         $this->auditLogService->record('auth.password_reset_requested', [
