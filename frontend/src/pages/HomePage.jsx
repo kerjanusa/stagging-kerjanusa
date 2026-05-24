@@ -426,13 +426,17 @@ const HomePage = () => {
               </p>
             </div>
 
-            <div className="comparison-table" role="table" aria-label="Daftar paket recruiter KerjaNusa">
+            <div
+              className="comparison-table"
+              role="table"
+              aria-label="Daftar paket recruiter KerjaNusa"
+              style={{
+                '--comparison-table-columns': packageTableColumnTemplate,
+                '--comparison-table-min-width': '760px',
+              }}
+            >
               <div className="comparison-table-head" role="rowgroup">
-                <div
-                  className="comparison-table-row comparison-table-row-head"
-                  role="row"
-                  style={{ gridTemplateColumns: packageTableColumnTemplate, minWidth: '760px' }}
-                >
+                <div className="comparison-table-row comparison-table-row-head" role="row">
                   <div className="comparison-cell comparison-cell-feature" role="columnheader">
                     Fitur
                   </div>
@@ -452,12 +456,7 @@ const HomePage = () => {
 
               <div className="comparison-table-body" role="rowgroup">
                 {recruiterPackageRows.map((row) => (
-                  <div
-                    key={row.feature}
-                    className="comparison-table-row"
-                    role="row"
-                    style={{ gridTemplateColumns: packageTableColumnTemplate, minWidth: '760px' }}
-                  >
+                  <div key={row.feature} className="comparison-table-row" role="row">
                     <div
                       className="comparison-cell comparison-cell-feature"
                       role="cell"
