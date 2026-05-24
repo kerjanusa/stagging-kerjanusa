@@ -146,12 +146,14 @@ class AuthController extends Controller
                 'email' => $validated['email'],
             ]);
 
-            if ($candidateUser instanceof User) {
+            if (is_object($candidateUser)) {
                 $debugResetUser = $candidateUser;
                 $debugResetToken = $broker->createToken($candidateUser);
 
                 try {
-                    $candidateUser->sendPasswordResetNotification($debugResetToken);
+                    if (method_exists($candidateUser, 'sendPasswordResetNotification')) {
+                        $candidateUser->sendPasswordResetNotification($debugResetToken);
+                    }
                 } catch (Throwable $exception) {
                     $this->securityEventService->record('auth.password_reset_delivery_failed', [
                         'action' => 'forgot_password',
@@ -358,11 +360,12 @@ class AuthController extends Controller
     /**
      * Expose a staging-only reset URL when email delivery is not dependable.
      */
-    private function passwordResetDebugPayload(?User $user, ?string $token): array
+    private function passwordResetDebugPayload(mixed $user, ?string $token): array
     {
         try {
             if (
                 !$user ||
+                !is_object($user) ||
                 !$token ||
                 (
                     !$this->shouldExposePasswordResetLink() &&
