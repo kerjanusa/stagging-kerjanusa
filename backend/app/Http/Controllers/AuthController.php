@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Str;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -134,14 +135,31 @@ class AuthController extends Controller
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
         $validated = $request->validated();
+        $identifierHash = $this->hashIdentifier($validated['email']);
 
-        PasswordBroker::sendResetLink([
-            'email' => $validated['email'],
-        ]);
+        try {
+            PasswordBroker::sendResetLink([
+                'email' => $validated['email'],
+            ]);
+        } catch (Throwable $exception) {
+            $this->securityEventService->record('auth.password_reset_delivery_failed', [
+                'action' => 'forgot_password',
+                'step' => 'send_reset_link',
+                'identifier_hash' => $identifierHash,
+                'result' => 'degraded',
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+            ], null, 'error', AuthService::class);
+
+            return response()->json([
+                'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
+            ]);
+        }
+
         $this->auditLogService->record('auth.password_reset_requested', [
             'action' => 'forgot_password',
             'step' => 'send_reset_link',
-            'identifier_hash' => $this->hashIdentifier($validated['email']),
+            'identifier_hash' => $identifierHash,
             'result' => 'accepted',
         ], null, AuthService::class);
 

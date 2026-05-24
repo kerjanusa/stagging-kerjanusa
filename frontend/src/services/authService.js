@@ -368,7 +368,16 @@ class AuthService {
       const response = await apiClient.post('/forgot-password', { email });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      const responseData = error.response?.data;
+
+      if (typeof responseData === 'string' && /<html|<!doctype/i.test(responseData)) {
+        throw {
+          message:
+            'Layanan reset password sedang bermasalah. Coba lagi beberapa saat atau hubungi admin.',
+        };
+      }
+
+      throw responseData || error.message;
     }
   }
 
