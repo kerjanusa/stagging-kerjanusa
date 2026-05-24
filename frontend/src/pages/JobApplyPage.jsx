@@ -20,6 +20,7 @@ import {
 } from '../utils/routeHelpers.js';
 import {
   formatExperienceLevel,
+  formatInterviewType,
   formatJobType,
   formatWorkMode,
   formatVideoScreeningRequirement,
@@ -29,7 +30,7 @@ import '../styles/jobList.css';
 const SAVED_JOBS_STORAGE_PREFIX = 'candidate_saved_jobs';
 const JOB_ACTIVE_WINDOW_IN_DAYS = 30;
 const ONE_DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
-const JOB_APPLY_TOTAL_STEPS = 2;
+const JOB_APPLY_TOTAL_STEPS = 5;
 const IDR_NUMBER_FORMATTER = new Intl.NumberFormat('id-ID');
 const RESUME_SKIP_OPTION = '__skip_resume__';
 
@@ -329,66 +330,6 @@ const JobApplyStoryButtonLabel = ({ icon, label }) => (
   </span>
 );
 
-const JobApplyTopbarIcon = ({ type }) => {
-  if (type === 'return') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path
-          d="M9 7 4 12l5 5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M5 12h8.5a5.5 5.5 0 0 1 0 11H10"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-
-  if (type === 'share') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path
-          d="M8.25 15.75 15.75 8.25"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-        <path
-          d="M10 8.25h5.75V14"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path
-        d="M14.75 6.75 9.25 12l5.5 5.25"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-};
-
 /**
  * Halaman detail/apply khusus kandidat.
  */
@@ -596,17 +537,45 @@ const JobApplyPage = () => {
       job?.location ? `Penempatan utama di ${job.location}.` : 'Penempatan mengikuti kebutuhan recruiter.',
     ];
   }, [focusChips, job?.description, job?.experience_level, job?.job_type, job?.location, job?.work_mode]);
-  const abilityItems = React.useMemo(
-    () =>
-      [...new Set(
-        [
-          ...focusChips,
-          formatJobType(job?.job_type),
-          formatWorkMode(job?.work_mode),
-          formatExperienceChip(job?.experience_level),
-        ].filter(Boolean)
-      )].slice(0, 6),
-    [focusChips, job?.experience_level, job?.job_type, job?.work_mode]
+  const questionPreview = React.useMemo(() => {
+    if (screeningQuestions.length > 0) {
+      return screeningQuestions.slice(0, 4).map((question) => ({
+        title: question.question,
+        meta:
+          Array.isArray(question.answers) && question.answers.length > 0
+            ? `${question.answers.length} pilihan jawaban`
+            : 'Jawaban naratif singkat',
+      }));
+    }
+
+    return [
+      { title: 'Berapa gaji bulanan yang kamu inginkan?', meta: 'Ekspektasi kompensasi' },
+      { title: 'Kualifikasi mana yang paling kuat milikmu?', meta: 'Kecocokan inti' },
+      { title: 'Berapa tahun pengalaman kerja yang paling relevan?', meta: 'Riwayat pengalaman' },
+      { title: 'Produk atau tools kerja apa yang biasa kamu gunakan?', meta: 'Workflow harian' },
+    ];
+  }, [screeningQuestions]);
+  const benefitCards = React.useMemo(
+    () => [
+      {
+        kicker: 'Penempatan',
+        title: formatWorkMode(job?.work_mode),
+        description: job?.location
+          ? `Lokasi prioritas ${job.location}.`
+          : 'Lokasi mengikuti kebutuhan perusahaan.',
+      },
+      {
+        kicker: 'Proses seleksi',
+        title: job?.interview_type ? formatInterviewType(job.interview_type) : 'Mengikuti recruiter',
+        description: activeVideoScreeningLabel || 'Tidak ada kewajiban video tambahan.',
+      },
+      {
+        kicker: 'Kebutuhan tim',
+        title: Number(job?.openings_count) > 0 ? `${job.openings_count} posisi` : 'Lowongan aktif',
+        description: formatJobCountdownLabel(job) || 'Masih menerima kandidat yang relevan.',
+      },
+    ],
+    [activeVideoScreeningLabel, job]
   );
   const companyProfileLink = String(recruiterProfile.website || '').trim();
   const companyVideoEmbedUrl = React.useMemo(
@@ -617,24 +586,36 @@ const JobApplyPage = () => {
     () =>
       [
         {
-          value: formatJobCountdownLabel(job) || 'Masih dibuka',
-          label: 'Sisa waktu lowongan',
-        },
-        {
           value: job?.location || recruiterProfile.companyLocation || 'Indonesia',
-          label: 'Lokasi lowongan',
+          label: 'Lokasi penempatan',
         },
         {
-          value: formatJobType(job?.job_type),
-          label: 'Tipe pekerjaan',
+          value: `${formatJobType(job?.job_type)} • ${formatWorkMode(job?.work_mode)}`,
+          label: 'Skema kerja',
+        },
+        {
+          value: job?.interview_type
+            ? formatInterviewType(job.interview_type)
+            : 'Mengikuti recruiter',
+          label: 'Proses interview',
         },
         {
           value: formatSalaryRangeLabel(job?.salary_min, job?.salary_max),
-          label: 'Range gaji',
+          label: 'Competitive salary',
         },
       ].filter((item) => item.value),
     [job, recruiterProfile.companyLocation]
   );
+  const storyCultureChips = React.useMemo(() => {
+    const chipPool = [
+      ...focusChips,
+      formatJobType(job?.job_type),
+      formatWorkMode(job?.work_mode),
+      formatExperienceChip(job?.experience_level),
+    ].filter(Boolean);
+
+    return [...new Set(chipPool)].slice(0, 4);
+  }, [focusChips, job?.experience_level, job?.job_type, job?.work_mode]);
   const storyQuote =
     buildDescriptionPreview(
       recruiterProfile.companyDescription ||
@@ -659,14 +640,13 @@ const JobApplyPage = () => {
   const isScreeningStepIncomplete =
     unansweredRequiredScreeningCount > 0 || isRequiredVideoMissing;
   const isAlreadyApplied = appliedJobIds.has(Number(job?.id));
+  const nextApplyStepFromDetail = 2;
   const storyPublishedLabel = formatJobStoryDate(job?.created_at);
   const candidateName = candidateProfile.fullName || user?.name || 'Pelamar';
   const selectedResumeLabel =
     selectedResumeChoice === RESUME_SKIP_OPTION
       ? 'Tidak menyertakan resume'
       : selectedResumeChoice || 'Belum memilih resume';
-  const hasScreeningRequirements =
-    screeningQuestions.length > 0 || Boolean(job?.video_screening_requirement);
   const pageStatusMessage = !user
     ? 'Masuk sebagai pelamar untuk lanjut mengirim lamaran dari halaman ini.'
     : user.role !== 'candidate'
@@ -676,6 +656,33 @@ const JobApplyPage = () => {
         : !candidateCompletion.isReady
           ? `Lengkapi ${candidateCompletion.missingRequiredItems.length} komponen inti agar lamaran bisa dikirim.`
           : 'Profil Anda sudah siap untuk melanjutkan proses lamaran dari halaman ini.';
+
+  const jobApplyStepSummary =
+    jobApplyStep === 2
+      ? {
+          label: 'Pilih dokumen',
+          description: candidateResumeFiles.length > 0
+            ? 'Tentukan CV yang akan dipakai untuk lamaran ini sebelum lanjut ke tahap berikutnya.'
+            : 'Belum ada CV tersimpan. Anda masih bisa lanjut tanpa resume atau atur file dari Profil Siap Lamar.',
+        }
+      : jobApplyStep === 3
+        ? {
+            label: 'Jawab kebutuhan recruiter',
+            description:
+              screeningQuestions.length > 0 || Boolean(job?.video_screening_requirement)
+                ? 'Jawab pertanyaan screening dan siapkan video bila lowongan memintanya.'
+                : 'Lowongan ini tidak meminta pertanyaan tambahan.',
+          }
+        : jobApplyStep === 4
+          ? {
+            label: 'Review sebelum kirim',
+            description: 'Periksa jawaban dan data utama Anda sebelum mengirim lamaran.',
+          }
+          : {
+              label: 'Detail lowongan',
+              description:
+                'Pahami kebutuhan lowongan, cara kerja tim, dan pertanyaan recruiter sebelum mulai melamar.',
+            };
 
   const handleScreeningAnswerChange = React.useCallback((questionIdValue, questionText, answerValue) => {
     setApplicationScreeningAnswers((currentAnswers) => {
@@ -703,10 +710,6 @@ const JobApplyPage = () => {
       return;
     }
 
-    if (isAlreadyApplied) {
-      return;
-    }
-
     setSavedJobIds((currentIds) => {
       const nextIds = new Set(currentIds);
 
@@ -719,7 +722,7 @@ const JobApplyPage = () => {
       persistSavedJobIds(user?.id, nextIds);
       return nextIds;
     });
-  }, [isAlreadyApplied, job?.id, user?.id]);
+  }, [job?.id, user?.id]);
 
   const handleShareJob = React.useCallback(async () => {
     if (!job) {
@@ -780,10 +783,6 @@ const JobApplyPage = () => {
     });
   }, [job?.title, navigate]);
 
-  const handleReturnToJobs = React.useCallback(() => {
-    navigate(APP_ROUTES.jobs);
-  }, [navigate]);
-
   const handleOpenProfile = React.useCallback(() => {
     const missingPreview = candidateCompletion.missingRequiredItems.slice(0, 3).join(', ');
 
@@ -793,6 +792,45 @@ const JobApplyPage = () => {
       },
     });
   }, [candidateCompletion.missingRequiredItems, navigate]);
+
+  const handleAdvanceFromDetail = React.useCallback(() => {
+    if (!job) {
+      return;
+    }
+
+    if (isAlreadyApplied) {
+      handleOpenApplications();
+      return;
+    }
+
+    if (!user) {
+      handleOpenLogin();
+      return;
+    }
+
+    if (user.role !== 'candidate') {
+      navigate(getDefaultRouteForRole(user.role));
+      return;
+    }
+
+    if (!candidateCompletion.isReady) {
+      handleOpenProfile();
+      return;
+    }
+
+    setApplicationFeedback(null);
+    setJobApplyStep(nextApplyStepFromDetail);
+  }, [
+    candidateCompletion.isReady,
+    handleOpenApplications,
+    handleOpenLogin,
+    handleOpenProfile,
+    isAlreadyApplied,
+    job,
+    navigate,
+    nextApplyStepFromDetail,
+    user,
+  ]);
 
   const handleApplySubmit = async (event) => {
     event.preventDefault();
@@ -811,24 +849,8 @@ const JobApplyPage = () => {
       return;
     }
 
-    if (isAlreadyApplied) {
-      handleOpenApplications();
-      return;
-    }
-
     if (!candidateCompletion.isReady) {
       handleOpenProfile();
-      return;
-    }
-
-    if (unansweredRequiredScreeningCount > 0 || isRequiredVideoMissing) {
-      setApplicationFeedback({
-        type: 'error',
-        message:
-          unansweredRequiredScreeningCount > 0
-            ? `Masih ada ${unansweredRequiredScreeningCount} pertanyaan wajib yang belum dijawab.`
-            : 'Link video screening wajib masih kosong.',
-      });
       return;
     }
 
@@ -841,16 +863,6 @@ const JobApplyPage = () => {
       );
 
       setAppliedJobIds((currentIds) => new Set([...currentIds, Number(job.id)]));
-      setSavedJobIds((currentIds) => {
-        if (!currentIds.has(Number(job.id))) {
-          return currentIds;
-        }
-
-        const nextIds = new Set(currentIds);
-        nextIds.delete(Number(job.id));
-        persistSavedJobIds(user?.id, nextIds);
-        return nextIds;
-      });
       setApplicationFeedback({
         type: 'success',
         message: `Lamaran untuk ${job.title} berhasil dikirim.`,
@@ -889,48 +901,68 @@ const JobApplyPage = () => {
   return (
     <div className="job-apply-page-shell">
       <div className="job-apply-page-topbar">
-        <button type="button" className="job-apply-page-backlink" onClick={handleReturnToJobs}>
+        <button type="button" className="job-apply-page-backlink" onClick={() => navigate(APP_ROUTES.jobs)}>
           ← Kembali ke Lowongan Kerja
         </button>
-        <span className="job-apply-page-route-label">
-          {isSuccessStep ? 'Lamaran berhasil' : 'Detail lowongan & lamaran'}
-        </span>
+        <span className="job-apply-page-route-label">Detail lowongan & lamaran</span>
       </div>
 
       <div className="job-apply-modal job-apply-modal-standalone is-story-step">
-        <div
-          className={`job-apply-modal-header job-apply-modal-header-story${
-            isSuccessStep ? ' is-success-step' : ''
-          }`}
-        >
-          {!isSuccessStep && (
-            <button
-              type="button"
-              className="job-apply-story-topbar-button"
-              onClick={handleReturnToJobs}
-              aria-label="Kembali ke Lowongan Kerja"
-            >
-              <JobApplyTopbarIcon type="back" />
-            </button>
-          )}
+        <div className="job-apply-modal-header job-apply-modal-header-story">
+          <button
+            type="button"
+            className="job-apply-story-topbar-button"
+            onClick={() => navigate(APP_ROUTES.jobs)}
+            aria-label="Kembali ke Lowongan Kerja"
+          >
+            ←
+          </button>
           <div className="job-apply-story-topbar-copy">
-            <span>{isSuccessStep ? 'Lowongan kerja' : 'Detail lowongan'}</span>
-            <strong id="job-apply-modal-title">
-              {isSuccessStep ? 'Berkas telah berhasil terkirim' : job.title}
-            </strong>
+            <span>Detail lowongan</span>
+            <strong id="job-apply-modal-title">{job.title}</strong>
           </div>
           <button
             type="button"
-            className={`job-apply-story-topbar-button${isSuccessStep ? ' is-return-link' : ''}`}
-            onClick={isSuccessStep ? handleReturnToJobs : handleShareJob}
-            aria-label={isSuccessStep ? 'Kembali ke Lowongan Kerja' : 'Bagikan lowongan'}
+            className="job-apply-story-topbar-button"
+            onClick={handleShareJob}
+            aria-label="Bagikan lowongan"
           >
-            <JobApplyTopbarIcon type={isSuccessStep ? 'return' : 'share'} />
+            ↗
           </button>
         </div>
 
-        <form className="job-apply-form is-story-step" onSubmit={handleApplySubmit}>
-          {!isSuccessStep && (
+        {!isSuccessStep && jobApplyStep > 1 && (
+          <div className="job-apply-step-tabs" aria-label="Tahapan melamar">
+            {[2, 3, 4].map((step) => (
+              <button
+                key={`job-apply-page-step-${step}`}
+                type="button"
+                className={`job-apply-step-tab${
+                  jobApplyStep === step ? ' is-active' : ''
+                }${jobApplyStep > step ? ' is-done' : ''}`}
+                onClick={() => setJobApplyStep(step)}
+              >
+                <span>{step}</span>
+                <strong>
+                  {step === 2 ? 'Dokumen' : step === 3 ? 'Screening' : 'Review'}
+                </strong>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!isSuccessStep && jobApplyStep > 1 && (
+          <div className="job-apply-page-step-copy">
+            <strong>{jobApplyStepSummary.label}</strong>
+            <span>{jobApplyStepSummary.description}</span>
+          </div>
+        )}
+
+        <form
+          className={`job-apply-form${jobApplyStep === 1 ? ' is-story-step' : ''}`}
+          onSubmit={handleApplySubmit}
+        >
+          {jobApplyStep === 1 && (
             <div className="job-apply-story-shell">
               <section className="job-apply-story-hero">
                 <div className="job-apply-story-cover">
@@ -1002,101 +1034,9 @@ const JobApplyPage = () => {
                   </div>
                 </div>
 
-                <section className="job-apply-story-section job-apply-story-about-card">
-                  <div className="job-apply-story-heading">
-                    <strong>Company Profile</strong>
-                    <span>Tentang kami</span>
-                  </div>
-
-                  <p className="job-apply-company-copy">
-                    {recruiterProfile.companyDescription ||
-                      buildDescriptionPreview(job.description, 260) ||
-                      'Recruiter akan menjelaskan kultur kerja dan detail tim pada tahap seleksi berikutnya.'}
-                  </p>
-
-                  <div className="job-apply-quote-card job-apply-quote-card-story">
-                    <p>"{storyQuote}"</p>
-                  </div>
-
-                  <div className="job-apply-visual-card job-apply-visual-card-story">
-                    <div className="job-apply-visual-stage" aria-hidden="true">
-                      <span className="job-apply-visual-window" />
-                      <span className="job-apply-visual-desk" />
-                    </div>
-                    <div className="job-apply-visual-plaque">
-                      <strong>{recruiterProfile.contactRole || 'Hiring team'}</strong>
-                      <span>
-                        {recruiterProfile.companyLocation || job.location || 'Indonesia'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {companyProfileLink && !companyVideoEmbedUrl && (
-                    <a
-                      className="job-apply-company-link"
-                      href={companyProfileLink}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Buka company profile
-                    </a>
-                  )}
-                </section>
-
-                {companyVideoEmbedUrl && (
-                  <section className="job-apply-story-section">
-                    <div className="job-apply-story-heading">
-                      <strong>Video Profile Company</strong>
-                      <span>Lihat profil perusahaan sebelum melamar</span>
-                    </div>
-
-                    <div className="job-apply-video-embed">
-                      <iframe
-                        src={companyVideoEmbedUrl}
-                        title={`Company profile ${companyName}`}
-                        loading="lazy"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-
-                    {companyProfileLink && (
-                      <a
-                        className="job-apply-company-link"
-                        href={companyProfileLink}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Buka video / profile perusahaan
-                      </a>
-                    )}
-                  </section>
-                )}
-
-                <section className="job-apply-story-section">
-                  <div className="job-apply-story-heading">
-                    <strong>Kemampuan</strong>
-                    <span>Ringkasan kemampuan dan fokus kerja yang dibutuhkan</span>
-                  </div>
-
-                  <div className="job-apply-story-question-tags job-apply-story-culture-tags">
-                    {abilityItems.map((item) => (
-                      <span key={`job-ability-chip-${item}`}>{item}</span>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="job-apply-story-section">
-                  <div className="job-apply-story-heading">
-                    <strong>Kualifikasi</strong>
-                  </div>
-
-                  <ul className="job-apply-story-bullet-list">
-                    {qualificationItems.map((item, index) => (
-                      <li key={`job-qualification-${index}-${item}`}>{item}</li>
-                    ))}
-                  </ul>
-                </section>
+                <div className="job-apply-quote-card job-apply-quote-card-story">
+                  <p>"{storyQuote}"</p>
+                </div>
 
                 <section className="job-apply-story-section">
                   <div className="job-apply-story-heading">
@@ -1112,252 +1052,358 @@ const JobApplyPage = () => {
 
                 <section className="job-apply-story-section">
                   <div className="job-apply-story-heading">
-                    <strong>Resume Saya</strong>
-                    <span>Pilih dokumen yang akan dipakai untuk lowongan ini</span>
+                    <strong>Kualifikasi</strong>
                   </div>
 
-                  <div className="job-apply-document-stack">
-                    {candidateResumeFiles.length > 0 ? (
-                      candidateResumeFiles.map((resumeName, resumeIndex) => (
-                        <label
-                          key={`job-apply-resume-${resumeIndex}-${resumeName}`}
-                          className={`job-apply-document-card${
-                            selectedResumeChoice === resumeName ? ' is-active' : ''
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="selected-resume"
-                            checked={selectedResumeChoice === resumeName}
-                            onChange={() => setSelectedResumeChoice(resumeName)}
-                          />
-                          <div className="job-apply-document-copy">
-                            <strong>{resumeName}</strong>
-                            <span>
-                              {resumeIndex === 0
-                                ? 'CV utama yang saat ini tersimpan di profil kandidat.'
-                                : 'CV tambahan yang tersimpan di profil kandidat.'}
-                            </span>
-                          </div>
-                          {resumeIndex === 0 && <small>Default</small>}
-                        </label>
-                      ))
-                    ) : (
-                      <article className="job-apply-document-empty">
-                        <strong>Belum ada CV tersimpan</strong>
-                        <p className="job-apply-company-copy">
-                          Atur CV PDF dari Profil Siap Lamar jika ingin melampirkannya ke lamaran ini.
-                        </p>
+                  <ul className="job-apply-story-bullet-list">
+                    {qualificationItems.map((item, index) => (
+                      <li key={`job-qualification-${index}-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </section>
+
+                <section className="job-apply-story-question-panel">
+                  <div className="job-apply-story-question-heading">
+                    <strong>Employer questions</strong>
+                    <p>
+                      Jawaban Anda akan ikut membantu recruiter memahami kesiapan dan pola kerja Anda.
+                    </p>
+                  </div>
+
+                  <div className="job-apply-question-list">
+                    {questionPreview.map((item, index) => (
+                      <article
+                        key={`job-question-preview-${index}`}
+                        className="job-apply-question-card"
+                      >
+                        <small>{`Pertanyaan ${index + 1}`}</small>
+                        <strong>{item.title}</strong>
+                        <span>{item.meta}</span>
                       </article>
-                    )}
-
-                    <label
-                      className={`job-apply-document-card${
-                        selectedResumeChoice === RESUME_SKIP_OPTION ? ' is-active' : ''
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="selected-resume"
-                        checked={selectedResumeChoice === RESUME_SKIP_OPTION}
-                        onChange={() => setSelectedResumeChoice(RESUME_SKIP_OPTION)}
-                      />
-                      <div className="job-apply-document-copy">
-                        <strong>Jangan sertakan resume</strong>
-                        <span>Anda tetap bisa lanjut melamar tanpa menautkan CV.</span>
-                      </div>
-                    </label>
+                    ))}
                   </div>
 
-                  <div className="job-apply-inline-actions">
-                    <button type="button" className="btn btn-outline" onClick={handleOpenProfile}>
-                      Atur CV di Profil
-                    </button>
-                    <span className="job-apply-company-copy">
-                      Pilihan saat ini: {selectedResumeLabel}
-                    </span>
+                  <div className="job-apply-story-question-tags">
+                    {questionPreview.map((item, index) => (
+                      <span key={`question-tag-${index}-${item.meta}`}>
+                        {item.meta || `Prompt ${index + 1}`}
+                      </span>
+                    ))}
                   </div>
                 </section>
 
                 <section className="job-apply-story-section">
                   <div className="job-apply-story-heading">
-                    <strong>Pertanyaan dari HR</strong>
-                    <span>Jawab poin yang memang diminta recruiter</span>
+                    <strong>Manfaat Utama</strong>
                   </div>
 
-                  {screeningQuestions.length > 0 ? (
-                    <div className="job-apply-screening-stack">
-                      {screeningQuestions.map((question) => {
-                        const currentAnswer =
-                          applicationScreeningAnswers.find(
-                            (answer) => String(answer.question_id) === String(question.id)
-                          )?.answer || '';
+                  <div className="job-apply-benefit-grid">
+                    {benefitCards.map((item) => (
+                      <article key={item.kicker} className="job-apply-benefit-card">
+                        <span>{item.kicker}</span>
+                        <strong>{item.title}</strong>
+                        <p>{item.description}</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
 
-                        return (
-                          <div key={question.id} className="job-apply-screening-card">
-                            <span>
-                              {question.question}
-                              {question.required ?? true ? ' *' : ''}
-                            </span>
-                            {Array.isArray(question.answers) && question.answers.length > 0 ? (
-                              <div className="job-apply-screening-choice-row">
-                                {question.answers.map((answerOption) => (
-                                  <label key={`${question.id}-${answerOption}`}>
-                                    <input
-                                      type="radio"
-                                      name={`screening-${question.id}`}
-                                      checked={currentAnswer === answerOption}
-                                      onChange={() =>
-                                        handleScreeningAnswerChange(
-                                          question.id,
-                                          question.question,
-                                          answerOption
-                                        )
-                                      }
-                                    />
-                                    <span>{answerOption}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            ) : (
-                              <textarea
-                                rows="3"
-                                placeholder="Tulis jawaban Anda..."
-                                value={currentAnswer}
-                                onChange={(event) =>
-                                  handleScreeningAnswerChange(
-                                    question.id,
-                                    question.question,
-                                    event.target.value
-                                  )
-                                }
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
+                <section className="job-apply-story-section job-apply-story-about-card">
+                  <div className="job-apply-story-heading">
+                    <strong>Tentang Kami</strong>
+                    <span>{companyName}</span>
+                  </div>
+
+                  <p className="job-apply-company-copy">
+                    {recruiterProfile.companyDescription ||
+                      buildDescriptionPreview(job.description, 260) ||
+                      'Recruiter akan menjelaskan kultur kerja dan detail tim pada tahap seleksi berikutnya.'}
+                  </p>
+
+                  <div className="job-apply-story-question-tags job-apply-story-culture-tags">
+                    {storyCultureChips.map((item) => (
+                      <span key={`job-focus-chip-${item}`}>{item}</span>
+                    ))}
+                  </div>
+
+                  {(companyProfileLink || companyVideoEmbedUrl) && (
                     <div className="job-apply-profile-summary">
-                      <strong>Tidak ada pertanyaan tambahan</strong>
+                      <strong>Company profile</strong>
                       <p className="job-apply-company-copy">
-                        Recruiter tidak menambahkan pertanyaan HR pada lowongan ini.
+                        Pelajari profil perusahaan lebih lanjut sebelum lanjut ke tahap berikutnya.
                       </p>
                     </div>
                   )}
-                </section>
 
-                {job?.video_screening_requirement && (
-                  <section className="job-apply-story-section">
-                    <div className="job-apply-story-heading">
-                      <strong>Video Skrining</strong>
-                      <span>
-                        {job.video_screening_requirement === 'required'
-                          ? 'Wajib dilampirkan untuk lowongan ini'
-                          : 'Opsional untuk lowongan ini'}
-                      </span>
-                    </div>
-
-                    {activeVideoScreeningLabel && (
-                      <p className="job-apply-video-screening-note">{activeVideoScreeningLabel}</p>
-                    )}
-
-                    <label className="job-apply-field">
-                      <span>
-                        Link video screening
-                        {job.video_screening_requirement === 'required'
-                          ? ' (wajib)'
-                          : ' (opsional)'}
-                      </span>
-                      <input
-                        type="url"
-                        placeholder="https://..."
-                        value={applicationVideoIntroUrl}
-                        onChange={(event) => setApplicationVideoIntroUrl(event.target.value)}
+                  {companyVideoEmbedUrl && (
+                    <div className="job-apply-video-embed">
+                      <iframe
+                        src={companyVideoEmbedUrl}
+                        title={`Company profile ${companyName}`}
+                        loading="lazy"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
                       />
-                      <small>
-                        Gunakan link yang bisa dibuka recruiter tanpa perlu meminta akses tambahan.
-                      </small>
-                    </label>
-                  </section>
-                )}
-
-                <section className="job-apply-story-section">
-                  <div className="job-apply-story-heading">
-                    <strong>Catatan Tambahan untuk Recruiter</strong>
-                    <span>Opsional</span>
-                  </div>
-
-                  <label className="job-apply-field">
-                    <span>Catatan singkat</span>
-                    <textarea
-                      rows="4"
-                      placeholder="Tulis motivasi singkat atau informasi pendukung lain untuk recruiter."
-                      value={applicationCoverLetter}
-                      onChange={(event) => setApplicationCoverLetter(event.target.value)}
-                    />
-                    <small>
-                      Anda bisa menjelaskan motivasi melamar atau konteks singkat yang belum tertangkap dari CV.
-                    </small>
-                  </label>
-
-                  <div className="job-apply-profile-summary">
-                    <strong>Ringkasan lamaran</strong>
-                    <div className="job-apply-profile-grid">
-                      <span>Perusahaan: {companyName}</span>
-                      <span>Posisi: {job.title}</span>
-                      <span>Resume dipilih: {selectedResumeLabel}</span>
-                      <span>
-                        Screening terjawab:{' '}
-                        {screeningQuestions.length > 0
-                          ? `${applicationScreeningAnswers.filter((item) => String(item.answer || '').trim()).length}/${screeningQuestions.length}`
-                          : 'Tidak ada screening'}
-                      </span>
-                      <span>
-                        Video: {applicationVideoIntroUrl.trim() ? 'Sudah ditautkan' : 'Belum ditautkan'}
-                      </span>
-                      <span>
-                        Lowongan tersimpan: {savedJobIds.has(Number(job.id)) ? 'Ya' : 'Belum'}
-                      </span>
                     </div>
-                  </div>
-
-                  {isScreeningStepIncomplete && (
-                    <p className="job-apply-feedback job-apply-feedback-error">
-                      {unansweredRequiredScreeningCount > 0
-                        ? `Masih ada ${unansweredRequiredScreeningCount} pertanyaan wajib yang belum dijawab.`
-                        : 'Link video screening wajib masih kosong.'}
-                    </p>
                   )}
 
-                  {!hasScreeningRequirements && (
-                    <p className="job-apply-company-copy">
-                      Lowongan ini bisa langsung di-quick apply karena recruiter tidak menambahkan
-                      pertanyaan HR atau video screening.
-                    </p>
+                  <div className="job-apply-visual-card job-apply-visual-card-story">
+                    <div className="job-apply-visual-stage" aria-hidden="true">
+                      <span className="job-apply-visual-window" />
+                      <span className="job-apply-visual-desk" />
+                    </div>
+                    <div className="job-apply-visual-plaque">
+                      <strong>{recruiterProfile.contactRole || 'Hiring team'}</strong>
+                      <span>
+                        {recruiterProfile.companyLocation || job.location || 'Indonesia'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {companyProfileLink && (
+                    <a
+                      className="job-apply-company-link"
+                      href={companyProfileLink}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Buka company profile
+                    </a>
                   )}
                 </section>
               </div>
             </div>
           )}
 
+          {jobApplyStep === 2 && (
+            <>
+              <div className="job-apply-profile-summary">
+                <strong>Pilih dokumen lamaran</strong>
+                <p className="job-apply-company-copy">
+                  Tentukan resume yang akan Anda pakai untuk lowongan ini. Anda bisa mengatur file
+                  PDF dari Profil Siap Lamar.
+                </p>
+              </div>
+
+              <div className="job-apply-document-stack">
+                {candidateResumeFiles.length > 0 ? (
+                  candidateResumeFiles.map((resumeName, resumeIndex) => (
+                    <label
+                      key={`job-apply-resume-${resumeIndex}-${resumeName}`}
+                      className={`job-apply-document-card${
+                        selectedResumeChoice === resumeName ? ' is-active' : ''
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="selected-resume"
+                        checked={selectedResumeChoice === resumeName}
+                        onChange={() => setSelectedResumeChoice(resumeName)}
+                      />
+                      <div className="job-apply-document-copy">
+                        <strong>{resumeName}</strong>
+                        <span>
+                          {resumeIndex === 0
+                            ? 'CV utama yang saat ini tersimpan di profil kandidat.'
+                            : 'CV tambahan yang tersimpan di profil kandidat.'}
+                        </span>
+                      </div>
+                      {resumeIndex === 0 && <small>Default</small>}
+                    </label>
+                  ))
+                ) : (
+                  <article className="job-apply-document-empty">
+                    <strong>Belum ada CV tersimpan</strong>
+                    <p className="job-apply-company-copy">
+                      Atur CV PDF dari Profil Siap Lamar jika ingin melampirkannya ke lamaran ini.
+                    </p>
+                  </article>
+                )}
+
+                <label
+                  className={`job-apply-document-card${
+                    selectedResumeChoice === RESUME_SKIP_OPTION ? ' is-active' : ''
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="selected-resume"
+                    checked={selectedResumeChoice === RESUME_SKIP_OPTION}
+                    onChange={() => setSelectedResumeChoice(RESUME_SKIP_OPTION)}
+                  />
+                  <div className="job-apply-document-copy">
+                    <strong>Jangan sertakan resume</strong>
+                    <span>Anda tetap bisa lanjut melamar tanpa menautkan CV.</span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="job-apply-inline-actions">
+                <button type="button" className="btn btn-outline" onClick={handleOpenProfile}>
+                  Atur CV di Profil
+                </button>
+                <span className="job-apply-company-copy">
+                  Pilihan saat ini: {selectedResumeLabel}
+                </span>
+              </div>
+            </>
+          )}
+
+          {jobApplyStep === 3 && (
+            <>
+              <div className="job-apply-profile-summary">
+                <strong>Jawab screening recruiter</strong>
+                <p className="job-apply-company-copy">
+                  Lengkapi pertanyaan HR dan video screening bila lowongan ini memintanya.
+                </p>
+              </div>
+
+              {activeVideoScreeningLabel && (
+                <p className="job-apply-video-screening-note">{activeVideoScreeningLabel}</p>
+              )}
+
+              {screeningQuestions.length > 0 ? (
+                <div className="job-apply-screening-stack">
+                  <strong>Pertanyaan screening</strong>
+                  {screeningQuestions.map((question) => {
+                    const currentAnswer =
+                      applicationScreeningAnswers.find(
+                        (answer) => String(answer.question_id) === String(question.id)
+                      )?.answer || '';
+
+                    return (
+                      <div key={question.id} className="job-apply-screening-card">
+                        <span>
+                          {question.question}
+                          {question.required ?? true ? ' *' : ''}
+                        </span>
+                        {Array.isArray(question.answers) && question.answers.length > 0 ? (
+                          <div className="job-apply-screening-choice-row">
+                            {question.answers.map((answerOption) => (
+                              <label key={`${question.id}-${answerOption}`}>
+                                <input
+                                  type="radio"
+                                  name={`screening-${question.id}`}
+                                  checked={currentAnswer === answerOption}
+                                  onChange={() =>
+                                    handleScreeningAnswerChange(
+                                      question.id,
+                                      question.question,
+                                      answerOption
+                                    )
+                                  }
+                                />
+                                <span>{answerOption}</span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          <textarea
+                            rows="3"
+                            placeholder="Tulis jawaban Anda..."
+                            value={currentAnswer}
+                            onChange={(event) =>
+                              handleScreeningAnswerChange(
+                                question.id,
+                                question.question,
+                                event.target.value
+                              )
+                            }
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="job-apply-profile-summary">
+                  <strong>Tidak ada pertanyaan tambahan</strong>
+                  <p className="job-apply-company-copy">
+                    Recruiter tidak menambahkan kuis screening. Anda bisa langsung lanjut ke review akhir.
+                  </p>
+                </div>
+              )}
+
+              {job?.video_screening_requirement && (
+                <label className="job-apply-field">
+                  <span>
+                    Link video screening
+                    {job.video_screening_requirement === 'required' ? ' (wajib)' : ' (opsional)'}
+                  </span>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={applicationVideoIntroUrl}
+                    onChange={(event) => setApplicationVideoIntroUrl(event.target.value)}
+                  />
+                  <small>
+                    Gunakan link yang bisa dibuka recruiter tanpa perlu meminta akses tambahan.
+                  </small>
+                </label>
+              )}
+
+              {isScreeningStepIncomplete && (
+                <p className="job-apply-feedback job-apply-feedback-error">
+                  {unansweredRequiredScreeningCount > 0
+                    ? `Masih ada ${unansweredRequiredScreeningCount} pertanyaan wajib yang belum dijawab.`
+                    : 'Link video screening wajib masih kosong.'}
+                </p>
+              )}
+            </>
+          )}
+
+          {jobApplyStep === 4 && (
+            <>
+              <div className="job-apply-profile-summary">
+                <strong>Review singkat sebelum kirim</strong>
+                <div className="job-apply-profile-grid">
+                  <span>Perusahaan: {companyName}</span>
+                  <span>Posisi: {job.title}</span>
+                  <span>Resume dipilih: {selectedResumeLabel}</span>
+                  <span>
+                    Screening terjawab:{' '}
+                    {screeningQuestions.length > 0
+                      ? `${applicationScreeningAnswers.filter((item) => String(item.answer || '').trim()).length}/${screeningQuestions.length}`
+                      : 'Tidak ada screening'}
+                  </span>
+                  <span>
+                    Video: {applicationVideoIntroUrl.trim() ? 'Sudah ditautkan' : 'Belum ditautkan'}
+                  </span>
+                  <span>
+                    Lowongan tersimpan: {savedJobIds.has(Number(job.id)) ? 'Ya' : 'Belum'}
+                  </span>
+                </div>
+              </div>
+
+              <label className="job-apply-field">
+                <span>Catatan singkat untuk recruiter</span>
+                <textarea
+                  rows="4"
+                  placeholder="Tulis motivasi singkat atau informasi pendukung lain untuk recruiter."
+                  value={applicationCoverLetter}
+                  onChange={(event) => setApplicationCoverLetter(event.target.value)}
+                />
+                <small>
+                  Anda bisa menjelaskan motivasi melamar atau konteks singkat yang belum tertangkap dari CV.
+                </small>
+              </label>
+            </>
+          )}
+
           {isSuccessStep && (
             <div className="job-apply-success-stack">
               <div className="job-apply-success-card">
-                <strong>Berkas telah berhasil terkirim</strong>
+                <strong>Lamaran berhasil dikirim</strong>
                 <h3>{job.title}</h3>
                 <p>
-                  Halo {candidateName}, berkas Anda sudah terkirim ke {companyName}. Sekarang Anda
-                  bisa membuka Lamaran Saya atau kembali ke Lowongan Kerja untuk melihat peluang lain.
+                  Halo {candidateName}, berkas Anda berhasil terkirim ke {companyName}. Pantau statusnya di Lamaran Saya atau lanjut jelajahi peluang lain.
                 </p>
                 <div className="job-apply-chip-wrap">
-                  <span className="job-apply-chip">Status awal: Menunggu review recruiter</span>
+                  <span className="job-apply-chip">
+                    Status awal: Menunggu review recruiter
+                  </span>
                   <span className="job-apply-chip job-apply-chip-secondary">
-                    Terkirim{' '}
-                    {new Date().toLocaleString('id-ID', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
+                    Terkirim {new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
                   </span>
                 </div>
               </div>
@@ -1370,7 +1416,7 @@ const JobApplyPage = () => {
             </p>
           )}
 
-          <div className={`job-apply-actions${!isSuccessStep ? ' is-story-step' : ''}`}>
+          <div className={`job-apply-actions${jobApplyStep === 1 && !isSuccessStep ? ' is-story-step' : ''}`}>
             {isSuccessStep ? (
               <>
                 <button
@@ -1386,11 +1432,11 @@ const JobApplyPage = () => {
                 >
                   Buka Lamaran Saya
                 </button>
-                <button type="button" className="btn btn-outline" onClick={handleReturnToJobs}>
-                  Kembali ke Lowongan Kerja
+                <button type="button" className="btn btn-outline" onClick={() => navigate(APP_ROUTES.jobs)}>
+                  Kembali ke lowongan
                 </button>
               </>
-            ) : (
+            ) : jobApplyStep === 1 ? (
               <>
                 {isAlreadyApplied ? (
                   <>
@@ -1445,14 +1491,6 @@ const JobApplyPage = () => {
                   </>
                 ) : (
                   <>
-                    <div className="job-apply-actions-copy">
-                      <strong>Quick Apply dari halaman ini</strong>
-                      <span>
-                        Semua dokumen, pertanyaan HR, dan video screening sudah disusun dalam satu
-                        alur. Pastikan jawaban Anda lengkap sebelum mengirim.
-                      </span>
-                    </div>
-
                     <button
                       type="button"
                       className="btn btn-outline job-apply-story-secondary-button"
@@ -1463,13 +1501,60 @@ const JobApplyPage = () => {
                         label={savedJobIds.has(Number(job.id)) ? 'Saved' : 'Save'}
                       />
                     </button>
-                    <button type="submit" className="btn btn-primary job-apply-story-primary-button" disabled={isApplying}>
-                      <JobApplyStoryButtonLabel
-                        icon="apply"
-                        label={isApplying ? 'Mengirim...' : 'Quick Apply'}
-                      />
+                    <button
+                      type="button"
+                      className="btn btn-primary job-apply-story-primary-button"
+                      onClick={handleAdvanceFromDetail}
+                    >
+                      <JobApplyStoryButtonLabel icon="apply" label="Quick Apply" />
                     </button>
                   </>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="job-apply-actions-copy">
+                  <strong>
+                    {jobApplyStep === 2
+                      ? 'Pilih dokumen lamaran'
+                      : jobApplyStep === 3
+                        ? 'Lengkapi kebutuhan recruiter'
+                        : 'Siap kirim?'}
+                  </strong>
+                  <span>
+                    {jobApplyStep === 2
+                      ? 'Tentukan CV yang akan dipakai untuk lowongan ini atau lanjut tanpa resume.'
+                      : jobApplyStep === 3
+                      ? 'Gunakan jawaban singkat yang jujur dan pastikan link video benar-benar bisa dibuka.'
+                      : 'Periksa lagi data utama Anda sebelum mengirim lamaran dari halaman ini.'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setJobApplyStep((currentValue) => Math.max(1, currentValue - 1))}
+                >
+                  Kembali
+                </button>
+
+                {jobApplyStep < 4 ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={jobApplyStep === 3 && isScreeningStepIncomplete}
+                    onClick={() => setJobApplyStep((currentValue) => Math.min(4, currentValue + 1))}
+                  >
+                    {jobApplyStep === 2
+                      ? screeningQuestions.length > 0 || Boolean(job?.video_screening_requirement)
+                        ? 'Lanjut ke screening'
+                        : 'Lanjut ke review'
+                      : 'Lanjut ke review'}
+                  </button>
+                ) : (
+                  <button type="submit" className="btn btn-primary" disabled={isApplying}>
+                    {isApplying ? 'Mengirim...' : 'Kirim Lamaran'}
+                  </button>
                 )}
               </>
             )}

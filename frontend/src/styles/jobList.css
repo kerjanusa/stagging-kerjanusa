@@ -2306,10 +2306,6 @@
   border-bottom: none;
 }
 
-.job-apply-modal-header-story.is-success-step {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
 .job-apply-story-topbar-button {
   width: 2.35rem;
   height: 2.35rem;
@@ -2323,23 +2319,9 @@
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-.job-apply-story-topbar-button svg {
-  width: 1.08rem;
-  height: 1.08rem;
-}
-
 .job-apply-story-topbar-button:hover {
   background: rgba(255, 255, 255, 0.14);
   transform: translateY(-1px);
-}
-
-.job-apply-story-topbar-button.is-return-link {
-  background: rgba(241, 204, 111, 0.16);
-  color: #ffecc8;
-}
-
-.job-apply-story-topbar-button.is-return-link:hover {
-  background: rgba(241, 204, 111, 0.24);
 }
 
 .job-apply-story-topbar-copy {
@@ -2347,10 +2329,6 @@
   display: grid;
   gap: 0.06rem;
   text-align: center;
-}
-
-.job-apply-modal-header-story.is-success-step .job-apply-story-topbar-copy {
-  text-align: left;
 }
 
 .job-apply-story-topbar-copy span {
