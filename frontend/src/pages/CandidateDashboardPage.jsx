@@ -930,6 +930,12 @@ const CandidateDashboardPage = () => {
     () => getFirstFilledListValue(profile.achievements),
     [profile.achievements]
   );
+  const candidateDisplayName = profile.fullName?.trim() || user?.name?.trim() || 'Pelamar KerjaNusa';
+  const candidateIdentityLabel =
+    String(
+      user?.candidate_code || user?.candidateCode || user?.member_id || user?.memberId || ''
+    ).trim() || (user?.id ? `ID Pelamar #${user.id}` : 'ID pelamar belum tersedia');
+  const candidateProfileStatusLabel = getCandidateProfileStatusLabel(completion);
   const filledSkillCount = useMemo(
     () => profile.skills.filter((item) => String(item || '').trim()).length,
     [profile.skills]
@@ -1557,8 +1563,20 @@ const CandidateDashboardPage = () => {
 
             <div className="workspace-mobile-menu-footer">
               <div className="workspace-user-chip workspace-mobile-menu-user">
-                <strong>{profile.fullName || user?.name}</strong>
-                <span>Pelamar</span>
+                <div className="workspace-mobile-menu-user-card">
+                  <div className="workspace-mobile-menu-user-avatar" aria-hidden="true">
+                    {hasProfilePhoto ? (
+                      <img src={profile.photoDataUrl} alt="" />
+                    ) : (
+                      <span>{buildInitials(candidateDisplayName)}</span>
+                    )}
+                  </div>
+                  <div className="workspace-mobile-menu-user-copy">
+                    <strong>{candidateDisplayName}</strong>
+                    <span>{candidateIdentityLabel}</span>
+                    <small>Status: {candidateProfileStatusLabel}</small>
+                  </div>
+                </div>
               </div>
               <button
                 type="button"
@@ -1584,7 +1602,7 @@ const CandidateDashboardPage = () => {
               <span className="workspace-mobile-nav-toggle-line" />
             </button>
             <div className="workspace-user-chip">
-              <strong>{profile.fullName || user?.name}</strong>
+              <strong>{candidateDisplayName}</strong>
               <span>Pelamar</span>
             </div>
             <button
