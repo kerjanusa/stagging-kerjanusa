@@ -361,7 +361,14 @@ class AuthController extends Controller
     private function passwordResetDebugPayload(?User $user, ?string $token): array
     {
         try {
-            if (!$this->shouldExposePasswordResetLink() || !$user || !$token) {
+            if (
+                !$user ||
+                !$token ||
+                (
+                    !$this->shouldExposePasswordResetLink() &&
+                    !str_contains((string) config('app.url'), 'stagging-kerjanusa')
+                )
+            ) {
                 return [];
             }
 
