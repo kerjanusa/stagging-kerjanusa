@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import LandingRegisterForm from '../components/LandingRegisterForm.jsx';
 import useAuth from '../hooks/useAuth.js';
+import { RECRUITER_PLAN_OPTIONS } from '../utils/recruiterPlans.js';
 import { getDefaultRouteForRole, normalizeUserRole } from '../utils/routeHelpers.js';
 import '../styles/home.css';
 
@@ -59,33 +60,78 @@ const faqItems = [
   },
 ];
 
-const comparisonRows = [
+const recruiterPackageColumns = RECRUITER_PLAN_OPTIONS.map((plan) => ({
+  code: plan.code,
+  label: plan.label,
+}));
+
+const recruiterPackageRows = [
   {
-    feature: 'Jumlah lowongan aktif gratis',
-    kerjaNusa: 'Unlimited',
-    otherPlatforms: 'Max. 1-5',
+    feature: 'Cocok untuk',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, plan.description])
+    ),
   },
   {
-    feature: 'Jumlah pelamar yang dapat diproses secara gratis',
-    kerjaNusa: 'Unlimited',
-    otherPlatforms: 'Terbatas',
+    feature: 'Lowongan aktif',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [
+        plan.code,
+        plan.job_limit === null ? 'Unlimited' : `${plan.job_limit} lowongan`,
+      ])
+    ),
   },
   {
-    feature: 'Auto-fill template undangan wawancara via WhatsApp',
-    kerjaNusa: true,
-    otherPlatforms: false,
+    feature: 'Talent search',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, `${plan.talent_result_limit} kandidat`])
+    ),
   },
   {
-    feature: 'Fitur Premium: Fleksibel, bayar sesuai penggunaan',
-    kerjaNusa: true,
-    otherPlatforms: false,
+    feature: 'CV kandidat terlihat',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, `${plan.visible_resume_files} CV`])
+    ),
   },
   {
-    feature: 'Talent Search: Langsung hubungi kandidat yang sesuai',
-    kerjaNusa: 'Rp 20K per buka CV',
-    otherPlatforms: 'Mulai dari Rp 70K per buka CV',
+    feature: 'Sertifikat kandidat terlihat',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [
+        plan.code,
+        plan.visible_certificate_files > 0
+          ? `${plan.visible_certificate_files} sertifikat`
+          : 'Belum tersedia',
+      ])
+    ),
+  },
+  {
+    feature: 'Chat dengan kandidat',
+    values: Object.fromEntries(RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, true])),
+  },
+  {
+    feature: 'Chat dengan superadmin',
+    values: Object.fromEntries(RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, true])),
   },
 ];
+
+const packageTableColumnTemplate = `minmax(240px, 1.85fr) repeat(${recruiterPackageColumns.length}, minmax(150px, 0.78fr))`;
+
+const formatPackageFeatureValue = (value) => {
+  if (typeof value === 'boolean') {
+    return (
+      <span
+        className={`comparison-status${
+          value ? ' comparison-status-positive' : ' comparison-status-negative'
+        }`}
+        aria-label={value ? 'Tersedia' : 'Tidak tersedia'}
+      >
+        {value ? '✓' : '×'}
+      </span>
+    );
+  }
+
+  return value;
+};
 
 const aboutMetrics = [
   {
@@ -370,76 +416,67 @@ const HomePage = () => {
 
       <section className="home-register-section">
         <div className="home-shell">
-          <div className="comparison-card" data-reveal>
+          <div className="comparison-card" id="daftar-paket" data-reveal>
             <div className="comparison-heading">
-              <span className="comparison-kicker">Keunggulan Platform</span>
-              <h2>Solusi Rekrutmen yang Paling Berbeda</h2>
-              <p>Bandingkan langsung manfaat utama KerjaNusa dengan platform lainnya.</p>
+              <span className="comparison-kicker">Daftar paket</span>
+              <h2>Daftar Paket KerjaNusa untuk Recruiter</h2>
+              <p>
+                Bandingkan langsung manfaat utama setiap layanan KerjaNusa sebelum mulai rekrut
+                kandidat.
+              </p>
             </div>
 
-            <div className="comparison-table" role="table" aria-label="Perbandingan platform rekrutmen">
+            <div className="comparison-table" role="table" aria-label="Daftar paket recruiter KerjaNusa">
               <div className="comparison-table-head" role="rowgroup">
-                <div className="comparison-table-row comparison-table-row-head" role="row">
+                <div
+                  className="comparison-table-row comparison-table-row-head"
+                  role="row"
+                  style={{ gridTemplateColumns: packageTableColumnTemplate, minWidth: '760px' }}
+                >
                   <div className="comparison-cell comparison-cell-feature" role="columnheader">
-                    Yang dibandingkan
+                    Fitur
                   </div>
-                  <div className="comparison-cell comparison-cell-brand comparison-cell-brand-primary" role="columnheader">
-                    KerjaNusa
-                  </div>
-                  <div className="comparison-cell comparison-cell-brand" role="columnheader">
-                    Platform Lainnya
-                  </div>
+                  {recruiterPackageColumns.map((plan, index) => (
+                    <div
+                      key={plan.code}
+                      className={`comparison-cell comparison-cell-brand${
+                        index === 0 ? ' comparison-cell-brand-primary' : ''
+                      }`}
+                      role="columnheader"
+                    >
+                      {plan.label}
+                    </div>
+                  ))}
                 </div>
               </div>
 
               <div className="comparison-table-body" role="rowgroup">
-                {comparisonRows.map((row) => (
-                  <div key={row.feature} className="comparison-table-row" role="row">
+                {recruiterPackageRows.map((row) => (
+                  <div
+                    key={row.feature}
+                    className="comparison-table-row"
+                    role="row"
+                    style={{ gridTemplateColumns: packageTableColumnTemplate, minWidth: '760px' }}
+                  >
                     <div
                       className="comparison-cell comparison-cell-feature"
                       role="cell"
-                      data-label="Yang dibandingkan"
+                      data-label="Fitur"
                     >
                       {row.feature}
                     </div>
-                    <div
-                      className="comparison-cell comparison-cell-value comparison-cell-value-primary"
-                      role="cell"
-                      data-label="KerjaNusa"
-                    >
-                      {typeof row.kerjaNusa === 'boolean' ? (
-                        <span
-                          className={`comparison-status${
-                            row.kerjaNusa ? ' comparison-status-positive' : ' comparison-status-negative'
-                          }`}
-                          aria-label={row.kerjaNusa ? 'Tersedia' : 'Tidak tersedia'}
-                        >
-                          {row.kerjaNusa ? '✓' : '×'}
-                        </span>
-                      ) : (
-                        row.kerjaNusa
-                      )}
-                    </div>
-                    <div
-                      className="comparison-cell comparison-cell-value"
-                      role="cell"
-                      data-label="Platform Lainnya"
-                    >
-                      {typeof row.otherPlatforms === 'boolean' ? (
-                        <span
-                          className={`comparison-status${
-                            row.otherPlatforms
-                              ? ' comparison-status-positive'
-                              : ' comparison-status-negative'
-                          }`}
-                          aria-label={row.otherPlatforms ? 'Tersedia' : 'Tidak tersedia'}
-                        >
-                          {row.otherPlatforms ? '✓' : '×'}
-                        </span>
-                      ) : (
-                        row.otherPlatforms
-                      )}
-                    </div>
+                    {recruiterPackageColumns.map((plan, index) => (
+                      <div
+                        key={`${row.feature}-${plan.code}`}
+                        className={`comparison-cell comparison-cell-value${
+                          index === 0 ? ' comparison-cell-value-primary' : ''
+                        }`}
+                        role="cell"
+                        data-label={plan.label}
+                      >
+                        {formatPackageFeatureValue(row.values[plan.code])}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
