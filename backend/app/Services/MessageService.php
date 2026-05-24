@@ -132,22 +132,42 @@ class MessageService
             ->orderBy('company_name')
             ->orderBy('name')
             ->get()
-            ->filter(function (User $contact) use ($normalizedSearch) {
+            ->filter(function (User $contact) use ($normalizedSearch, $user) {
                 if ($normalizedSearch === '') {
                     return true;
                 }
 
-                $haystack = strtolower(implode(' ', array_filter([
-                    $contact->name,
-                    $contact->company_name,
-                    $contact->email,
-                ])));
+                $haystack = $this->buildContactSearchHaystack($user, $contact);
 
                 return str_contains($haystack, $normalizedSearch);
             })
             ->map(fn (User $contact) => $this->messagePresenter->presentUser($contact))
             ->values()
             ->all();
+    }
+
+    /**
+     * Build the normalized search haystack used by chat contacts.
+     */
+    private function buildContactSearchHaystack(User $viewer, User $contact): string
+    {
+        if ($viewer->hasRole(User::ROLE_CANDIDATE)) {
+            if ($contact->hasRole(User::ROLE_SUPERADMIN)) {
+                return strtolower(trim((string) ($contact->company_name ?: 'KerjaNusa')));
+            }
+
+            if ($contact->hasRole(User::ROLE_RECRUITER)) {
+                return strtolower(trim((string) ($contact->company_name ?: 'Perusahaan Recruiter')));
+            }
+
+            return strtolower(trim((string) ($contact->company_name ?: $contact->name ?: 'Kontak')));
+        }
+
+        return strtolower(implode(' ', array_filter([
+            $contact->name,
+            $contact->company_name,
+            $contact->email,
+        ])));
     }
 
     /**

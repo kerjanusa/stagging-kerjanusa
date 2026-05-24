@@ -43,7 +43,7 @@ const getEmailAlias = (value) => {
 /**
  * Menentukan nama utama yang ditampilkan untuk thread atau kontak berdasarkan role yang aktif.
  */
-const resolveContactLabel = (contact) => {
+const resolveContactLabel = (contact, companyFirstContacts = false) => {
   if (!contact) {
     return 'Kontak';
   }
@@ -51,6 +51,18 @@ const resolveContactLabel = (contact) => {
   const normalizedName = normalizeLabelText(contact.name);
   const normalizedCompany = normalizeLabelText(contact.company_name);
   const normalizedEmailAlias = getEmailAlias(contact.email);
+
+  if (companyFirstContacts) {
+    if (contact.role === 'superadmin') {
+      return normalizedCompany || 'KerjaNusa';
+    }
+
+    if (contact.role === 'recruiter') {
+      return normalizedCompany || 'Perusahaan Recruiter';
+    }
+
+    return normalizedCompany || normalizedName || `Kontak #${contact.id || '-'}`;
+  }
 
   if (contact.role === 'recruiter') {
     return (
@@ -71,7 +83,7 @@ const resolveContactLabel = (contact) => {
 /**
  * Menentukan teks pendamping kontak seperti email atau label akun cadangan.
  */
-const resolveContactSecondaryText = (contact) => {
+const resolveContactSecondaryText = (contact, companyFirstContacts = false) => {
   if (!contact) {
     return 'Kontak belum tersedia.';
   }
@@ -79,6 +91,20 @@ const resolveContactSecondaryText = (contact) => {
   const normalizedEmail = normalizeLabelText(contact.email);
   const normalizedName = normalizeLabelText(contact.name);
   const normalizedCompany = normalizeLabelText(contact.company_name);
+
+  if (companyFirstContacts) {
+    if (contact.role === 'superadmin') {
+      return 'Layanan platform KerjaNusa';
+    }
+
+    if (contact.role === 'recruiter') {
+      return normalizedCompany
+        ? 'Perusahaan recruiter'
+        : 'Profil perusahaan recruiter belum dilengkapi';
+    }
+
+    return normalizedCompany || 'Kontak perusahaan';
+  }
 
   if (normalizedEmail) {
     return normalizedEmail;
@@ -117,10 +143,14 @@ const InboxWorkspace = ({
   isLoadingMessages,
   isSendingMessage,
   compactLayout = false,
+  companyFirstContacts = false,
   emptyMessage = 'Pilih percakapan untuk mulai berdiskusi.',
 }) => {
   const messageListRef = useRef(null);
   const hasSelectedConversation = Boolean(selectedContactId);
+  const normalizedSearchQuery = normalizeLabelText(contactSearchQuery);
+  const showContactSuggestions = normalizedSearchQuery.length > 0 && !isLoadingContacts;
+  const contactSuggestions = showContactSuggestions ? contacts.slice(0, 5) : [];
 
   useEffect(() => {
     if (!selectedContactId || !messageListRef.current) {
@@ -145,6 +175,17 @@ const InboxWorkspace = ({
     }
 
     onSendMessage?.();
+  };
+
+  /**
+   * Membuka percakapan dari hasil pencarian dan opsional membersihkan query agar dropdown menutup.
+   */
+  const handleSelectContact = (contact, clearSearch = false) => {
+    onSelectContact?.(contact);
+
+    if (clearSearch) {
+      onContactSearchQueryChange?.('');
+    }
   };
 
   return (
@@ -185,11 +226,11 @@ const InboxWorkspace = ({
                     className={`collaboration-thread-card${
                       Number(selectedContactId) === Number(thread.contact?.id) ? ' is-active' : ''
                     }`}
-                    onClick={() => onSelectContact?.(thread.contact)}
+                    onClick={() => handleSelectContact(thread.contact)}
                   >
                     <div className="collaboration-thread-card-top">
                       <strong className="collaboration-card-title">
-                        {resolveContactLabel(thread.contact)}
+                        {resolveContactLabel(thread.contact, companyFirstContacts)}
                       </strong>
                       <span className="collaboration-card-timestamp">
                         {formatMessageTime(thread.updated_at)}
@@ -218,7 +259,11 @@ const InboxWorkspace = ({
               type="search"
               name="contact-search"
               className="collaboration-search"
-              placeholder="Cari nama, email, atau perusahaan..."
+              placeholder={
+                companyFirstContacts
+                  ? 'Cari nama perusahaan atau KerjaNusa...'
+                  : 'Cari recruiter, perusahaan, atau superadmin...'
+              }
               value={contactSearchQuery}
               autoComplete="off"
               autoCorrect="off"
@@ -226,6 +271,30 @@ const InboxWorkspace = ({
               spellCheck="false"
               onChange={(event) => onContactSearchQueryChange?.(event.target.value)}
             />
+
+            {showContactSuggestions && (
+              <div className="collaboration-search-suggestions" role="listbox">
+                {contactSuggestions.length === 0 ? (
+                  <p className="collaboration-search-empty">
+                    {companyFirstContacts
+                      ? 'Tidak ada perusahaan yang cocok.'
+                      : 'Tidak ada kontak yang cocok.'}
+                  </p>
+                ) : (
+                  contactSuggestions.map((contact) => (
+                    <button
+                      key={`contact-suggestion-${contact.id}`}
+                      type="button"
+                      className="collaboration-search-suggestion"
+                      onClick={() => handleSelectContact(contact, true)}
+                    >
+                      <strong>{resolveContactLabel(contact, companyFirstContacts)}</strong>
+                      <span>{resolveContactSecondaryText(contact, companyFirstContacts)}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
 
             {isLoadingContacts ? (
               <p className="workspace-muted-text">Memuat kontak...</p>
@@ -242,20 +311,20 @@ const InboxWorkspace = ({
                     }${
                       Number(selectedContactId) === Number(contact.id) ? ' is-active' : ''
                     }`}
-                    onClick={() => onSelectContact?.(contact)}
-                    title={resolveContactLabel(contact)}
+                    onClick={() => handleSelectContact(contact)}
+                    title={resolveContactLabel(contact, companyFirstContacts)}
                   >
                     {compactLayout ? (
                       <strong className="collaboration-contact-label">
-                        {resolveContactLabel(contact)}
+                        {resolveContactLabel(contact, companyFirstContacts)}
                       </strong>
                     ) : (
                       <>
                         <strong className="collaboration-card-title">
-                          {resolveContactLabel(contact)}
+                          {resolveContactLabel(contact, companyFirstContacts)}
                         </strong>
                         <span className="collaboration-card-email">
-                          {resolveContactSecondaryText(contact)}
+                          {resolveContactSecondaryText(contact, companyFirstContacts)}
                         </span>
                       </>
                     )}
@@ -276,11 +345,11 @@ const InboxWorkspace = ({
           <div className="collaboration-chat-header">
             <div>
               <span className="workspace-section-label">Percakapan</span>
-              <h2>{resolveContactLabel(selectedContact)}</h2>
+              <h2>{resolveContactLabel(selectedContact, companyFirstContacts)}</h2>
             </div>
             {selectedContact ? (
               <p className="collaboration-chat-contact-meta">
-                {resolveContactSecondaryText(selectedContact)}
+                {resolveContactSecondaryText(selectedContact, companyFirstContacts)}
               </p>
             ) : (
               <p className="collaboration-chat-contact-meta is-placeholder">
@@ -316,7 +385,11 @@ const InboxWorkspace = ({
                   }`}
                 >
                   <div className="collaboration-message-meta">
-                    <strong>{message.is_mine ? 'Anda' : resolveContactLabel(message.sender)}</strong>
+                    <strong>
+                      {message.is_mine
+                        ? 'Anda'
+                        : resolveContactLabel(message.sender, companyFirstContacts)}
+                    </strong>
                     <span>{formatMessageTime(message.created_at)}</span>
                   </div>
                   {message.job?.title && (
