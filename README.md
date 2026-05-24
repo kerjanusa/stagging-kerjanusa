@@ -186,7 +186,7 @@ curl -X POST http://localhost:8000/api/jobs \
 2. Frontend development di `frontend/`
 3. Test API dengan Postman
 4. Integrasi frontend-backend
-5. Deploy ke production
+5. Push ke repo staging untuk deploy
 
 ## 🐛 Troubleshooting
 
@@ -211,7 +211,7 @@ curl -X POST http://localhost:8000/api/jobs \
 - Code splitting dengan React.lazy()
 - Memoize expensive computations
 - Optimize images
-- Use production build untuk deploy
+- Gunakan build optimized sebelum push ke staging
 
 ## 🤝 Contributing
 
@@ -234,7 +234,7 @@ Untuk pertanyaan atau issues, buat discussion atau submit issue di repository.
 - [ ] Test API dengan Postman
 - [ ] Create additional features
 - [ ] Add unit tests
-- [ ] Deploy to production
+- [ ] Push dan verifikasi di staging
 
 ---
 

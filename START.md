@@ -147,7 +147,7 @@ User → Browser (React)
 5. 🎨 Customize UI
 6. 🔧 Add more features
 7. ✔️ Test thoroughly
-8. 📦 Deploy to production
+8. 📦 Push ke staging
 
 ---
 
