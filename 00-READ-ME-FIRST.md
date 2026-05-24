@@ -165,7 +165,7 @@ Setelah website jalan, baca dalam urutan ini:
 - **Framework**: Laravel 10
 - **Architecture**: Service pattern (Controllers → Services → Models)
 - **Auth**: Laravel Sanctum tokens
-- **Database**: SQLite (dev), MySQL (production)
+- **Database**: SQLite (dev), MySQL/PostgreSQL (deploy/staging)
 
 ### Frontend
 - **Language**: JavaScript (ES6+)
@@ -189,7 +189,7 @@ Setelah website jalan, baca dalam urutan ini:
 - Custom hooks untuk reusable logic
 - Zustand untuk global state
 - Service classes untuk API
-- Ready untuk production
+- Siap untuk workflow staging
 
 ✅ **Documentation Lengkap:**
 - Setup guide
@@ -209,7 +209,7 @@ Setelah website jalan, baca dalam urutan ini:
 6. 🎨 **Customize** UI sesuai brand
 7. 🔧 **Add** more features
 8. ✔️ **Test** thoroughly
-9. 📦 **Deploy** to production
+9. 📦 **Push** ke staging dan verifikasi deploy
 
 ---
 
@@ -238,10 +238,10 @@ npm install
 # Start dev server
 npm run dev
 
-# Build for production
+# Build optimized bundle
 npm run build
 
-# Preview production build
+# Preview hasil build
 npm run preview
 ```
 
@@ -262,10 +262,10 @@ npm run preview
 
 ---
 
-## 🚀 Production Checklist
+## 🚀 Staging Checklist
 
-- [ ] Setup production database (MySQL)
-- [ ] Setup production `.env`
+- [ ] Setup staging database
+- [ ] Setup staging `.env`
 - [ ] Build frontend: `npm run build`
 - [ ] Setup reverse proxy / Nginx
 - [ ] Enable HTTPS
@@ -277,7 +277,7 @@ npm run preview
 
 ---
 
-**Selamat! Website Pintarnya sudah ready untuk production! 🎉**
+**Selamat! Website Pintarnya sudah ready untuk staging!**
 
 Jika ada pertanyaan, baca dokumentasi atau hubungi team.
 
@@ -285,4 +285,4 @@ Jika ada pertanyaan, baca dokumentasi atau hubungi team.
 
 **Updated**: 27 Maret 2026  
 **Version**: 1.0  
-**Status**: Production Ready ✅
+**Status**: Staging Workflow Active ✅
