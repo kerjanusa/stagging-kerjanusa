@@ -1263,6 +1263,11 @@
     border-radius: 0.95rem;
   }
 
+  .workspace-mobile-menu-user.workspace-user-chip {
+    max-width: none;
+    width: 100%;
+  }
+
   .workspace-user-chip strong,
   .workspace-user-chip span {
     overflow: hidden;
@@ -1273,7 +1278,9 @@
   .workspace-mobile-menu-user-copy strong,
   .workspace-mobile-menu-user-copy span,
   .workspace-mobile-menu-user-copy small {
-    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .workspace-user-chip strong {
