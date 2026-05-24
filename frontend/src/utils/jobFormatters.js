@@ -5,6 +5,14 @@ export const EXPERIENCE_LEVEL_LABELS = {
   senior: 'Senior Level (5 + tahun)',
 };
 
+export const JOB_TYPE_LABELS = {
+  'full-time': 'Fulltime / Tetap',
+  'part-time': 'Magang / Paruh waktu',
+  contract: 'Kontrak',
+  freelance: 'Freelance',
+  internship: 'Magang',
+};
+
 export const WORK_MODE_LABELS = {
   wfo: 'WFO',
   hybrid: 'Hybrid (Campuran)',
@@ -19,8 +27,8 @@ export const INTERVIEW_TYPE_LABELS = {
 };
 
 export const VIDEO_SCREENING_LABELS = {
-  required: 'Video Identitas Wajib',
-  optional: '',
+  required: 'Video screening wajib',
+  optional: 'Video screening opsional',
 };
 
 /**
@@ -36,6 +44,11 @@ const startCase = (value = '') =>
  */
 export const formatExperienceLevel = (value = '') =>
   EXPERIENCE_LEVEL_LABELS[value] || startCase(value) || '-';
+
+/**
+ * Format a job-type enum into a candidate-facing label.
+ */
+export const formatJobType = (value = '') => JOB_TYPE_LABELS[value] || startCase(value) || '-';
 
 /**
  * Format a work-mode enum into a display label for the UI.
