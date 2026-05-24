@@ -177,6 +177,13 @@ class AuthController extends Controller
                 'result' => 'accepted',
             ], null, AuthService::class);
 
+            error_log(sprintf(
+                'forgot_password_state user=%s token=%s expose=%s',
+                is_object($debugResetUser) ? get_class($debugResetUser) : 'null',
+                $debugResetToken ? 'yes' : 'no',
+                $this->shouldExposePasswordResetLink() ? 'yes' : 'no'
+            ));
+
             return response()->json([
                 'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
             ] + $this->passwordResetDebugPayload($debugResetUser, $debugResetToken));
@@ -376,6 +383,11 @@ class AuthController extends Controller
             }
 
             $notification = new ResetPasswordNotification($token);
+
+            error_log(sprintf(
+                'forgot_password_debug_payload_emit email=%s',
+                (string) ($user->email ?? 'unknown')
+            ));
 
             return [
                 'debug_reset_url' => $notification->resetUrl($user),
