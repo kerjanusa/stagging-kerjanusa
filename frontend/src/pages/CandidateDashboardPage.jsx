@@ -27,6 +27,7 @@ import {
   formatVideoScreeningRequirement,
   formatWorkMode,
 } from '../utils/jobFormatters.js';
+import { getApplicationStage } from '../utils/recruiterFlow.js';
 import { APP_ROUTES, getJobApplyRoute } from '../utils/routeHelpers.js';
 import '../styles/workspace.css';
 
@@ -36,6 +37,47 @@ const CANDIDATE_SECTION_OPTIONS = [
   { value: 'applications', label: 'Lamaran Saya', mobileLabel: 'Lamaran Saya' },
   { value: 'messages', label: 'Chat', mobileLabel: 'Chat' },
 ];
+
+const APPLICATION_STATUS_FILTER_OPTIONS = [
+  {
+    value: 'review',
+    label: 'Review',
+    description: 'Lamaran yang masih ditinjau recruiter atau masuk screening awal.',
+  },
+  {
+    value: 'rejected',
+    label: 'Ditolak',
+    description: 'Lamaran yang tidak dilanjutkan recruiter.',
+  },
+  {
+    value: 'withdrawn',
+    label: 'Dibatalkan',
+    description: 'Lamaran yang Anda batalkan dari sisi kandidat.',
+  },
+  {
+    value: 'passed',
+    label: 'Lolos',
+    description: 'Lamaran yang masuk shortlist, interview, offering, atau diterima.',
+  },
+];
+
+const getCandidateApplicationFilterValue = (application) => {
+  const stage = getApplicationStage(application);
+
+  if (stage === 'rejected') {
+    return 'rejected';
+  }
+
+  if (stage === 'withdrawn') {
+    return 'withdrawn';
+  }
+
+  if (['shortlisted', 'interview', 'offering', 'hired'].includes(stage)) {
+    return 'passed';
+  }
+
+  return 'review';
+};
 
 /**
  * Mengambil ekstensi file dengan aman untuk validasi dokumen kandidat.
@@ -678,7 +720,7 @@ const CandidateDashboardPage = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isDetectingCurrentLocation, setIsDetectingCurrentLocation] = useState(false);
-  const [applicationBucket, setApplicationBucket] = useState('active');
+  const [applicationStatusFilter, setApplicationStatusFilter] = useState('');
   const [applicationActionInFlightId, setApplicationActionInFlightId] = useState(null);
   const [selectedChatContact, setSelectedChatContact] = useState(null);
   const [chatDraftMessage, setChatDraftMessage] = useState('');
@@ -814,15 +856,6 @@ const CandidateDashboardPage = () => {
     () => getCandidateProfileCompletion(persistedProfile),
     [persistedProfile]
   );
-  const activeApplications = useMemo(
-    () => applications.filter((application) => isCandidateApplicationActive(application.status, application)),
-    [applications]
-  );
-  const completedApplications = useMemo(
-    () =>
-      applications.filter((application) => !isCandidateApplicationActive(application.status, application)),
-    [applications]
-  );
   const appliedJobIds = useMemo(
     () => new Set(applications.map((application) => Number(application.job_id))),
     [applications]
@@ -912,22 +945,40 @@ const CandidateDashboardPage = () => {
     candidateJobsSearchTerm || jobTypeFilter || jobExperienceFilter || showSavedJobsOnly
   );
 
-  const applicationList = applicationBucket === 'active' ? activeApplications : completedApplications;
-  const applicationsWithScreeningCount = useMemo(
+  const applicationStatusCounts = useMemo(
     () =>
-      applications.filter(
-        (application) => Number(application.screening_summary?.total_questions || 0) > 0
-      ).length,
+      applications.reduce(
+        (counts, application) => {
+          const bucket = getCandidateApplicationFilterValue(application);
+          counts[bucket] += 1;
+          return counts;
+        },
+        {
+          review: 0,
+          rejected: 0,
+          withdrawn: 0,
+          passed: 0,
+        }
+      ),
     [applications]
   );
-  const applicationsAdvancedStageCount = useMemo(
+  const applicationList = useMemo(
     () =>
-      applications.filter((application) =>
-        ['shortlisted', 'interview', 'offering', 'hired'].includes(
-          application.stage || application.status
-        )
-      ).length,
-    [applications]
+      applications.filter((application) => {
+        if (!applicationStatusFilter) {
+          return true;
+        }
+
+        return getCandidateApplicationFilterValue(application) === applicationStatusFilter;
+      }),
+    [applicationStatusFilter, applications]
+  );
+  const selectedApplicationStatusOption = useMemo(
+    () =>
+      APPLICATION_STATUS_FILTER_OPTIONS.find(
+        (option) => option.value === applicationStatusFilter
+      ) || null,
+    [applicationStatusFilter]
   );
 
   const handleSectionChange = (section) => {
@@ -960,6 +1011,10 @@ const CandidateDashboardPage = () => {
     setJobTypeFilter('');
     setJobExperienceFilter('');
     setShowSavedJobsOnly(false);
+  };
+
+  const handleResetApplicationFilters = () => {
+    setApplicationStatusFilter('');
   };
 
   const handleOpenCandidateJob = (job) => {
@@ -2817,43 +2872,56 @@ const CandidateDashboardPage = () => {
 
               {applicationsError && <div className="error">{applicationsError}</div>}
 
-              <div className="workspace-application-filter-row">
+              <div className="workspace-application-filter-toolbar">
+                <div className="workspace-application-filter-copy">
+                  <span>Status</span>
+                  <strong>
+                    {selectedApplicationStatusOption
+                      ? `Filter aktif: ${selectedApplicationStatusOption.label}`
+                      : 'Semua status lamaran'}
+                  </strong>
+                  <small>
+                    Gunakan status untuk melihat lamaran yang sedang direview, lolos, ditolak, atau dibatalkan.
+                  </small>
+                </div>
                 <button
                   type="button"
-                  className={`workspace-filter-chip${
-                    applicationBucket === 'active' ? ' is-active' : ''
-                  }`}
-                  onClick={() => setApplicationBucket('active')}
+                  className="btn btn-outline workspace-application-filter-reset"
+                  onClick={handleResetApplicationFilters}
+                  disabled={!applicationStatusFilter}
                 >
-                  Aktif ({activeApplications.length})
+                  Reset
                 </button>
-                <button
-                  type="button"
-                  className={`workspace-filter-chip${
-                    applicationBucket === 'completed' ? ' is-active' : ''
-                  }`}
-                  onClick={() => setApplicationBucket('completed')}
-                >
-                  Selesai ({completedApplications.length})
+              </div>
+
+              <div className="workspace-application-filter-row">
+                {APPLICATION_STATUS_FILTER_OPTIONS.map((option) => (
+                  <button
+                    key={`candidate-application-filter-${option.value}`}
+                    type="button"
+                    className={`workspace-filter-chip${
+                      applicationStatusFilter === option.value ? ' is-active' : ''
+                    }`}
+                    onClick={() => setApplicationStatusFilter(option.value)}
+                  >
+                    {option.label} ({applicationStatusCounts[option.value]})
                   </button>
+                ))}
               </div>
 
               <div className="workspace-application-summary-grid">
-                <article className="workspace-application-summary-card">
-                  <strong>{activeApplications.length}</strong>
-                  <span>Lamaran aktif</span>
-                  <small>Masih diproses recruiter atau menunggu tindak lanjut.</small>
-                </article>
-                <article className="workspace-application-summary-card">
-                  <strong>{applicationsWithScreeningCount}</strong>
-                  <span>Lamaran dengan screening</span>
-                  <small>Sudah memuat pertanyaan HR yang perlu dipantau hasilnya.</small>
-                </article>
-                <article className="workspace-application-summary-card">
-                  <strong>{applicationsAdvancedStageCount}</strong>
-                  <span>Masuk tahap lanjut</span>
-                  <small>Sudah sampai shortlist, interview, offering, atau hired.</small>
-                </article>
+                {APPLICATION_STATUS_FILTER_OPTIONS.map((option) => (
+                  <article
+                    key={`candidate-application-summary-${option.value}`}
+                    className={`workspace-application-summary-card${
+                      applicationStatusFilter === option.value ? ' is-active' : ''
+                    }`}
+                  >
+                    <strong>{applicationStatusCounts[option.value]}</strong>
+                    <span>{option.label}</span>
+                    <small>{option.description}</small>
+                  </article>
+                ))}
               </div>
 
               {isLoadingApplications ? (
@@ -2862,12 +2930,20 @@ const CandidateDashboardPage = () => {
                 <div className="workspace-card-list">
                   <article className="workspace-subcard">
                     <div className="workspace-subcard-heading">
-                      <strong>Belum ada lamaran di kategori ini</strong>
+                      <strong>
+                        {applications.length === 0
+                          ? 'Belum ada lamaran yang tersimpan'
+                          : selectedApplicationStatusOption
+                            ? `Belum ada lamaran dengan status ${selectedApplicationStatusOption.label.toLowerCase()}`
+                            : 'Belum ada hasil lamaran yang bisa ditampilkan'}
+                      </strong>
                     </div>
                     <p>
-                      {applicationBucket === 'active'
+                      {applications.length === 0
                         ? 'Kirim lamaran ke lowongan yang paling cocok agar proses kandidat mulai bergerak.'
-                        : 'Semua proses yang sudah selesai akan tampil di sini untuk jadi histori pribadi Anda.'}
+                        : selectedApplicationStatusOption
+                          ? `Coba pilih status lain atau tekan Reset untuk menampilkan semua lamaran yang sudah Anda kirim.`
+                          : 'Gunakan filter status di atas untuk mengecek proses review recruiter dan hasil akhirnya.'}
                     </p>
                   </article>
                 </div>
