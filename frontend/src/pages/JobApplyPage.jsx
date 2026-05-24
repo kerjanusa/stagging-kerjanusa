@@ -329,6 +329,66 @@ const JobApplyStoryButtonLabel = ({ icon, label }) => (
   </span>
 );
 
+const JobApplyTopbarIcon = ({ type }) => {
+  if (type === 'return') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path
+          d="M9 7 4 12l5 5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M5 12h8.5a5.5 5.5 0 0 1 0 11H10"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (type === 'share') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path
+          d="M8.25 15.75 15.75 8.25"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <path
+          d="M10 8.25h5.75V14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M14.75 6.75 9.25 12l5.5 5.25"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+};
+
 /**
  * Halaman detail/apply khusus kandidat.
  */
@@ -720,6 +780,10 @@ const JobApplyPage = () => {
     });
   }, [job?.title, navigate]);
 
+  const handleReturnToJobs = React.useCallback(() => {
+    navigate(APP_ROUTES.jobs);
+  }, [navigate]);
+
   const handleOpenProfile = React.useCallback(() => {
     const missingPreview = candidateCompletion.missingRequiredItems.slice(0, 3).join(', ');
 
@@ -825,33 +889,43 @@ const JobApplyPage = () => {
   return (
     <div className="job-apply-page-shell">
       <div className="job-apply-page-topbar">
-        <button type="button" className="job-apply-page-backlink" onClick={() => navigate(APP_ROUTES.jobs)}>
+        <button type="button" className="job-apply-page-backlink" onClick={handleReturnToJobs}>
           ← Kembali ke Lowongan Kerja
         </button>
-        <span className="job-apply-page-route-label">Detail lowongan & lamaran</span>
+        <span className="job-apply-page-route-label">
+          {isSuccessStep ? 'Lamaran berhasil' : 'Detail lowongan & lamaran'}
+        </span>
       </div>
 
       <div className="job-apply-modal job-apply-modal-standalone is-story-step">
-        <div className="job-apply-modal-header job-apply-modal-header-story">
-          <button
-            type="button"
-            className="job-apply-story-topbar-button"
-            onClick={() => navigate(APP_ROUTES.jobs)}
-            aria-label="Kembali ke Lowongan Kerja"
-          >
-            ←
-          </button>
+        <div
+          className={`job-apply-modal-header job-apply-modal-header-story${
+            isSuccessStep ? ' is-success-step' : ''
+          }`}
+        >
+          {!isSuccessStep && (
+            <button
+              type="button"
+              className="job-apply-story-topbar-button"
+              onClick={handleReturnToJobs}
+              aria-label="Kembali ke Lowongan Kerja"
+            >
+              <JobApplyTopbarIcon type="back" />
+            </button>
+          )}
           <div className="job-apply-story-topbar-copy">
-            <span>Detail lowongan</span>
-            <strong id="job-apply-modal-title">{job.title}</strong>
+            <span>{isSuccessStep ? 'Lowongan kerja' : 'Detail lowongan'}</span>
+            <strong id="job-apply-modal-title">
+              {isSuccessStep ? 'Berkas telah berhasil terkirim' : job.title}
+            </strong>
           </div>
           <button
             type="button"
-            className="job-apply-story-topbar-button"
-            onClick={handleShareJob}
-            aria-label="Bagikan lowongan"
+            className={`job-apply-story-topbar-button${isSuccessStep ? ' is-return-link' : ''}`}
+            onClick={isSuccessStep ? handleReturnToJobs : handleShareJob}
+            aria-label={isSuccessStep ? 'Kembali ke Lowongan Kerja' : 'Bagikan lowongan'}
           >
-            ↗
+            <JobApplyTopbarIcon type={isSuccessStep ? 'return' : 'share'} />
           </button>
         </div>
 
@@ -1270,17 +1344,20 @@ const JobApplyPage = () => {
           {isSuccessStep && (
             <div className="job-apply-success-stack">
               <div className="job-apply-success-card">
-                <strong>Lamaran berhasil dikirim</strong>
+                <strong>Berkas telah berhasil terkirim</strong>
                 <h3>{job.title}</h3>
                 <p>
-                  Halo {candidateName}, berkas Anda berhasil terkirim ke {companyName}. Pantau statusnya di Lamaran Saya atau lanjut jelajahi peluang lain.
+                  Halo {candidateName}, berkas Anda sudah terkirim ke {companyName}. Sekarang Anda
+                  bisa membuka Lamaran Saya atau kembali ke Lowongan Kerja untuk melihat peluang lain.
                 </p>
                 <div className="job-apply-chip-wrap">
-                  <span className="job-apply-chip">
-                    Status awal: Menunggu review recruiter
-                  </span>
+                  <span className="job-apply-chip">Status awal: Menunggu review recruiter</span>
                   <span className="job-apply-chip job-apply-chip-secondary">
-                    Terkirim {new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                    Terkirim{' '}
+                    {new Date().toLocaleString('id-ID', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
                   </span>
                 </div>
               </div>
@@ -1309,8 +1386,8 @@ const JobApplyPage = () => {
                 >
                   Buka Lamaran Saya
                 </button>
-                <button type="button" className="btn btn-outline" onClick={() => navigate(APP_ROUTES.jobs)}>
-                  Kembali ke lowongan
+                <button type="button" className="btn btn-outline" onClick={handleReturnToJobs}>
+                  Kembali ke Lowongan Kerja
                 </button>
               </>
             ) : (
