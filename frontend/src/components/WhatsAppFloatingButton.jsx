@@ -7,14 +7,16 @@ const CONTACT_WHATSAPP_LINK =
   'https://api.whatsapp.com/send?phone=6281286402753&text=Halo%20KerjaNusa';
 
 /**
- * Menampilkan shortcut WhatsApp publik kecuali saat user berada di area superadmin.
+ * Menampilkan shortcut WhatsApp hanya untuk pengunjung publik yang belum login.
+ * Token dipakai sebagai guard awal agar tombol tidak sempat muncul di area kandidat
+ * saat role user belum selesai dinormalisasi dari session tersimpan.
  */
 const WhatsAppFloatingButton = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const location = useLocation();
   const normalizedRole = user?.role === 'internal' ? 'superadmin' : user?.role;
 
-  if (normalizedRole === 'superadmin' || location.pathname === APP_ROUTES.adminDashboard) {
+  if (token || normalizedRole || location.pathname === APP_ROUTES.adminDashboard) {
     return null;
   }
 
