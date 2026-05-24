@@ -1184,7 +1184,12 @@
   }
 
   .workspace-topbar-candidate .workspace-nav.is-open {
-    display: flex;
+    display: block;
+  }
+
+  .workspace-topbar-candidate .workspace-nav.is-open .workspace-nav-button,
+  .workspace-topbar-candidate .workspace-nav.is-open .workspace-mobile-menu-user {
+    display: none;
   }
 
   .workspace-topbar-candidate .workspace-actions .workspace-user-chip,
@@ -1236,9 +1241,9 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 0.7rem;
     width: 100%;
-    margin-top: 0.3rem;
-    padding: 0.8rem 0 0.1rem;
-    border-top: 1px solid rgba(91, 35, 79, 0.1);
+    margin-top: 0;
+    padding: 0.15rem 0 0.1rem;
+    border-top: 0;
   }
 
   .workspace-mobile-menu-user {
