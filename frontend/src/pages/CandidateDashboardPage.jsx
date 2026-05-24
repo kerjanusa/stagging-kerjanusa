@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import InboxWorkspace from '../components/InboxWorkspace.jsx';
+import JobCard from '../components/JobCard.jsx';
 import locationCoordinates from '../data/locationCoordinates.js';
 import useApplications from '../hooks/useApplications.js';
 import useAuth from '../hooks/useAuth.js';
 import useChat from '../hooks/useChat.js';
 import useJobs from '../hooks/useJobs.js';
+import {
+  decorateCandidateJobs,
+  persistSavedJobIds,
+  readSavedJobIds,
+} from '../utils/candidateJobs.js';
 import {
   formatCandidateApplicationStatus,
   getCandidateApplicationMeta,
@@ -15,7 +21,6 @@ import {
   isCandidateApplicationActive,
   readCandidateProfile,
   saveCandidateProfile,
-  sortCandidateRecommendedJobs,
 } from '../utils/candidateFlow.js';
 import {
   formatExperienceLevel,
@@ -544,47 +549,6 @@ const formatCurrency = (value) => {
 };
 
 /**
- * Menyingkat angka gaji menjadi format jutaan yang padat untuk kartu lowongan.
- */
-const formatCompactSalaryValue = (value) => {
-  const numericValue = Number(value || 0);
-
-  if (!Number.isFinite(numericValue) || numericValue <= 0) {
-    return '0,0jt';
-  }
-
-  return `${(numericValue / 1000000).toLocaleString('id-ID', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  })}jt`;
-};
-
-/**
- * Menggabungkan gaji minimum dan maksimum ke satu label singkat.
- */
-const formatCompactSalaryRange = (minimumValue, maximumValue) =>
-  `Rp ${formatCompactSalaryValue(minimumValue)} - ${formatCompactSalaryValue(maximumValue)}`;
-
-/**
- * Mengubah skor match kandidat dari backend ke persentase 0 sampai 100 untuk badge UI.
- */
-const formatCandidateJobScorePercent = (job) => {
-  const rawScore = Number(job?.candidate_match?.score || 0);
-
-  if (!Number.isFinite(rawScore) || rawScore <= 0) {
-    return 0;
-  }
-
-  return Math.min(100, Math.round((rawScore / 10) * 100));
-};
-
-/**
- * Menyederhanakan label level pengalaman agar lebih ringkas pada kartu rekomendasi.
- */
-const formatCompactExperienceLevel = (value = '') =>
-  String(formatExperienceLevel(value)).replace(/\s*\(.*?\)/g, '').trim() || '-';
-
-/**
  * Membuat inisial avatar dari nama kandidat atau kontak.
  */
 const buildInitials = (value = '') =>
@@ -594,19 +558,6 @@ const buildInitials = (value = '') =>
     .slice(0, 2)
     .map((segment) => segment.charAt(0).toUpperCase())
     .join('') || 'KN';
-
-/**
- * Memotong deskripsi lowongan panjang untuk tampilan preview yang lebih padat.
- */
-const truncateJobDescription = (description = '', maxLength = 132) => {
-  const normalizedDescription = String(description || '').trim();
-
-  if (normalizedDescription.length <= maxLength) {
-    return normalizedDescription;
-  }
-
-  return `${normalizedDescription.slice(0, maxLength).trim()}...`;
-};
 
 /**
  * Mengambil item pertama yang terisi dari daftar field kandidat.
@@ -733,6 +684,11 @@ const CandidateDashboardPage = () => {
   const [chatDraftMessage, setChatDraftMessage] = useState('');
   const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [resumePreview, setResumePreview] = useState(null);
+  const [savedJobIds, setSavedJobIds] = useState(() => readSavedJobIds(user?.id));
+  const [jobSearchQuery, setJobSearchQuery] = useState('');
+  const [jobTypeFilter, setJobTypeFilter] = useState('');
+  const [jobExperienceFilter, setJobExperienceFilter] = useState('');
+  const [showSavedJobsOnly, setShowSavedJobsOnly] = useState(false);
 
   useEffect(() => {
     setActiveSection(resolveCandidateSectionFromHash(location.hash));
@@ -745,6 +701,27 @@ const CandidateDashboardPage = () => {
     setVisibleExperienceCount(getVisibleExperienceCount(nextProfile));
     setVisibleOrganizationCount(getVisibleOrganizationCount(nextProfile));
   }, [user]);
+
+  useEffect(() => {
+    setSavedJobIds(readSavedJobIds(user?.id));
+  }, [user?.id]);
+
+  useEffect(() => {
+    setSavedJobIds((currentIds) => {
+      const nextIds = new Set(
+        [...currentIds].filter(
+          (jobId) => !applications.some((application) => Number(application.job_id) === Number(jobId))
+        )
+      );
+
+      if (nextIds.size === currentIds.size) {
+        return currentIds;
+      }
+
+      persistSavedJobIds(user?.id, nextIds);
+      return nextIds;
+    });
+  }, [applications, user?.id]);
 
   useEffect(() => {
     if (!resumePreview?.url) {
@@ -765,7 +742,7 @@ const CandidateDashboardPage = () => {
       return;
     }
 
-    fetchJobs({}, 1, 24);
+    fetchJobs({}, 1, 60);
     getMyApplications(1, 30);
   }, [fetchJobs, getMyApplications, user?.id, user?.role]);
 
@@ -846,14 +823,15 @@ const CandidateDashboardPage = () => {
       applications.filter((application) => !isCandidateApplicationActive(application.status, application)),
     [applications]
   );
-  const recommendedJobs = useMemo(
-    () =>
-      sortCandidateRecommendedJobs(jobs, persistedProfile, applications).filter(
-        (job) => !job.alreadyApplied
-      ),
-    [applications, jobs, persistedProfile]
+  const appliedJobIds = useMemo(
+    () => new Set(applications.map((application) => Number(application.job_id))),
+    [applications]
   );
-  const spotlightJobs = recommendedJobs.slice(0, 6);
+  const activeSavedJobIds = useMemo(
+    () => new Set([...savedJobIds].filter((jobId) => !appliedJobIds.has(Number(jobId)))),
+    [appliedJobIds, savedJobIds]
+  );
+  const candidateJobs = useMemo(() => decorateCandidateJobs(jobs, persistedProfile), [jobs, persistedProfile]);
   const primaryPreferredRole = firstFilledItem(persistedProfile.preferredRoles, 'Belum diisi');
   const primaryPreferredLocation = firstFilledItem(
     persistedProfile.preferredLocations,
@@ -884,6 +862,36 @@ const CandidateDashboardPage = () => {
   const mobileBottomSections = CANDIDATE_SECTION_OPTIONS.filter((section) =>
     ['profile', 'jobs', 'applications', 'messages'].includes(section.value)
   );
+  const candidateJobsSearchTerm = jobSearchQuery.trim().toLowerCase();
+  const candidateFilteredJobs = useMemo(
+    () =>
+      candidateJobs.filter((job) => {
+        const matchesSearch =
+          !candidateJobsSearchTerm ||
+          String(job.title || '').toLowerCase().includes(candidateJobsSearchTerm) ||
+          String(job.description || '').toLowerCase().includes(candidateJobsSearchTerm) ||
+          String(job.recruiter?.company_name || job.recruiter?.name || '')
+            .toLowerCase()
+            .includes(candidateJobsSearchTerm);
+        const matchesJobType = !jobTypeFilter || job.job_type === jobTypeFilter;
+        const matchesExperience = !jobExperienceFilter || job.experience_level === jobExperienceFilter;
+        const matchesSavedState = !showSavedJobsOnly || activeSavedJobIds.has(Number(job.id));
+
+        return matchesSearch && matchesJobType && matchesExperience && matchesSavedState;
+      }),
+    [
+      activeSavedJobIds,
+      candidateJobs,
+      candidateJobsSearchTerm,
+      jobExperienceFilter,
+      jobTypeFilter,
+      showSavedJobsOnly,
+    ]
+  );
+  const matchingCandidateJobsCount = useMemo(
+    () => candidateJobs.filter((job) => job.recommendationScore > 0).length,
+    [candidateJobs]
+  );
   const jobPreferenceChips = [
     primaryPreferredRole !== 'Belum diisi' ? `Role incaran: ${primaryPreferredRole}` : '',
     primaryPreferredLocation !== 'Belum diisi'
@@ -900,6 +908,9 @@ const CandidateDashboardPage = () => {
     primaryPreferredLocation !== 'Belum diisi' ? primaryPreferredLocation : 'Lokasi belum dipilih',
     profile.targetIndustry?.trim() || 'Industri target belum diisi',
   ].join(' • ');
+  const hasActiveJobFilters = Boolean(
+    candidateJobsSearchTerm || jobTypeFilter || jobExperienceFilter || showSavedJobsOnly
+  );
 
   const applicationList = applicationBucket === 'active' ? activeApplications : completedApplications;
   const applicationsWithScreeningCount = useMemo(
@@ -925,7 +936,42 @@ const CandidateDashboardPage = () => {
     navigate(getCandidateSectionRoute(section));
   };
 
-  const handleOpenRecommendedJob = (job) => {
+  const handleSavedJobToggle = (jobId) => {
+    if (applications.some((application) => Number(application.job_id) === Number(jobId))) {
+      return;
+    }
+
+    setSavedJobIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+
+      if (nextIds.has(Number(jobId))) {
+        nextIds.delete(Number(jobId));
+      } else {
+        nextIds.add(Number(jobId));
+      }
+
+      persistSavedJobIds(user?.id, nextIds);
+      return nextIds;
+    });
+  };
+
+  const handleResetJobFilters = () => {
+    setJobSearchQuery('');
+    setJobTypeFilter('');
+    setJobExperienceFilter('');
+    setShowSavedJobsOnly(false);
+  };
+
+  const handleOpenCandidateJob = (job) => {
+    if (applications.some((application) => Number(application.job_id) === Number(job.id))) {
+      navigate(`${APP_ROUTES.candidateDashboard}#applications`, {
+        state: {
+          candidateNotice: `Anda sudah pernah melamar ${job.title}. Cek status terbarunya di Lamaran Saya.`,
+        },
+      });
+      return;
+    }
+
     navigate(getJobApplyRoute(job.id));
   };
 
@@ -2557,10 +2603,10 @@ const CandidateDashboardPage = () => {
             <div className="candidate-jobs-shell">
               <header className="candidate-jobs-hero" data-reveal>
                 <span className="candidate-jobs-kicker">Lowongan Kerja</span>
-                <h1>Peluang kerja yang paling dekat dengan profil Anda</h1>
+                <h1>Pilih lowongan aktif untuk langsung Anda buka</h1>
                 <p>
-                  Rekomendasi disusun dari posisi incaran, lokasi minat, skill utama, dan
-                  kesiapan profil yang sudah tersimpan di akun Anda.
+                  Gunakan filter lowongan kerja di bawah ini, cek masa berakhir lowongan, lalu
+                  simpan atau lamar posisi yang paling sesuai dengan target kerja Anda.
                 </p>
               </header>
 
@@ -2592,25 +2638,107 @@ const CandidateDashboardPage = () => {
 
                 <article className="candidate-jobs-context-card">
                   <div className="candidate-jobs-context-head">
-                    <strong>Arah pencarian Anda</strong>
-                    <span>{recommendedJobs.length} peluang cocok</span>
+                    <strong>Ringkasan lowongan aktif</strong>
+                    <span>{candidateFilteredJobs.length} terlihat</span>
                   </div>
                   <p>{jobsFocusCaption}</p>
                   <div className="candidate-jobs-priority-row">
+                    <span className="candidate-jobs-priority-chip">
+                      {candidateJobs.length} lowongan aktif
+                    </span>
+                    <span className="candidate-jobs-priority-chip">
+                      {matchingCandidateJobsCount} lowongan cocok
+                    </span>
+                    <span className="candidate-jobs-priority-chip">
+                      {activeSavedJobIds.size} lowongan tersimpan
+                    </span>
                     {jobPreferenceChips.length > 0 ? (
-                      jobPreferenceChips.map((item) => (
-                        <span key={item} className="candidate-jobs-priority-chip">
+                      jobPreferenceChips.slice(0, 1).map((item) => (
+                        <span key={item} className="candidate-jobs-priority-chip is-muted">
                           {item}
                         </span>
                       ))
                     ) : (
                       <span className="candidate-jobs-priority-chip is-muted">
-                        Isi target pekerjaan dan lokasi agar rekomendasi lebih akurat.
+                        Isi target pekerjaan dan lokasi agar daftar lowongan makin relevan.
                       </span>
                     )}
                   </div>
                 </article>
               </div>
+
+              <article className="candidate-jobs-filter-card" data-reveal data-reveal-delay="60ms">
+                <div className="candidate-jobs-filter-head">
+                  <div>
+                    <strong>Filter Lowongan Kerja</strong>
+                    <p>Pilih filter, lalu buka lowongan kerja yang ingin Anda lamar.</p>
+                  </div>
+                  <Link to={APP_ROUTES.jobs} className="candidate-jobs-filter-link">
+                    Filter lanjutan
+                  </Link>
+                </div>
+
+                <div className="candidate-jobs-filter-grid">
+                  <input
+                    type="text"
+                    className="candidate-jobs-search-input"
+                    placeholder="Cari posisi atau perusahaan..."
+                    value={jobSearchQuery}
+                    onChange={(event) => setJobSearchQuery(event.target.value)}
+                  />
+
+                  <select
+                    className="candidate-jobs-filter-select"
+                    value={jobTypeFilter}
+                    onChange={(event) => setJobTypeFilter(event.target.value)}
+                  >
+                    <option value="">Semua tipe pekerjaan</option>
+                    <option value="full-time">Fulltime / Tetap</option>
+                    <option value="contract">Kontrak</option>
+                    <option value="freelance">Freelance</option>
+                    <option value="internship">Magang</option>
+                    <option value="part-time">Paruh waktu</option>
+                  </select>
+
+                  <select
+                    className="candidate-jobs-filter-select"
+                    value={jobExperienceFilter}
+                    onChange={(event) => setJobExperienceFilter(event.target.value)}
+                  >
+                    <option value="">Semua level pengalaman</option>
+                    <option value="entry">Entry Level (Freshgraduate)</option>
+                    <option value="junior">Junior Level (1 - 3 tahun)</option>
+                    <option value="mid">Mid Level (3 - 5 tahun)</option>
+                    <option value="senior">Senior Level (5 + tahun)</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    className={`candidate-jobs-filter-toggle${
+                      showSavedJobsOnly ? ' is-active' : ''
+                    }`}
+                    onClick={() => setShowSavedJobsOnly((currentValue) => !currentValue)}
+                  >
+                    {showSavedJobsOnly
+                      ? 'Tampilkan semua lowongan'
+                      : 'Hanya lowongan tersimpan'}
+                  </button>
+                </div>
+
+                <div className="candidate-jobs-filter-footer">
+                  <span>
+                    {candidateFilteredJobs.length} lowongan aktif siap dibuka dari halaman ini.
+                  </span>
+                  <button
+                    type="button"
+                    className="candidate-jobs-reset-button"
+                    onClick={handleResetJobFilters}
+                    disabled={!hasActiveJobFilters}
+                  >
+                    Reset filter
+                  </button>
+                </div>
+              </article>
 
               <aside className="candidate-jobs-safety-card" data-reveal data-reveal-delay="80ms">
                 <strong>Waspada penipuan lowongan</strong>
@@ -2625,86 +2753,52 @@ const CandidateDashboardPage = () => {
 
               <div className="candidate-jobs-card-list">
                 {isLoadingJobs ? (
-                  <div className="loading">Memuat rekomendasi lowongan...</div>
-                ) : recommendedJobs.length === 0 ? (
+                  <div className="loading">Memuat lowongan kerja...</div>
+                ) : candidateFilteredJobs.length === 0 ? (
                   <article className="candidate-jobs-card candidate-jobs-card-empty">
                     <div className="candidate-jobs-empty-head">
-                      <strong>Belum ada rekomendasi kuat</strong>
-                      <span>Lengkapi minat kerja</span>
+                      <strong>Belum ada lowongan yang cocok dengan filter</strong>
+                      <span>Ubah filter atau minat kerja</span>
                     </div>
                     <p>
-                      Tambahkan posisi yang diminati, lokasi prioritas, dan industri target agar
-                      sistem bisa menyusun lowongan yang lebih relevan untuk Anda.
+                      Coba reset filter, buka filter lanjutan, atau lengkapi arah pencarian pada
+                      Profil Siap Lamar agar daftar lowongan yang tampil makin relevan.
                     </p>
                     <button
                       type="button"
                       className="candidate-jobs-primary-button"
-                      onClick={() => handleSectionChange('profile')}
+                      onClick={() => {
+                        if (hasActiveJobFilters) {
+                          handleResetJobFilters();
+                          return;
+                        }
+
+                        handleSectionChange('profile');
+                      }}
                     >
-                      Lengkapi Profil Siap Lamar
+                      {hasActiveJobFilters ? 'Reset filter lowongan' : 'Lengkapi Profil Siap Lamar'}
                     </button>
                   </article>
                 ) : (
-                  recommendedJobs.map((job, index) => {
-                    const recruiterName =
-                      job.recruiter?.company_name || job.recruiter?.name || 'Recruiter Demo';
-                    const matchPercent = formatCandidateJobScorePercent(job);
-                    const primaryMatchReason =
-                      job.candidate_match?.reasons?.[0] ||
-                      'Rekomendasi ini diambil dari kecocokan profil Anda.';
-
-                    return (
-                      <article
-                        key={job.id}
-                        className="candidate-jobs-card"
-                        data-reveal
-                        data-reveal-delay={`${Math.min(index, 5) * 40}ms`}
-                      >
-                        <div className="candidate-jobs-card-head">
-                          <div className="candidate-jobs-card-identity">
-                            <span className="candidate-jobs-avatar" aria-hidden="true">
-                              {buildInitials(recruiterName)}
-                            </span>
-                            <div className="candidate-jobs-title-wrap">
-                              <h2>{job.title}</h2>
-                              <span>{recruiterName}</span>
-                            </div>
-                          </div>
-                          <div className="candidate-jobs-match-badge">
-                            <strong>{matchPercent}%</strong>
-                            <span>COCOK</span>
-                          </div>
-                        </div>
-
-                        <div className="candidate-jobs-meta-row">
-                          <span>{job.location || '-'}</span>
-                          <span>{formatCompactExperienceLevel(job.experience_level)}</span>
-                          <span>{formatWorkMode(job.work_mode)}</span>
-                        </div>
-
-                        <p className="candidate-jobs-description">
-                          <span className="candidate-jobs-match-reason">{primaryMatchReason}</span>
-                          {truncateJobDescription(job.description)}
-                        </p>
-
-                        <div className="candidate-jobs-footer">
-                          <div className="candidate-jobs-salary">
-                            <small>Estimasi Gaji</small>
-                            <strong>
-                              {formatCompactSalaryRange(job.salary_min, job.salary_max)}
-                            </strong>
-                          </div>
-                          <button
-                            type="button"
-                            className="candidate-jobs-primary-button"
-                            onClick={() => handleOpenRecommendedJob(job)}
-                          >
-                            Buka &amp; Lamar
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })
+                  candidateFilteredJobs.map((job, index) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      index={index}
+                      onApply={handleOpenCandidateJob}
+                      onToggleSave={handleSavedJobToggle}
+                      isSaved={activeSavedJobIds.has(Number(job.id))}
+                      isApplied={appliedJobIds.has(Number(job.id))}
+                      actionLabel={
+                        appliedJobIds.has(Number(job.id))
+                          ? 'Lihat Status Lamaran'
+                          : 'Buka & Lamar'
+                      }
+                      actionVariant={
+                        appliedJobIds.has(Number(job.id)) ? 'outline' : 'primary'
+                      }
+                    />
+                  ))
                 )}
               </div>
             </div>
