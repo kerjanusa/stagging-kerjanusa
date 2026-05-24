@@ -1573,7 +1573,6 @@ const CandidateDashboardPage = () => {
                   </div>
                   <div className="workspace-mobile-menu-user-copy">
                     <strong>{candidateDisplayName}</strong>
-                    <span>{candidateIdentityLabel}</span>
                     <small>Status: {candidateProfileStatusLabel}</small>
                   </div>
                 </div>
