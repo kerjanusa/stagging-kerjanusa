@@ -25,7 +25,7 @@ export const getJobApplyRoute = (jobId) => `${APP_ROUTES.jobs}/${Number(jobId)}/
 export const normalizeUserRole = (role) => (role === 'internal' ? 'superadmin' : role);
 
 const ROLE_HOME_ROUTES = {
-  recruiter: APP_ROUTES.recruiterDashboard,
+  recruiter: APP_ROUTES.landing,
   candidate: `${APP_ROUTES.candidateDashboard}#profile`,
   superadmin: APP_ROUTES.adminDashboard,
   internal: APP_ROUTES.adminDashboard,

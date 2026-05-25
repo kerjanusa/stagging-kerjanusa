@@ -145,7 +145,14 @@ function AppLayout() {
               </GuestRoute>
             }
           />
-          <Route path={APP_ROUTES.landing} element={<HomePage />} />
+          <Route
+            path={APP_ROUTES.landing}
+            element={
+              <ProtectedRoute allowedRoles={['recruiter']} loginRole="recruiter">
+                <HomePage />
+              </ProtectedRoute>
+            }
+          />
           <Route path={APP_ROUTES.about} element={<AboutPage />} />
           <Route path={APP_ROUTES.platform} element={<PlatformPage />} />
           <Route
