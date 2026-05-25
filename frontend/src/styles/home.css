@@ -1583,6 +1583,10 @@
   overflow-x: auto;
 }
 
+.comparison-mobile-cards {
+  display: none;
+}
+
 .comparison-table-head,
 .comparison-table-body {
   min-width: var(--comparison-table-min-width, 0);
@@ -2731,6 +2735,141 @@
 .comparison-status-negative {
   background: linear-gradient(135deg, #a94f62, #73263f);
   color: #fff8ef;
+}
+
+.comparison-mobile-card {
+  position: relative;
+  display: grid;
+  gap: 1.1rem;
+  padding: 1.2rem 1rem 1rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(183, 133, 45, 0.14);
+  background: rgba(255, 251, 247, 0.95);
+  box-shadow: 0 18px 34px rgba(46, 22, 44, 0.06);
+}
+
+.comparison-mobile-card-growth {
+  border-color: rgba(126, 94, 16, 0.42);
+  box-shadow:
+    0 18px 34px rgba(46, 22, 44, 0.06),
+    inset 0 0 0 1px rgba(126, 94, 16, 0.1);
+}
+
+.comparison-mobile-card-badge {
+  position: absolute;
+  top: 0;
+  right: 0.95rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.55rem;
+  padding: 0.18rem 0.58rem;
+  border-radius: 0.52rem;
+  background: #8e7308;
+  color: #fff7dc;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.comparison-mobile-card-head {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.comparison-mobile-card-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  min-height: 1.7rem;
+  padding: 0.2rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(183, 133, 45, 0.16);
+  background: rgba(255, 250, 244, 0.92);
+  color: #7b6732;
+  font-size: 0.76rem;
+  line-height: 1;
+}
+
+.comparison-mobile-card-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--primary-dark);
+}
+
+.comparison-mobile-card-head p {
+  margin: 0;
+  color: var(--gray-600);
+  font-size: 1rem;
+  line-height: 1.68;
+}
+
+.comparison-mobile-card-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.comparison-mobile-card-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 0.7rem;
+  color: var(--primary-dark);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.comparison-mobile-card-item.is-unavailable {
+  color: #8f8a84;
+}
+
+.comparison-mobile-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin-top: 0.05rem;
+  border-radius: 0.24rem;
+  background: linear-gradient(135deg, #f0d689, #c89735);
+  color: var(--primary-dark);
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.comparison-mobile-card-item-accent .comparison-mobile-card-icon {
+  background: linear-gradient(135deg, #ffe79f, #e1b63e);
+}
+
+.comparison-mobile-card-item-muted .comparison-mobile-card-icon {
+  background: transparent;
+  color: #9d958d;
+  border: 1px solid rgba(157, 149, 141, 0.28);
+}
+
+.comparison-mobile-card-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.3rem;
+  width: 100%;
+  border-radius: 0.95rem;
+  background: linear-gradient(135deg, #ffe376 0%, #ffcf48 100%);
+  color: var(--primary-dark);
+  font-size: 1rem;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 16px 24px rgba(201, 151, 53, 0.2);
+}
+
+.comparison-mobile-card-growth .comparison-mobile-card-button {
+  background: linear-gradient(135deg, #7f6807 0%, #ad910e 100%);
+  color: #fff8e8;
 }
 
 .landing-signup-form .form-group label {
@@ -3995,87 +4134,26 @@
 }
 
 @media (max-width: 640px) {
+  .comparison-heading {
+    align-items: center;
+    text-align: center;
+  }
+
+  .comparison-kicker {
+    align-self: center;
+  }
+
+  .comparison-heading p {
+    max-width: 19rem;
+  }
+
   .comparison-table {
-    overflow: visible;
-  }
-
-  .comparison-table-head {
     display: none;
-    min-width: 0;
   }
 
-  .comparison-table-body {
-    min-width: 0;
+  .comparison-mobile-cards {
     display: grid;
-    gap: 0.68rem;
-  }
-
-  .comparison-table-row {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-    gap: 0.56rem;
-    margin-top: 0;
-    padding: 0.9rem 0.82rem;
-    min-width: 0;
-    border-radius: 0.92rem;
-    border: 1px solid rgba(183, 133, 45, 0.14);
-    background: rgba(255, 251, 247, 0.94);
-  }
-
-  .comparison-table-row + .comparison-table-row {
-    margin-top: 0;
-  }
-
-  .comparison-cell {
-    display: grid;
-    gap: 0.2rem;
-    min-width: 0;
-  }
-
-  .comparison-cell::before {
-    display: block;
-    font-size: 0.62rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--gray-500);
-  }
-
-  .comparison-cell-feature::before {
-    content: 'Yang dibandingkan';
-  }
-
-  .comparison-cell-value::before {
-    content: attr(data-label);
-  }
-
-  .comparison-cell-feature {
-    font-size: 0.72rem;
-    line-height: 1.45;
-    color: var(--primary-dark);
-  }
-
-  .comparison-cell-brand,
-  .comparison-cell-value,
-  .comparison-cell-value-primary {
-    padding: 0.72rem 0.76rem;
-    border-radius: 0.76rem;
-    font-size: 0.68rem;
-    line-height: 1.42;
-    text-align: left;
-  }
-
-  .comparison-cell-value {
-    background: rgba(247, 237, 228, 0.72);
-  }
-
-  .comparison-cell-value-primary {
-    background: rgba(240, 214, 137, 0.18);
-    box-shadow: inset 0 0 0 1px rgba(183, 133, 45, 0.16);
-  }
-
-  .comparison-status {
-    justify-self: flex-start;
+    gap: 1rem;
   }
 }
 
@@ -4084,23 +4162,27 @@
     padding-inline: 0.82rem;
   }
 
-  .comparison-table-body {
+  .comparison-mobile-cards {
+    gap: 0.86rem;
+  }
+
+  .comparison-mobile-card {
+    padding: 1rem 0.9rem 0.9rem;
+    border-radius: 1rem;
+  }
+
+  .comparison-mobile-card-head {
     gap: 0.58rem;
   }
 
-  .comparison-table-row {
-    padding: 0.8rem 0.72rem;
+  .comparison-mobile-card-head h3 {
+    font-size: 1.7rem;
   }
 
-  .comparison-cell::before {
-    font-size: 0.56rem;
-  }
-
-  .comparison-cell-feature,
-  .comparison-cell-brand,
-  .comparison-cell-value,
-  .comparison-cell-value-primary {
-    font-size: 0.62rem;
+  .comparison-mobile-card-head p,
+  .comparison-mobile-card-item,
+  .comparison-mobile-card-button {
+    font-size: 0.92rem;
   }
 }
 
