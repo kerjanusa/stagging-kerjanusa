@@ -67,6 +67,10 @@ const DEFAULT_VISIBLE_ORGANIZATION_ENTRIES = 1;
 const MAX_ADDITIONAL_ORGANIZATION_ENTRIES = 2;
 const MAX_VISIBLE_ORGANIZATION_ENTRIES =
   DEFAULT_VISIBLE_ORGANIZATION_ENTRIES + MAX_ADDITIONAL_ORGANIZATION_ENTRIES;
+const DEFAULT_VISIBLE_SKILL_ENTRIES = 1;
+const MAX_ADDITIONAL_SKILL_ENTRIES = 5;
+const MAX_VISIBLE_SKILL_ENTRIES =
+  DEFAULT_VISIBLE_SKILL_ENTRIES + MAX_ADDITIONAL_SKILL_ENTRIES;
 const PROFILE_PHOTO_MAX_FILE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 const PROFILE_PHOTO_MAX_DIMENSION_IN_PIXELS = 480;
 const PROFILE_PHOTO_OUTPUT_QUALITY = 0.82;
@@ -364,6 +368,21 @@ const getVisibleOrganizationCount = (profile) =>
       DEFAULT_VISIBLE_ORGANIZATION_ENTRIES,
       countFilledOrganizationEntries(profile?.organizationActivities || [])
     )
+  );
+
+/**
+ * Menghitung jumlah skill kandidat yang benar-benar terisi.
+ */
+const countFilledSkillEntries = (skills = []) =>
+  skills.filter((item) => String(item || '').trim()).length;
+
+/**
+ * Menentukan berapa banyak field skill yang perlu dibuka di UI kandidat.
+ */
+const getVisibleSkillCount = (profile) =>
+  Math.min(
+    MAX_VISIBLE_SKILL_ENTRIES,
+    Math.max(DEFAULT_VISIBLE_SKILL_ENTRIES, countFilledSkillEntries(profile?.skills || []))
   );
 
 /**
@@ -762,6 +781,9 @@ const CandidateDashboardPage = () => {
   const [visibleOrganizationCount, setVisibleOrganizationCount] = useState(() =>
     getVisibleOrganizationCount(readCandidateProfile(user, { preferStoredDraft: false }))
   );
+  const [visibleSkillCount, setVisibleSkillCount] = useState(() =>
+    getVisibleSkillCount(readCandidateProfile(user, { preferStoredDraft: false }))
+  );
   const [isSkillsSectionExpanded, setIsSkillsSectionExpanded] = useState(true);
   const [feedback, setFeedback] = useState(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -784,6 +806,7 @@ const CandidateDashboardPage = () => {
     setProfile(nextProfile);
     setVisibleExperienceCount(getVisibleExperienceCount(nextProfile));
     setVisibleOrganizationCount(getVisibleOrganizationCount(nextProfile));
+    setVisibleSkillCount(getVisibleSkillCount(nextProfile));
   }, [user]);
 
   useEffect(() => {
@@ -931,10 +954,6 @@ const CandidateDashboardPage = () => {
     [profile.achievements]
   );
   const candidateDisplayName = profile.fullName?.trim() || user?.name?.trim() || 'Pelamar KerjaNusa';
-  const candidateIdentityLabel =
-    String(
-      user?.candidate_code || user?.candidateCode || user?.member_id || user?.memberId || ''
-    ).trim() || (user?.id ? `ID Pelamar #${user.id}` : 'ID pelamar belum tersedia');
   const candidateProfileStatusLabel = getCandidateProfileStatusLabel(completion);
   const filledSkillCount = useMemo(
     () => profile.skills.filter((item) => String(item || '').trim()).length,
@@ -1248,6 +1267,40 @@ const CandidateDashboardPage = () => {
     setFeedback(null);
   };
 
+  const handleAddSkillEntry = () => {
+    if (visibleSkillCount >= MAX_VISIBLE_SKILL_ENTRIES) {
+      setFeedback({
+        type: 'error',
+        message: `Kemampuan hanya bisa ditambah maksimal ${MAX_ADDITIONAL_SKILL_ENTRIES} kali.`,
+      });
+      return;
+    }
+
+    setVisibleSkillCount((currentCount) => Math.min(MAX_VISIBLE_SKILL_ENTRIES, currentCount + 1));
+    setFeedback(null);
+  };
+
+  const handleRemoveSkillEntry = (index) => {
+    if (index <= 0 || visibleSkillCount <= DEFAULT_VISIBLE_SKILL_ENTRIES) {
+      return;
+    }
+
+    setProfile((currentProfile) => {
+      const nextSkills = currentProfile.skills
+        .filter((_, itemIndex) => itemIndex !== index)
+        .concat('');
+
+      return {
+        ...currentProfile,
+        skills: nextSkills.slice(0, currentProfile.skills.length),
+      };
+    });
+    setVisibleSkillCount((currentCount) =>
+      Math.max(DEFAULT_VISIBLE_SKILL_ENTRIES, currentCount - 1)
+    );
+    setFeedback(null);
+  };
+
   const handleListFieldChange = (field, index, value) => {
     setProfile((currentProfile) => ({
       ...currentProfile,
@@ -1448,6 +1501,7 @@ const CandidateDashboardPage = () => {
       setProfile(syncedProfile);
       setVisibleExperienceCount(getVisibleExperienceCount(syncedProfile));
       setVisibleOrganizationCount(getVisibleOrganizationCount(syncedProfile));
+      setVisibleSkillCount(getVisibleSkillCount(syncedProfile));
 
       setFeedback({
         type: 'success',
@@ -2461,39 +2515,76 @@ const CandidateDashboardPage = () => {
                             saat bekerja.
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          className="candidate-profile-detail-action"
-                          onClick={() =>
-                            setIsSkillsSectionExpanded((currentValue) => !currentValue)
-                          }
-                          aria-expanded={isSkillsSectionExpanded}
-                        >
-                          {isSkillsSectionExpanded ? '- Minimize' : '+ Buka'}
-                        </button>
+                        <div className="candidate-profile-detail-actions">
+                          {isSkillsSectionExpanded && (
+                            <button
+                              type="button"
+                              className="candidate-profile-detail-action"
+                              onClick={handleAddSkillEntry}
+                              disabled={visibleSkillCount >= MAX_VISIBLE_SKILL_ENTRIES}
+                            >
+                              {visibleSkillCount >= MAX_VISIBLE_SKILL_ENTRIES
+                                ? 'Maksimal'
+                                : 'Tambah'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="candidate-profile-detail-action"
+                            onClick={() =>
+                              setIsSkillsSectionExpanded((currentValue) => !currentValue)
+                            }
+                            aria-expanded={isSkillsSectionExpanded}
+                          >
+                            {isSkillsSectionExpanded ? '-' : '+ Buka'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                     {isSkillsSectionExpanded ? (
-                      <div className="candidate-profile-inline-grid candidate-profile-multi-grid">
-                        {profile.skills.map((skillItem, skillIndex) => (
-                          <label
+                      <div className="candidate-profile-form-stack">
+                        {profile.skills.slice(0, visibleSkillCount).map((skillItem, skillIndex) => (
+                          <div
                             key={`candidate-skill-${skillIndex}`}
-                            className="candidate-profile-field"
+                            className="candidate-profile-experience-entry"
                           >
-                            <span>Kemampuan {skillIndex + 1}</span>
-                            <input
-                              type="text"
-                              placeholder={
-                                skillIndex === 0
-                                  ? 'Contoh: Excel lanjut, presentasi, negosiasi'
-                                  : 'Tulis kemampuan lain jika ada'
-                              }
-                              value={skillItem || ''}
-                              onChange={(event) =>
-                                handleListFieldChange('skills', skillIndex, event.target.value)
-                              }
-                            />
-                          </label>
+                            {visibleSkillCount > 1 && (
+                              <div className="candidate-profile-experience-entry-head">
+                                <strong>
+                                  {skillIndex === 0
+                                    ? 'Kemampuan Utama'
+                                    : `Kemampuan ${skillIndex + 1}`}
+                                </strong>
+                                {skillIndex > 0 && (
+                                  <button
+                                    type="button"
+                                    className="candidate-profile-experience-remove"
+                                    onClick={() => handleRemoveSkillEntry(skillIndex)}
+                                    aria-label={`Hapus kemampuan ${skillIndex + 1}`}
+                                    title={`Hapus kemampuan ${skillIndex + 1}`}
+                                  >
+                                    -
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            <label className="candidate-profile-field">
+                              <span>Nama Kemampuan</span>
+                              <input
+                                type="text"
+                                placeholder={
+                                  skillIndex === 0
+                                    ? 'Contoh: Excel lanjut, presentasi, negosiasi'
+                                    : 'Tulis kemampuan lain jika ada'
+                                }
+                                value={skillItem || ''}
+                                onChange={(event) =>
+                                  handleListFieldChange('skills', skillIndex, event.target.value)
+                                }
+                              />
+                            </label>
+                          </div>
                         ))}
                       </div>
                     ) : (
