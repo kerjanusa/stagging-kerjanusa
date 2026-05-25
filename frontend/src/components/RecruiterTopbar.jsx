@@ -85,9 +85,9 @@ const RecruiterTopbar = ({
       >
         <div className="recruiter-topbar-shell">
           <Link
-            to={APP_ROUTES.recruiterDashboard}
+            to={APP_ROUTES.landing}
             className="recruiter-topbar-brand"
-            aria-label="Dashboard recruiter"
+            aria-label="Dashboard awal recruiter"
             onClick={handleBrandClick}
           >
             <img src="/kerjanusa-logo-cutout.png" alt="KerjaNusa Recruitment Platform" />
