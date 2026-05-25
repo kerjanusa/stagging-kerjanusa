@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import LandingRegisterForm from '../components/LandingRegisterForm.jsx';
 import useAuth from '../hooks/useAuth.js';
+import { CONTACT_WHATSAPP_LINK } from '../utils/contactLinks.js';
 import { RECRUITER_PLAN_OPTIONS } from '../utils/recruiterPlans.js';
 import { getDefaultRouteForRole, normalizeUserRole } from '../utils/routeHelpers.js';
 import '../styles/home.css';
@@ -602,7 +603,12 @@ const HomePage = () => {
                     ))}
                   </div>
 
-                  <a className="comparison-mobile-card-button" href="#daftar">
+                  <a
+                    className="comparison-mobile-card-button"
+                    href={CONTACT_WHATSAPP_LINK}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     Pilih Paket
                   </a>
                 </article>

@@ -9,6 +9,7 @@ import useChat from '../hooks/useChat.js';
 import useJobs from '../hooks/useJobs.js';
 import RecruiterWorkspaceService from '../services/recruiterWorkspaceService.js';
 import { readCandidateProfile } from '../utils/candidateFlow.js';
+import { CONTACT_WHATSAPP_LINK } from '../utils/contactLinks.js';
 import {
   APPLICATION_STAGE_OPTIONS,
   RECRUITER_JOB_WORKFLOW_OPTIONS,
@@ -33,9 +34,7 @@ import { formatExperienceLevel, formatWorkMode } from '../utils/jobFormatters.js
 import { APP_ROUTES } from '../utils/routeHelpers.js';
 import '../styles/workspace.css';
 import '../styles/recruiterDashboard.css';
-
-const RECRUITER_SUPPORT_WHATSAPP_LINK =
-  'https://api.whatsapp.com/send?phone=6281286402753&text=Halo%20KerjaNusa';
+const RECRUITER_SUPPORT_WHATSAPP_LINK = CONTACT_WHATSAPP_LINK;
 
 const RECRUITER_MOBILE_BOTTOM_SECTIONS = [
   { value: 'overview', label: 'Beranda', icon: 'home' },

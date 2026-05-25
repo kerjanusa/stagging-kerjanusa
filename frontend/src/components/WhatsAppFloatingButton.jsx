@@ -1,10 +1,8 @@
 import { useLocation } from 'react-router-dom';
 import useAuth from '../hooks/useAuth.js';
+import { CONTACT_WHATSAPP_LINK } from '../utils/contactLinks.js';
 import { APP_ROUTES } from '../utils/routeHelpers.js';
 import '../styles/whatsappFloating.css';
-
-const CONTACT_WHATSAPP_LINK =
-  'https://api.whatsapp.com/send?phone=6281286402753&text=Halo%20KerjaNusa';
 
 /**
  * Menampilkan shortcut WhatsApp hanya untuk pengunjung publik yang belum login.
