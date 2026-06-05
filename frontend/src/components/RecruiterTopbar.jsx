@@ -3,6 +3,20 @@ import { Link, useLocation } from 'react-router-dom';
 import { APP_ROUTES } from '../utils/routeHelpers.js';
 
 /**
+ * Membuat fallback inisial singkat untuk avatar recruiter atau perusahaan.
+ */
+const buildInitials = (value) => {
+  const normalizedValue = String(value || '').trim();
+
+  if (!normalizedValue) {
+    return 'R';
+  }
+
+  const segments = normalizedValue.split(/\s+/).filter(Boolean).slice(0, 2);
+  return segments.map((segment) => segment.charAt(0).toUpperCase()).join('') || 'R';
+};
+
+/**
  * Merender navigasi utama recruiter beserta shortcut paket, profil, dan logout.
  */
 const RecruiterTopbar = ({
@@ -18,6 +32,11 @@ const RecruiterTopbar = ({
 }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const recruiterDisplayName = companyProfile?.recruiterName || user?.name || 'Recruiter';
+  const companyDisplayName = companyProfile?.companyName || user?.company_name || 'Perusahaan';
+  const companyDisplayRole = companyProfile?.contactRole || 'Dashboard recruiter';
+  const companyLogoUrl = companyProfile?.companyLogoDataUrl || user?.profile_picture || '';
+  const companyInitials = buildInitials(companyDisplayName);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -57,14 +76,6 @@ const RecruiterTopbar = ({
     closeMobileMenu();
     scrollToTop();
     onSectionSelect?.(section);
-  };
-
-  /**
-   * Menutup menu saat user kembali ke website publik.
-   */
-  const handleHomeClick = () => {
-    closeMobileMenu();
-    scrollToTop();
   };
 
   /**
@@ -111,13 +122,6 @@ const RecruiterTopbar = ({
             className={`recruiter-topbar-panel${isMobileMenuOpen ? ' is-open' : ''}`}
           >
             <nav className="recruiter-topbar-nav" aria-label="Navigasi recruiter">
-              <Link
-                to={APP_ROUTES.landing}
-                className="recruiter-topbar-link recruiter-topbar-link-home"
-                onClick={handleHomeClick}
-              >
-                Website Awal
-              </Link>
               {sections.map((section) => (
                 <button
                   key={section.value}
@@ -146,16 +150,46 @@ const RecruiterTopbar = ({
               </div>
               <div className="recruiter-profile-chip">
                 <span className="recruiter-profile-avatar" aria-hidden="true">
-                  {user?.name?.charAt(0)?.toUpperCase() || 'R'}
+                  {companyLogoUrl ? (
+                    <img src={companyLogoUrl} alt="" />
+                  ) : (
+                    <span>{companyInitials}</span>
+                  )}
                 </span>
                 <div className="recruiter-profile-copy">
-                  <strong>{companyProfile?.recruiterName || user?.name || 'Recruiter'}</strong>
-                  <span>{companyProfile?.companyName || user?.company_name || 'Recruiter'}</span>
+                  <strong>{recruiterDisplayName}</strong>
+                  <span>{companyDisplayName}</span>
                 </div>
               </div>
               <button
                 type="button"
                 className="recruiter-logout-button"
+                onClick={handleLogoutClick}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? 'Keluar...' : 'Logout'}
+              </button>
+            </div>
+
+            <div className="recruiter-topbar-menu-footer">
+              <div className="recruiter-topbar-menu-company">
+                <span className="recruiter-topbar-menu-company-avatar" aria-hidden="true">
+                  {companyLogoUrl ? (
+                    <img src={companyLogoUrl} alt="" />
+                  ) : (
+                    <span>{companyInitials}</span>
+                  )}
+                </span>
+                <div className="recruiter-topbar-menu-company-copy">
+                  <strong>{companyDisplayName}</strong>
+                  <span>{recruiterDisplayName}</span>
+                  <small>{companyDisplayRole}</small>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="recruiter-logout-button recruiter-topbar-menu-logout"
                 onClick={handleLogoutClick}
                 disabled={isLoggingOut}
               >

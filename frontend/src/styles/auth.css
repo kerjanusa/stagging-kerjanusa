@@ -193,6 +193,14 @@
   margin-top: 1rem;
 }
 
+.auth-showcase-summary {
+  display: block;
+  margin-top: 0.8rem;
+  color: #557193;
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
 .auth-showcase-copy p span {
   color: #ff7f1f;
   font-weight: 800;

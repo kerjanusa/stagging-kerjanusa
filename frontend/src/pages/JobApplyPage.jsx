@@ -813,11 +813,18 @@ const JobApplyPage = () => {
       return;
     }
 
+    if (!candidateCompletion.isReady) {
+      handleOpenProfile();
+      return;
+    }
+
     setApplicationFeedback(null);
     setJobApplyStep(nextApplyStepFromDetail);
   }, [
+    candidateCompletion.isReady,
     handleOpenApplications,
     handleOpenLogin,
+    handleOpenProfile,
     isAlreadyApplied,
     job,
     navigate,
@@ -948,21 +955,6 @@ const JobApplyPage = () => {
           <div className="job-apply-page-step-copy">
             <strong>{jobApplyStepSummary.label}</strong>
             <span>{jobApplyStepSummary.description}</span>
-          </div>
-        )}
-
-        {!isSuccessStep && jobApplyStep > 1 && user?.role === 'candidate' && !candidateCompletion.isReady && (
-          <div className="job-apply-profile-summary">
-            <strong>Profil inti belum lengkap</strong>
-            <p className="job-apply-company-copy">
-              Anda tetap bisa membaca detail lowongan dan menyiapkan dokumen atau jawaban screening.
-              Sebelum menekan Kirim Lamaran, lengkapi profil inti lebih dulu agar lamaran bisa diproses.
-            </p>
-            <div className="job-apply-inline-actions">
-              <button type="button" className="btn btn-outline" onClick={handleOpenProfile}>
-                Lengkapi Profil
-              </button>
-            </div>
           </div>
         )}
 
@@ -1475,6 +1467,26 @@ const JobApplyPage = () => {
                       onClick={() => navigate(getDefaultRouteForRole(user.role))}
                     >
                       Buka Area Recruiter
+                    </button>
+                  </>
+                ) : !candidateCompletion.isReady ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-outline job-apply-story-secondary-button"
+                      onClick={handleSavedJobToggle}
+                    >
+                      <JobApplyStoryButtonLabel
+                        icon="save"
+                        label={savedJobIds.has(Number(job.id)) ? 'Saved' : 'Save'}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary job-apply-story-primary-button"
+                      onClick={handleOpenProfile}
+                    >
+                      <JobApplyStoryButtonLabel icon="apply" label="Lengkapi Profil" />
                     </button>
                   </>
                 ) : (

@@ -8,6 +8,11 @@ import {
 const CANDIDATE_PROFILE_STORAGE_PREFIX = 'candidate_dashboard_profile';
 const CURRENT_CALENDAR_YEAR = new Date().getFullYear();
 const MIN_EXPERIENCE_YEAR = CURRENT_CALENDAR_YEAR - 50;
+const MAX_CANDIDATE_EXPERIENCES = 3;
+const MAX_CANDIDATE_ORGANIZATION_ACTIVITIES = 3;
+const MAX_CANDIDATE_STRENGTHS = 3;
+const MAX_CANDIDATE_ACHIEVEMENTS = 3;
+const MAX_CANDIDATE_SKILLS = 6;
 
 /**
  * Create one empty experience item used by the candidate profile form.
@@ -22,6 +27,7 @@ const createExperienceItem = () => ({
   achievement: '',
   reasonForLeaving: '',
   referenceName: '',
+  referencePosition: '',
   referencePhone: '',
 });
 
@@ -192,6 +198,21 @@ const isPdfResumeFileName = (fileName = '') => getFileExtension(fileName) === 'p
 const firstFilledText = (items = []) => items.find((item) => trimText(item)) || '';
 
 /**
+ * Normalize one organization or volunteer activity entry.
+ */
+const normalizeOrganizationActivityItem = (item = {}) => ({
+  ...createOrganizationActivityItem(),
+  ...item,
+  organizationName: trimText(item.organizationName),
+  role: trimText(item.role),
+  startYear: normalizeExperienceYearValue(item.startYear),
+  endYear: normalizeExperienceYearValue(item.endYear, {
+    allowCurrent: true,
+  }),
+  description: trimText(item.description),
+});
+
+/**
  * Auto-generate a lightweight profile summary when the candidate leaves it blank.
  */
 const buildAutoProfileSummary = (profile) => {
@@ -257,9 +278,15 @@ export const createCandidateProfile = (user) => ({
     startYear: '',
     endYear: '',
   },
+  organizationActivities: Array.from(
+    { length: MAX_CANDIDATE_ORGANIZATION_ACTIVITIES },
+    createOrganizationActivityItem
+  ),
   organizationActivity: createOrganizationActivityItem(),
-  experiences: Array.from({ length: 5 }, createExperienceItem),
-  skills: Array.from({ length: 5 }, () => ''),
+  experiences: Array.from({ length: MAX_CANDIDATE_EXPERIENCES }, createExperienceItem),
+  strengths: Array.from({ length: MAX_CANDIDATE_STRENGTHS }, () => ''),
+  achievements: Array.from({ length: MAX_CANDIDATE_ACHIEVEMENTS }, () => ''),
+  skills: Array.from({ length: MAX_CANDIDATE_SKILLS }, () => ''),
   preferredLocations: Array.from({ length: 5 }, () => ''),
   preferredRoles: Array.from({ length: 5 }, () => ''),
   salaryMin: '',
@@ -280,7 +307,26 @@ export const mergeCandidateProfile = (user, savedProfile) => {
   }
 
   const normalizedPreferredLocations = normalizeStringList(savedProfile.preferredLocations, 5);
-  const normalizedSkills = normalizeStringList(savedProfile.skills, 5);
+  const normalizedSkills = normalizeStringList(savedProfile.skills, MAX_CANDIDATE_SKILLS);
+  const normalizedStrengths = normalizeStringList(
+    savedProfile.strengths,
+    MAX_CANDIDATE_STRENGTHS
+  );
+  const normalizedAchievements = normalizeStringList(
+    savedProfile.achievements,
+    MAX_CANDIDATE_ACHIEVEMENTS
+  );
+  const normalizedOrganizationActivities = Array.from(
+    { length: MAX_CANDIDATE_ORGANIZATION_ACTIVITIES },
+    (_, index) =>
+      normalizeOrganizationActivityItem(
+        Array.isArray(savedProfile.organizationActivities)
+          ? savedProfile.organizationActivities[index] || {}
+          : index === 0
+            ? savedProfile.organizationActivity || {}
+            : {}
+      )
+  );
 
   if (!firstFilledText(normalizedPreferredLocations) && trimText(savedProfile.currentAddress)) {
     normalizedPreferredLocations[0] = trimText(savedProfile.currentAddress);
@@ -311,17 +357,8 @@ export const mergeCandidateProfile = (user, savedProfile) => {
       startYear: normalizeExperienceYearValue(savedProfile.education?.startYear),
       endYear: normalizeEducationEndYearValue(savedProfile.education?.endYear),
     },
-    organizationActivity: {
-      ...baseProfile.organizationActivity,
-      ...(savedProfile.organizationActivity || {}),
-      organizationName: trimText(savedProfile.organizationActivity?.organizationName),
-      role: trimText(savedProfile.organizationActivity?.role),
-      startYear: normalizeExperienceYearValue(savedProfile.organizationActivity?.startYear),
-      endYear: normalizeExperienceYearValue(savedProfile.organizationActivity?.endYear, {
-        allowCurrent: true,
-      }),
-      description: trimText(savedProfile.organizationActivity?.description),
-    },
+    organizationActivities: normalizedOrganizationActivities,
+    organizationActivity: normalizedOrganizationActivities[0],
     experiences: baseProfile.experiences.map((item, index) => {
       const savedExperience = savedProfile.experiences?.[index] || {};
       const parsedLegacyYearRange = parseLegacyExperienceYearRange(savedExperience.year);
@@ -336,11 +373,21 @@ export const mergeCandidateProfile = (user, savedProfile) => {
       return {
         ...item,
         ...savedExperience,
+        company: trimText(savedExperience.company),
+        position: trimText(savedExperience.position),
+        responsibilities: trimText(savedExperience.responsibilities),
+        achievement: trimText(savedExperience.achievement),
+        reasonForLeaving: trimText(savedExperience.reasonForLeaving),
+        referenceName: trimText(savedExperience.referenceName),
+        referencePosition: trimText(savedExperience.referencePosition),
+        referencePhone: trimText(savedExperience.referencePhone),
         startYear,
         endYear,
         year: buildExperienceYearRange(startYear, endYear),
       };
     }),
+    strengths: normalizedStrengths,
+    achievements: normalizedAchievements,
     skills: normalizedSkills,
     preferredLocations: normalizedPreferredLocations,
     preferredRoles: normalizeStringList(savedProfile.preferredRoles, 5),

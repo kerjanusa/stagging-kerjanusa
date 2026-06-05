@@ -27,8 +27,8 @@ export const INTERVIEW_TYPE_LABELS = {
 };
 
 export const VIDEO_SCREENING_LABELS = {
-  required: 'Video screening wajib',
-  optional: 'Video screening opsional',
+  required: 'Aktif (Video identitas wajib)',
+  optional: 'Nonaktif',
 };
 
 /**

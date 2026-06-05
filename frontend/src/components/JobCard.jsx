@@ -103,7 +103,6 @@ const JobCard = ({
   onApply,
   onToggleSave,
   isSaved = false,
-  isApplied = false,
   actionLabel = 'Lamar Sekarang',
   actionVariant = 'primary',
 }) => {
@@ -114,33 +113,6 @@ const JobCard = ({
     formatExperienceChip(job.experience_level),
     formatWorkMode(job.work_mode),
   ].filter(Boolean);
-  const detailItems = [
-    {
-      label: 'Tipe Pekerjaan',
-      value: formatJobType(job.job_type),
-    },
-    {
-      label: 'Masa Berakhir',
-      value: job.closingCountdownLabel || 'Masih dibuka',
-    },
-    {
-      label: 'Level',
-      value: formatExperienceChip(job.experience_level),
-    },
-    videoScreeningLabel
-      ? {
-          label: 'Video Screening',
-          value: videoScreeningLabel,
-        }
-      : {
-          label: 'Kategori',
-          value: formatDisplayLabel(job.category),
-        },
-  ].filter(Boolean);
-  const saveButtonLabel = isApplied ? 'Sudah dilamar' : isSaved ? 'Tersimpan' : 'Simpan';
-  const stageLabel = job.recommendationMatchLabel
-    ? 'Lowongan aktif yang cocok'
-    : 'Lowongan aktif';
 
   return (
     <div
@@ -154,7 +126,9 @@ const JobCard = ({
             {buildCompanyInitials(companyName)}
           </div>
           <div className="job-header-copy">
-            <span className="job-kicker">{stageLabel}</span>
+            <span className="job-kicker">
+              {job.isRecommended ? 'Lowongan rekomendasi' : 'Peluang aktif'}
+            </span>
             <h3 className="job-title">{job.title}</h3>
             <p className="job-company">{companyName}</p>
           </div>
@@ -164,28 +138,26 @@ const JobCard = ({
             type="button"
             className={`job-save-button${isSaved ? ' is-saved' : ''}`}
             onClick={() => onToggleSave?.(job.id)}
-            aria-label={saveButtonLabel}
-            title={saveButtonLabel}
-            disabled={isApplied}
+            aria-label={isSaved ? 'Batalkan simpan lowongan' : 'Simpan lowongan'}
+            title={isSaved ? 'Batalkan simpan lowongan' : 'Simpan lowongan'}
           >
-            {saveButtonLabel}
+            {isSaved ? 'Tersimpan' : 'Simpan'}
           </button>
-          {job.recommendationMatchLabel && (
+          {job.recommendationMatchLabel ? (
             <span className="job-match-badge">{job.recommendationMatchLabel}</span>
+          ) : (
+            <span className="job-type">{formatJobType(job.job_type)}</span>
           )}
         </div>
       </div>
 
-      {(job.closingCountdownLabel || isSaved || isApplied || videoScreeningLabel) && (
+      {(job.closingCountdownLabel || job.recommendationMatchLabel || videoScreeningLabel) && (
         <div className="job-status-row">
           {job.closingCountdownLabel && (
             <span className="job-countdown-badge">{job.closingCountdownLabel}</span>
           )}
-          {!isApplied && isSaved && (
-            <span className="job-countdown-badge">Tersimpan untuk dilamar nanti</span>
-          )}
-          {isApplied && (
-            <span className="job-countdown-badge">Lamaran sudah pernah dikirim</span>
+          {job.recommendationMatchLabel && (
+            <span className="job-countdown-badge">{job.isRecommended ? 'Diprioritaskan' : 'Cocok'}</span>
           )}
           {videoScreeningLabel && (
             <span className="job-countdown-badge job-countdown-badge-muted">
@@ -204,12 +176,18 @@ const JobCard = ({
       </div>
 
       <div className="job-details">
-        {detailItems.map((item) => (
-          <div key={`${job.id}-${item.label}`} className="detail-item">
-            <span className="label">{item.label}</span>
-            <span className="value">{item.value}</span>
-          </div>
-        ))}
+        <div className="detail-item">
+          <span className="label">Kategori</span>
+          <span className="value">{formatDisplayLabel(job.category)}</span>
+        </div>
+        <div className="detail-item">
+          <span className="label">Tipe kerja</span>
+          <span className="value">{formatJobType(job.job_type)}</span>
+        </div>
+        <div className="detail-item">
+          <span className="label">Level</span>
+          <span className="value">{formatExperienceChip(job.experience_level)}</span>
+        </div>
       </div>
 
       <p className="job-description">{buildDescriptionPreview(job.description)}</p>

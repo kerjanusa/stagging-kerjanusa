@@ -1,18 +1,17 @@
+import { useEffect, useMemo, useState } from 'react';
+import L from 'leaflet';
+import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+
 const numberFormatter = new Intl.NumberFormat('id-ID');
 
-const MAP_VIEWBOX = {
-  width: 1500,
-  height: 590,
-  paddingX: 30,
-  paddingY: 10,
-};
-
-const MAP_BOUNDS = {
-  minLongitude: 94,
-  maxLongitude: 142,
-  minLatitude: -11.5,
-  maxLatitude: 6.5,
-};
+const DEFAULT_MAP_CENTER = [-2.5, 118];
+const DEFAULT_MAP_BOUNDS = [
+  [-15, 92],
+  [8.5, 145],
+];
+const DEFAULT_MIN_ZOOM = 4;
+const DEFAULT_MAX_ZOOM = 12;
 
 const statusLabelByTone = {
   success: 'Normal',
@@ -20,46 +19,29 @@ const statusLabelByTone = {
   danger: 'Butuh tindakan',
 };
 
-const MARKER_COLLISION_GAP = 10;
-const MARKER_OFFSET_STEP = 18;
-const MARKER_OFFSET_RING_COUNT = 7;
-
-/**
- * Mengubah koordinat lintang bujur menjadi titik x/y relatif di kanvas peta.
- */
-const projectGeoPoint = (latitude, longitude) => {
-  const usableWidth = MAP_VIEWBOX.width - MAP_VIEWBOX.paddingX * 2;
-  const usableHeight = MAP_VIEWBOX.height - MAP_VIEWBOX.paddingY * 2;
-  const normalizedX =
-    (longitude - MAP_BOUNDS.minLongitude) /
-    (MAP_BOUNDS.maxLongitude - MAP_BOUNDS.minLongitude);
-  const normalizedY =
-    (MAP_BOUNDS.maxLatitude - latitude) /
-    (MAP_BOUNDS.maxLatitude - MAP_BOUNDS.minLatitude);
-
-  return {
-    x: MAP_VIEWBOX.paddingX + normalizedX * usableWidth,
-    y: MAP_VIEWBOX.paddingY + normalizedY * usableHeight,
-  };
+const toneColorByStatus = {
+  success: '#16a34a',
+  warning: '#d7a53d',
+  danger: '#cf2525',
 };
 
 /**
- * Menentukan ukuran marker berdasarkan intensitas sinyal lokasi yang dirangkum.
+ * Mengembalikan radius marker berdasarkan kepadatan sinyal lokasi.
  */
-const getMarkerSize = (totalSignals) => {
+const getMarkerRadius = (totalSignals) => {
   if (totalSignals >= 16) {
-    return 26;
+    return 12;
   }
 
   if (totalSignals >= 10) {
-    return 22;
+    return 10;
   }
 
   if (totalSignals >= 5) {
-    return 19;
+    return 8;
   }
 
-  return 16;
+  return 6;
 };
 
 /**
@@ -74,119 +56,82 @@ const formatAliases = (aliases = []) => {
 };
 
 /**
- * Membatasi nilai numerik agar tetap berada di area render yang aman.
+ * Menyusun bounds peta dari sekumpulan hotspot monitoring.
  */
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+const buildMonitoringBounds = (points = []) => {
+  const coordinates = points
+    .filter(
+      (point) =>
+        Number.isFinite(point?.latitude) &&
+        Number.isFinite(point?.longitude)
+    )
+    .map((point) => [point.latitude, point.longitude]);
+
+  if (coordinates.length === 0) {
+    return null;
+  }
+
+  return L.latLngBounds(coordinates);
+};
 
 /**
- * Menyusun kandidat offset marker agar hotspot yang berdekatan tidak saling menimpa.
+ * Memusatkan peta ke seluruh hotspot aktif, atau fallback ke framing Indonesia.
  */
-const buildMarkerOffsetCandidates = () =>
-  [{ x: 0, y: 0 }].concat(
-    Array.from({ length: MARKER_OFFSET_RING_COUNT }, (_, ringIndex) => {
-      const radius = MARKER_OFFSET_STEP * (ringIndex + 1);
-      const slotCount = 8 + ringIndex * 4;
-      const ringRotation = ringIndex % 2 === 0 ? -90 : -75;
+const fitMapToMonitoringPoints = (map, points = []) => {
+  const bounds = buildMonitoringBounds(points);
 
-      return Array.from({ length: slotCount }, (_, slotIndex) => {
-        const radians =
-          ((ringRotation + (slotIndex * 360) / slotCount) * Math.PI) / 180;
-
-        return {
-          x: Math.cos(radians) * radius,
-          y: Math.sin(radians) * radius,
-        };
-      });
-    }).flat()
-  );
-
-/**
- * Menghitung jarak aman minimal antara dua marker berdasarkan ukuran visualnya.
- */
-const getMarkerClearance = (markerSize, placedMarkerSize) =>
-  (markerSize + placedMarkerSize) / 2 + MARKER_COLLISION_GAP;
-
-/**
- * Memproyeksikan semua titik monitoring sekaligus mencari offset terbaik per marker.
- */
-const buildProjectedPoints = (points) => {
-  const placedMarkers = [];
-  const offsetCandidates = buildMarkerOffsetCandidates();
-
-  return points.map((point) => {
-    const projected = projectGeoPoint(point.latitude, point.longitude);
-    const markerSize = getMarkerSize(point.totalSignals);
-    const markerMargin = markerSize / 2 + 8;
-    let resolvedMarker = null;
-
-    for (const candidate of offsetCandidates) {
-      const markerX = clamp(
-        projected.x + candidate.x,
-        markerMargin,
-        MAP_VIEWBOX.width - markerMargin
-      );
-      const markerY = clamp(
-        projected.y + candidate.y,
-        markerMargin,
-        MAP_VIEWBOX.height - markerMargin
-      );
-      const collidesWithPlacedMarker = placedMarkers.some((placedMarker) => {
-        const dx = markerX - placedMarker.markerX;
-        const dy = markerY - placedMarker.markerY;
-
-        return (
-          Math.hypot(dx, dy) <
-          getMarkerClearance(markerSize, placedMarker.markerSize)
-        );
-      });
-
-      if (!collidesWithPlacedMarker) {
-        resolvedMarker = {
-          markerX,
-          markerY,
-          offsetX: markerX - projected.x,
-          offsetY: markerY - projected.y,
-        };
-        break;
-      }
-    }
-
-    if (!resolvedMarker) {
-      const fallbackMarkerX = clamp(projected.x, markerMargin, MAP_VIEWBOX.width - markerMargin);
-      const fallbackMarkerY = clamp(projected.y, markerMargin, MAP_VIEWBOX.height - markerMargin);
-
-      resolvedMarker = {
-        markerX: fallbackMarkerX,
-        markerY: fallbackMarkerY,
-        offsetX: fallbackMarkerX - projected.x,
-        offsetY: fallbackMarkerY - projected.y,
-      };
-    }
-
-    placedMarkers.push({
-      markerX: resolvedMarker.markerX,
-      markerY: resolvedMarker.markerY,
-      markerSize,
+  if (bounds?.isValid()) {
+    map.fitBounds(bounds.pad(0.28), {
+      padding: [24, 24],
+      maxZoom: 6,
+      animate: true,
     });
+    return;
+  }
 
-    return {
-      ...point,
-      projected,
-      markerSize,
-      anchorXPercent: (projected.x / MAP_VIEWBOX.width) * 100,
-      anchorYPercent: (projected.y / MAP_VIEWBOX.height) * 100,
-      offsetX: Number(resolvedMarker.offsetX.toFixed(2)),
-      offsetY: Number(resolvedMarker.offsetY.toFixed(2)),
-      connectorLength: Number(
-        Math.hypot(resolvedMarker.offsetX, resolvedMarker.offsetY).toFixed(2)
-      ),
-      connectorAngle: `${Math.atan2(resolvedMarker.offsetY, resolvedMarker.offsetX)}rad`,
-    };
+  map.fitBounds(DEFAULT_MAP_BOUNDS, {
+    padding: [24, 24],
+    animate: true,
   });
 };
 
 /**
- * Merender peta monitoring Indonesia untuk dashboard superadmin dengan marker interaktif.
+ * Sinkronisasi event zoom dan fokus marker terpilih langsung ke instance Leaflet.
+ */
+const MonitoringMapViewportSync = ({
+  points,
+  onMapReady,
+  onZoomChange,
+  resetSignal,
+}) => {
+  const map = useMapEvents({
+    zoomend() {
+      onZoomChange(Math.round(map.getZoom()));
+    },
+  });
+
+  useEffect(() => {
+    onMapReady(map);
+    onZoomChange(Math.round(map.getZoom()));
+  }, [map, onMapReady, onZoomChange]);
+
+  useEffect(() => {
+    fitMapToMonitoringPoints(map, points);
+  }, [map, points]);
+
+  useEffect(() => {
+    if (!resetSignal) {
+      return;
+    }
+
+    fitMapToMonitoringPoints(map, points);
+  }, [map, points, resetSignal]);
+
+  return null;
+};
+
+/**
+ * Merender peta monitoring Indonesia untuk dashboard superadmin dengan interaksi gaya peta modern.
  */
 const MonitoringIndonesiaMap = ({
   points = [],
@@ -195,19 +140,45 @@ const MonitoringIndonesiaMap = ({
   unmappedLocations = [],
   formatDateTime,
 }) => {
-  const projectedPoints = buildProjectedPoints(points).map((point) => ({
-    ...point,
-    hasOffset: point.connectorLength >= 6,
-  }));
+  const [mapInstance, setMapInstance] = useState(null);
+  const [currentZoomLevel, setCurrentZoomLevel] = useState(DEFAULT_MIN_ZOOM);
+  const [resetSignal, setResetSignal] = useState(0);
+
+  const monitoringPoints = useMemo(
+    () =>
+      points
+        .filter(
+          (point) =>
+            Number.isFinite(point?.latitude) &&
+            Number.isFinite(point?.longitude)
+        )
+        .map((point) => ({
+          ...point,
+          markerRadius: getMarkerRadius(point.totalSignals),
+        })),
+    [points]
+  );
 
   const selectedPoint =
-    projectedPoints.find((point) => point.key === selectedPointKey) || projectedPoints[0] || null;
+    monitoringPoints.find((point) => point.key === selectedPointKey) || monitoringPoints[0] || null;
 
-  const totalSignals = projectedPoints.reduce((sum, point) => sum + point.totalSignals, 0);
-  const reviewHotspotsCount = projectedPoints.filter((point) => point.reviewCount > 0).length;
-  const flaggedHotspotsCount = projectedPoints.filter((point) => point.flaggedJobCount > 0).length;
+  const totalSignals = monitoringPoints.reduce((sum, point) => sum + point.totalSignals, 0);
+  const reviewHotspotsCount = monitoringPoints.filter((point) => point.reviewCount > 0).length;
+  const flaggedHotspotsCount = monitoringPoints.filter((point) => point.flaggedJobCount > 0).length;
 
-  if (projectedPoints.length === 0) {
+  const handleZoomIn = () => {
+    mapInstance?.zoomIn();
+  };
+
+  const handleZoomOut = () => {
+    mapInstance?.zoomOut();
+  };
+
+  const handleResetView = () => {
+    setResetSignal((currentValue) => currentValue + 1);
+  };
+
+  if (monitoringPoints.length === 0) {
     return (
       <div className="superadmin-empty-state is-panel">
         <div className="superadmin-empty-icon">⌁</div>
@@ -222,13 +193,13 @@ const MonitoringIndonesiaMap = ({
         <div>
           <h3>Peta Monitoring Indonesia</h3>
           <p>
-            Marker dibangun dari koordinat kota untuk memantau preferensi kandidat, recruiter,
-            lowongan aktif, dan lamaran masuk.
+            Peta interaktif ini menampilkan konsentrasi preferensi kandidat, recruiter,
+            lowongan aktif, dan lamaran masuk per kota.
           </p>
         </div>
         <div className="superadmin-monitoring-map-summary">
           <span className="superadmin-monitoring-map-summary-chip">
-            <strong>{numberFormatter.format(projectedPoints.length)}</strong>
+            <strong>{numberFormatter.format(monitoringPoints.length)}</strong>
             <span>Kota termonitor</span>
           </span>
           <span className="superadmin-monitoring-map-summary-chip">
@@ -243,65 +214,99 @@ const MonitoringIndonesiaMap = ({
       </div>
 
       <div className="superadmin-monitoring-map-stage">
-        <div
-          className="superadmin-monitoring-map-image-frame"
-          role="img"
-          aria-label="Peta Indonesia dengan penanda kota untuk monitoring"
-        >
-          <img
-            className="superadmin-monitoring-map-image"
-            src="/indonesia-monitoring-map.png"
-            alt=""
-            aria-hidden="true"
-            loading="lazy"
-          />
+        <div className="superadmin-monitoring-map-controls">
+          <span className="superadmin-monitoring-map-zoom-label">
+            Zoom {currentZoomLevel}
+          </span>
+          <button
+            type="button"
+            className="superadmin-monitoring-map-control-button"
+            onClick={handleZoomOut}
+            disabled={currentZoomLevel <= DEFAULT_MIN_ZOOM}
+            aria-label="Perkecil peta"
+            title="Zoom out"
+          >
+            -
+          </button>
+          <button
+            type="button"
+            className="superadmin-monitoring-map-control-button"
+            onClick={handleZoomIn}
+            disabled={currentZoomLevel >= DEFAULT_MAX_ZOOM}
+            aria-label="Perbesar peta"
+            title="Zoom in"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className="superadmin-monitoring-map-control-button is-reset"
+            onClick={handleResetView}
+            aria-label="Reset posisi peta"
+            title="Reset view"
+          >
+            Reset
+          </button>
         </div>
 
-        <div className="superadmin-monitoring-marker-layer">
-          {projectedPoints.map((point) => (
-            <div
-              key={point.key}
-              className="superadmin-monitoring-point"
-              style={{
-                left: `${point.anchorXPercent}%`,
-                top: `${point.anchorYPercent}%`,
-              }}
-            >
-              <span className={`superadmin-monitoring-anchor is-${point.tone}`} />
+        <div className="superadmin-monitoring-map-canvas">
+          <MapContainer
+            center={DEFAULT_MAP_CENTER}
+            zoom={DEFAULT_MIN_ZOOM}
+            minZoom={DEFAULT_MIN_ZOOM}
+            maxZoom={DEFAULT_MAX_ZOOM}
+            zoomControl={false}
+            attributionControl
+            scrollWheelZoom
+            dragging
+            doubleClickZoom
+            touchZoom
+            boxZoom={false}
+            maxBounds={DEFAULT_MAP_BOUNDS}
+            maxBoundsViscosity={0.6}
+            className="superadmin-monitoring-leaflet"
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
-              {point.hasOffset ? (
-                <span
-                  className="superadmin-monitoring-marker-connector"
-                  style={{
-                    '--connector-angle': point.connectorAngle,
-                    '--connector-length': `${point.connectorLength}px`,
+            <MonitoringMapViewportSync
+              points={monitoringPoints}
+              onMapReady={setMapInstance}
+              onZoomChange={setCurrentZoomLevel}
+              resetSignal={resetSignal}
+            />
+
+            {monitoringPoints.map((point) => {
+              const markerColor = toneColorByStatus[point.tone] || toneColorByStatus.success;
+              const isSelected = selectedPoint?.key === point.key;
+
+              return (
+                <CircleMarker
+                  key={point.key}
+                  center={[point.latitude, point.longitude]}
+                  radius={isSelected ? point.markerRadius + 1.5 : point.markerRadius}
+                  pathOptions={{
+                    color: '#ffffff',
+                    weight: isSelected ? 3 : 2,
+                    fillColor: markerColor,
+                    fillOpacity: 0.96,
                   }}
-                />
-              ) : null}
-
-              <button
-                type="button"
-                className={`superadmin-monitoring-marker is-${point.tone}${
-                  selectedPoint?.key === point.key ? ' is-selected' : ''
-                }`}
-                style={{
-                  '--marker-size': `${point.markerSize}px`,
-                  '--marker-offset-x': `${point.offsetX}px`,
-                  '--marker-offset-y': `${point.offsetY}px`,
-                }}
-                onMouseEnter={() => onSelectPoint?.(point.key)}
-                onFocus={() => onSelectPoint?.(point.key)}
-                onClick={() => onSelectPoint?.(point.key)}
-                aria-label={`${point.label}: ${numberFormatter.format(
-                  point.totalSignals
-                )} sinyal lokasi, status ${statusLabelByTone[point.tone]}`}
-                aria-pressed={selectedPoint?.key === point.key}
-                title={`${point.label} • ${numberFormatter.format(point.totalSignals)} sinyal lokasi`}
-              >
-                <span className="superadmin-monitoring-marker-core" />
-              </button>
-            </div>
-          ))}
+                  eventHandlers={{
+                    click: () => onSelectPoint?.(point.key),
+                    mouseover: () => onSelectPoint?.(point.key),
+                  }}
+                >
+                  <Tooltip direction="top" offset={[0, -point.markerRadius]} opacity={1}>
+                    <strong>{point.label}</strong>
+                    <br />
+                    {numberFormatter.format(point.totalSignals)} sinyal • {statusLabelByTone[point.tone]}
+                  </Tooltip>
+                </CircleMarker>
+              );
+            })}
+          </MapContainer>
         </div>
       </div>
 
@@ -320,10 +325,7 @@ const MonitoringIndonesiaMap = ({
             Butuh tindakan
           </span>
           <span className="superadmin-monitoring-map-legend-note">
-            Ukuran marker mengikuti kepadatan sinyal lokasi.
-          </span>
-          <span className="superadmin-monitoring-map-legend-note">
-            Hotspot berdekatan digeser tipis dari anchor agar tetap bisa diklik.
+            Geser peta untuk menjelajah hotspot, gunakan scroll atau tombol +/- untuk zoom.
           </span>
         </div>
 
@@ -333,15 +335,10 @@ const MonitoringIndonesiaMap = ({
               <div>
                 <span className="superadmin-monitoring-map-detail-kicker">Hotspot terpilih</span>
                 <strong>{selectedPoint.label}</strong>
-                {selectedPoint.hasOffset ? (
-                  <p>
-                    Marker ditarik sedikit dari titik koordinat asli agar hotspot terdekat tetap
-                    terbaca tanpa saling menutup.
-                  </p>
-                ) : selectedPoint.aliases.length > 1 ? (
+                {selectedPoint.aliases?.length > 1 ? (
                   <p>Alias lokasi: {formatAliases(selectedPoint.aliases)}</p>
                 ) : (
-                  <p>Koordinat digunakan sebagai anchor monitoring kota ini.</p>
+                  <p>Klik dan zoom area ini untuk melihat konteks lokasi monitoring secara lebih detail.</p>
                 )}
               </div>
               <span className={`superadmin-inline-badge is-${selectedPoint.tone}`}>

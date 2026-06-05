@@ -44,8 +44,6 @@ DEFAULT_INCLUDE_PATHS=(
   backend
   frontend
   staggingpushgithub.sh
-  staggingpushkerjanusatovercel.sh
-  staggingdeployvercel.sh
 )
 
 if [[ -n "${GITHUB_REPO_URL:-}" ]]; then

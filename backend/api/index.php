@@ -28,7 +28,7 @@ foreach ($requiredDirectories as $directory) {
         http_response_code(500);
         header('Content-Type: application/json');
         echo json_encode([
-            'message' => 'Failed to prepare writable storage path for Vercel runtime.',
+            'message' => 'Failed to prepare writable storage path for the runtime environment.',
         ]);
         exit;
     }

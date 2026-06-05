@@ -93,6 +93,14 @@
   line-height: 1.4;
 }
 
+.platform-hero-summary {
+  margin-top: 1rem;
+  max-width: 35rem;
+  color: #7d6873;
+  font-size: 0.98rem;
+  line-height: 1.78;
+}
+
 .platform-hero-metrics {
   display: flex;
   flex-wrap: wrap;
@@ -361,6 +369,54 @@
   line-height: 1.65;
 }
 
+.platform-mission-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.platform-mission-list p::before {
+  content: '•';
+  margin-right: 0.45rem;
+  color: #f4c55e;
+}
+
+.platform-benefits-section {
+  padding: clamp(4rem, 7vw, 5.6rem) 0;
+  background:
+    radial-gradient(circle at 10% 14%, rgba(56, 21, 40, 0.05), transparent 18%),
+    linear-gradient(180deg, #fffaf2 0%, #f5ecdf 100%);
+}
+
+.platform-values-heading-second {
+  margin-top: 2.6rem;
+}
+
+.platform-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.platform-benefit-card {
+  min-height: 116px;
+  padding: 1.25rem 1.2rem;
+  border: 1px solid rgba(93, 57, 75, 0.12);
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 20px 40px rgba(40, 16, 29, 0.06);
+}
+
+.platform-benefit-card strong {
+  color: var(--platform-ink);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.platform-benefit-card-recruiter {
+  background: linear-gradient(180deg, rgba(255, 249, 237, 0.98), rgba(255, 243, 217, 0.92));
+}
+
 .platform-visual-tile-signal {
   background:
     radial-gradient(circle at center, rgba(26, 208, 221, 0.16), transparent 22%),
@@ -472,7 +528,7 @@
 
 .platform-values-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0;
   margin-top: 2.2rem;
   border: 1px solid rgba(93, 57, 75, 0.12);
@@ -581,7 +637,7 @@
 
 .platform-footer-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(0, 1fr));
   gap: 2rem;
   padding-bottom: 2rem;
 }
@@ -687,21 +743,12 @@
     grid-template-columns: 1fr;
   }
 
+  .platform-benefits-grid {
+    grid-template-columns: 1fr;
+  }
+
   .platform-hero-visual {
     justify-content: flex-start;
-  }
-
-  .platform-values-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .platform-value-card:nth-child(2) {
-    border-right: 0;
-  }
-
-  .platform-value-card:nth-child(1),
-  .platform-value-card:nth-child(2) {
-    border-bottom: 1px solid rgba(93, 57, 75, 0.08);
   }
 }
 
@@ -721,10 +768,6 @@
 
   .platform-hero-metrics {
     gap: 1.1rem;
-  }
-
-  .platform-values-grid {
-    grid-template-columns: 1fr;
   }
 
   .platform-value-card {

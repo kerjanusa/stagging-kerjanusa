@@ -12,12 +12,6 @@ import {
   readCandidateApplyIntent,
 } from '../utils/candidateApplyIntent.js';
 import {
-  decorateCandidateJobs,
-  formatJobCountdownLabel,
-  persistSavedJobIds,
-  readSavedJobIds,
-} from '../utils/candidateJobs.js';
-import {
   getCandidateProfileCompletion,
   readCandidateProfile,
 } from '../utils/candidateFlow.js';
@@ -32,6 +26,8 @@ import {
 import '../styles/jobList.css';
 
 const EARTH_RADIUS_IN_KILOMETERS = 6371;
+const SAVED_JOBS_STORAGE_PREFIX = 'candidate_saved_jobs';
+const JOB_ACTIVE_WINDOW_IN_DAYS = 30;
 const JOB_RECENT_WINDOW_IN_DAYS = 14;
 const ONE_DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
 const SALARY_FILTER_OPTIONS = [
@@ -177,6 +173,20 @@ const buildSentenceList = (value = '', limit = 4) =>
     .slice(0, limit);
 
 /**
+ * Mengubah skor rekomendasi ringan menjadi label kecocokan kandidat.
+ */
+const buildRecommendationMatchLabel = (score = 0) => {
+  const numericScore = Number(score || 0);
+
+  if (numericScore <= 0) {
+    return '';
+  }
+
+  const percentage = Math.max(40, Math.min(95, 34 + numericScore * 8));
+  return `${percentage}% cocok`;
+};
+
+/**
  * Mengubah link YouTube recruiter menjadi embed URL bila memungkinkan.
  */
 const toYouTubeEmbedUrl = (value = '') => {
@@ -212,6 +222,92 @@ const toYouTubeEmbedUrl = (value = '') => {
 
   return '';
 };
+
+/**
+ * Membuat storage key bookmark lowongan per akun kandidat atau sesi guest.
+ */
+const getSavedJobsStorageKey = (userId) => `${SAVED_JOBS_STORAGE_PREFIX}:${userId || 'guest'}`;
+
+/**
+ * Membaca daftar lowongan yang disimpan kandidat dari localStorage.
+ */
+const readSavedJobIds = (userId) => {
+  if (typeof window === 'undefined') {
+    return new Set();
+  }
+
+  try {
+    const storedValue = JSON.parse(localStorage.getItem(getSavedJobsStorageKey(userId)) || '[]');
+    return new Set(Array.isArray(storedValue) ? storedValue.map((item) => Number(item)) : []);
+  } catch {
+    return new Set();
+  }
+};
+
+/**
+ * Menyimpan daftar bookmark lowongan kandidat ke localStorage.
+ */
+const persistSavedJobIds = (userId, savedJobIds) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  localStorage.setItem(
+    getSavedJobsStorageKey(userId),
+    JSON.stringify(Array.from(savedJobIds).map((item) => Number(item)))
+  );
+};
+
+/**
+ * Mengambil tanggal batas lowongan dari data eksplisit atau fallback umur posting.
+ */
+const resolveJobDeadline = (job) => {
+  const explicitDeadline = job?.expires_at || job?.deadline_at;
+
+  if (explicitDeadline) {
+    const parsedExplicitDeadline = new Date(explicitDeadline);
+
+    if (!Number.isNaN(parsedExplicitDeadline.getTime())) {
+      return parsedExplicitDeadline;
+    }
+  }
+
+  if (job?.created_at) {
+    const createdAt = new Date(job.created_at);
+
+    if (!Number.isNaN(createdAt.getTime())) {
+      return new Date(createdAt.getTime() + JOB_ACTIVE_WINDOW_IN_DAYS * ONE_DAY_IN_MILLISECONDS);
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Mengubah sisa waktu lowongan menjadi label singkat yang mudah dipahami kandidat.
+ */
+const formatJobCountdownLabel = (job) => {
+  const deadline = resolveJobDeadline(job);
+
+  if (!deadline) {
+    return '';
+  }
+
+  const remainingTime = deadline.getTime() - Date.now();
+
+  if (remainingTime <= 0) {
+    return 'Ditutup';
+  }
+
+  const remainingDays = Math.ceil(remainingTime / ONE_DAY_IN_MILLISECONDS);
+
+  if (remainingDays <= 1) {
+    return 'Tutup < 24 jam';
+  }
+
+  return `Tutup ${remainingDays} hari lagi`;
+};
+
 /**
  * Memfilter hasil lowongan di sisi kandidat untuk kebutuhan UI yang belum didukung backend.
  */
@@ -238,6 +334,48 @@ const filterCandidateFacingJobs = (jobs, filters, savedJobIds) => {
 
     return matchesCompany && matchesMinimumSalary && matchesSavedState && matchesRecentState;
   });
+};
+
+/**
+ * Memberi skor rekomendasi ringan supaya lowongan yang paling relevan tampil lebih dulu.
+ */
+const scoreJobForCandidate = (job, candidateProfile) => {
+  const normalizedTitle = String(job?.title || '').toLowerCase();
+  const normalizedDescription = String(job?.description || '').toLowerCase();
+  const normalizedLocation = String(job?.location || '').toLowerCase();
+  const preferredRoles = (candidateProfile?.preferredRoles || [])
+    .map((item) => String(item || '').trim().toLowerCase())
+    .filter(Boolean);
+  const preferredLocations = (candidateProfile?.preferredLocations || [])
+    .map((item) => String(item || '').trim().toLowerCase())
+    .filter(Boolean);
+  const candidateSkills = (candidateProfile?.skills || [])
+    .map((item) => String(item || '').trim().toLowerCase())
+    .filter(Boolean);
+
+  let score = 0;
+
+  preferredRoles.forEach((role) => {
+    if (normalizedTitle.includes(role)) {
+      score += 4;
+    } else if (normalizedDescription.includes(role)) {
+      score += 2;
+    }
+  });
+
+  preferredLocations.forEach((location) => {
+    if (normalizedLocation.includes(location)) {
+      score += 3;
+    }
+  });
+
+  candidateSkills.forEach((skill) => {
+    if (normalizedDescription.includes(skill)) {
+      score += 1;
+    }
+  });
+
+  return score;
 };
 
 /**
@@ -450,19 +588,6 @@ const JobListPage = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    setSavedJobIds((currentIds) => {
-      const nextIds = new Set([...currentIds].filter((jobId) => !appliedJobIds.has(Number(jobId))));
-
-      if (nextIds.size === currentIds.size) {
-        return currentIds;
-      }
-
-      persistSavedJobIds(user?.id, nextIds);
-      return nextIds;
-    });
-  }, [appliedJobIds, user?.id]);
-
-  useEffect(() => {
     if (hasRestoredApplyIntentRef.current) {
       return;
     }
@@ -595,10 +720,6 @@ const JobListPage = () => {
   const handleSavedJobToggle = React.useCallback(
     (jobId) => {
       setSavedJobIds((currentIds) => {
-        if (appliedJobIds.has(Number(jobId))) {
-          return currentIds;
-        }
-
         const nextIds = new Set(currentIds);
 
         if (nextIds.has(Number(jobId))) {
@@ -611,7 +732,7 @@ const JobListPage = () => {
         return nextIds;
       });
     },
-    [appliedJobIds, user?.id]
+    [user?.id]
   );
 
   /**
@@ -765,16 +886,6 @@ const JobListPage = () => {
       );
 
       setAppliedJobIds((currentIds) => new Set([...currentIds, Number(selectedJob.id)]));
-      setSavedJobIds((currentIds) => {
-        if (!currentIds.has(Number(selectedJob.id))) {
-          return currentIds;
-        }
-
-        const nextIds = new Set(currentIds);
-        nextIds.delete(Number(selectedJob.id));
-        persistSavedJobIds(user?.id, nextIds);
-        return nextIds;
-      });
       setApplicationFeedback({
         type: 'success',
         message: `Lamaran untuk ${selectedJob.title} berhasil dikirim.`,
@@ -930,10 +1041,6 @@ const JobListPage = () => {
     () => collectFilledStrings(candidateProfile.certificateFiles, 5),
     [candidateProfile.certificateFiles]
   );
-  const activeSavedJobIds = React.useMemo(
-    () => new Set([...savedJobIds].filter((jobId) => !appliedJobIds.has(Number(jobId)))),
-    [appliedJobIds, savedJobIds]
-  );
   const profileReadyMessage = candidateCompletion.isReady
     ? 'Profil Anda sudah siap dipakai untuk mulai melamar.'
     : `Lengkapi ${candidateCompletion.missingRequiredItems.length} komponen inti agar bisa melamar.`;
@@ -948,9 +1055,36 @@ const JobListPage = () => {
       selectedLocation
   );
   const filteredJobs = React.useMemo(() => {
-    const visibleJobs = filterCandidateFacingJobs(jobs, filters, activeSavedJobIds);
-    return decorateCandidateJobs(visibleJobs, candidateProfile);
-  }, [activeSavedJobIds, candidateProfile, filters, jobs]);
+    const visibleJobs = filterCandidateFacingJobs(jobs, filters, savedJobIds);
+
+    return [...visibleJobs]
+      .map((job) => ({
+        ...job,
+        recommendationScore: scoreJobForCandidate(job, candidateProfile),
+      }))
+      .sort((leftJob, rightJob) => {
+        if (rightJob.recommendationScore !== leftJob.recommendationScore) {
+          return rightJob.recommendationScore - leftJob.recommendationScore;
+        }
+
+        const rightCreatedAt = new Date(rightJob.created_at || 0).getTime();
+        const leftCreatedAt = new Date(leftJob.created_at || 0).getTime();
+        return rightCreatedAt - leftCreatedAt;
+      })
+      .map((job) => ({
+        ...job,
+        isRecommended: job.recommendationScore > 0,
+        recommendationMatchLabel: buildRecommendationMatchLabel(job.recommendationScore),
+      }));
+  }, [candidateProfile, filters, jobs, savedJobIds]);
+  const featuredJob = React.useMemo(() => filteredJobs[0] || null, [filteredJobs]);
+  const remainingJobs = React.useMemo(() => {
+    if (!featuredJob) {
+      return filteredJobs;
+    }
+
+    return filteredJobs.filter((job) => Number(job.id) !== Number(featuredJob.id));
+  }, [featuredJob, filteredJobs]);
   const selectedJobCompanyName =
     selectedJob?.recruiter?.company_name || selectedJob?.recruiter?.name || 'Perusahaan';
   const selectedJobRecruiterProfile = selectedJob?.recruiter?.recruiter_profile || {};
@@ -960,6 +1094,20 @@ const JobListPage = () => {
   const selectedJobSalaryLabel = selectedJob
     ? formatSalaryRangeLabel(selectedJob.salary_min, selectedJob.salary_max)
     : '-';
+  const featuredJobSalaryLabel = featuredJob
+    ? formatSalaryRangeLabel(featuredJob.salary_min, featuredJob.salary_max, true)
+    : '';
+  const featuredJobMetaChips = React.useMemo(
+    () =>
+      featuredJob
+        ? [
+            featuredJob.location,
+            formatExperienceChip(featuredJob.experience_level),
+            formatWorkMode(featuredJob.work_mode),
+          ].filter(Boolean)
+        : [],
+    [featuredJob]
+  );
   const selectedJobFocusChips = React.useMemo(() => {
     const focusSource = Array.isArray(selectedJobRecruiterProfile.hiringFocus)
       ? selectedJobRecruiterProfile.hiringFocus
@@ -1433,12 +1581,12 @@ const JobListPage = () => {
 
       <div className="jobs-section">
         <div className="job-results-hero" data-reveal data-reveal-delay="40ms">
-          <span className="job-results-kicker">Lowongan Kerja</span>
-          <h1>Pilih lowongan aktif yang ingin Anda lamar</h1>
+          <span className="job-results-kicker">Lowongan rekomendasi</span>
+          <h1>Prioritas lowongan untuk Anda</h1>
           <p>
             {user?.role === 'candidate'
-              ? 'Gunakan filter, simpan lowongan yang belum dilamar, lalu pilih peluang aktif yang paling sesuai dengan target kerja Anda.'
-              : 'KerjaNusa menampilkan lowongan aktif yang bisa langsung dibuka, dibandingkan, lalu dilamar sesuai kebutuhan tim Anda.'}
+              ? 'Rekomendasi disusun dari posisi incaran, lokasi minat, dan skill utama yang sudah Anda simpan di profil.'
+              : 'KerjaNusa menampilkan peluang aktif yang paling relevan lebih dulu agar proses melamar terasa lebih fokus.'}
           </p>
 
           {(candidatePreferredRoles[0] || candidatePreferredLocations[0] || candidateSkills[0]) && (
@@ -1479,26 +1627,77 @@ const JobListPage = () => {
           </div>
         )}
 
-        {!isLoading && filteredJobs.length > 0 && (
+        {!isLoading && featuredJob && (
+          <article className="job-featured-card" data-reveal data-reveal-delay="80ms">
+            <div className="job-featured-card-header">
+              <div className="job-featured-brand">
+                <div className="job-featured-badge" aria-hidden="true">
+                  {buildCompanyInitials(
+                    featuredJob.recruiter?.company_name || featuredJob.recruiter?.name
+                  )}
+                </div>
+                <div className="job-featured-brand-copy">
+                  <h2>{featuredJob.title}</h2>
+                  <p>
+                    {featuredJob.recruiter?.company_name ||
+                      featuredJob.recruiter?.name ||
+                      'Perusahaan'}
+                  </p>
+                </div>
+              </div>
+
+              {featuredJob.recommendationMatchLabel && (
+                <span className="job-featured-match">{featuredJob.recommendationMatchLabel}</span>
+              )}
+            </div>
+
+            <div className="job-featured-pill-row">
+              {featuredJobMetaChips.map((item) => (
+                <span key={`featured-job-${featuredJob.id}-${item}`} className="job-featured-pill">
+                  {item}
+                </span>
+              ))}
+            </div>
+
+            <p className="job-featured-description">
+              {buildDescriptionPreview(featuredJob.description, 190) ||
+                'Peluang ini dipilih paling dekat dengan minat kandidat dan kesiapan profil Anda.'}
+            </p>
+
+            <div className="job-featured-footer">
+              <div className="job-featured-salary">
+                <span className="job-featured-salary-label">Estimasi gaji</span>
+                <strong>{featuredJobSalaryLabel}</strong>
+              </div>
+
+              <button type="button" className="btn btn-primary" onClick={() => handleApply(featuredJob)}>
+                {appliedJobIds.has(Number(featuredJob.id)) ? 'Lihat Status Lamaran' : 'Buka & Lamar'}
+              </button>
+            </div>
+          </article>
+        )}
+
+        {!isLoading && remainingJobs.length > 0 && (
           <div className="job-results-subhead" data-reveal data-reveal-delay="120ms">
-            <strong>Daftar lowongan aktif</strong>
+            <strong>Lowongan lainnya</strong>
             <span>
-              Pilih loker yang relevan, cek masa aktifnya, lalu simpan atau lamar langsung dari
-              daftar ini.
+              Peluang tambahan di bawah ini tetap aktif dan bisa langsung Anda buka untuk melamar.
             </span>
           </div>
         )}
 
         <div className="jobs-grid">
-          {filteredJobs.map((job, index) => (
+          {remainingJobs.map((job, index) => (
             <JobCard
               key={job.id}
-              job={job}
+              job={{
+                ...job,
+                closingCountdownLabel: formatJobCountdownLabel(job),
+              }}
               index={index}
               onApply={handleApply}
               onToggleSave={handleSavedJobToggle}
-              isSaved={activeSavedJobIds.has(Number(job.id))}
-              isApplied={appliedJobIds.has(Number(job.id))}
+              isSaved={savedJobIds.has(Number(job.id))}
               actionLabel={
                 appliedJobIds.has(Number(job.id)) ? 'Lihat Status Lamaran' : 'Buka & Lamar'
               }

@@ -15,6 +15,8 @@ class Job extends Model
     public const WORKFLOW_ACTIVE = 'active';
     public const WORKFLOW_PAUSED = 'paused';
     public const WORKFLOW_CLOSED = 'closed';
+    public const WORKFLOW_REVIEW = 'review';
+    public const WORKFLOW_REJECTED = 'rejected';
     public const WORKFLOW_FILLED = 'filled';
     public const STATUSES = [
         self::STATUS_ACTIVE,
@@ -25,6 +27,8 @@ class Job extends Model
         self::WORKFLOW_ACTIVE,
         self::WORKFLOW_PAUSED,
         self::WORKFLOW_CLOSED,
+        self::WORKFLOW_REVIEW,
+        self::WORKFLOW_REJECTED,
         self::WORKFLOW_FILLED,
     ];
 

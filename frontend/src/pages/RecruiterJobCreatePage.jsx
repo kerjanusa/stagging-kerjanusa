@@ -5,7 +5,7 @@ import useAuth from '../hooks/useAuth';
 import useJobs from '../hooks/useJobs';
 import JobService from '../services/jobService';
 import {
-  RECRUITER_SECTION_OPTIONS,
+  RECRUITER_PRIMARY_SECTION_OPTIONS,
   getRecruiterCompanyCompletion,
   readRecruiterCompanyProfile,
   saveJobWorkflowStatus,
@@ -23,10 +23,10 @@ import '../styles/recruiterJobCreate.css';
 const RECRUITER_DASHBOARD_STORAGE_KEY = 'recruiter_dashboard_ui_state';
 
 const FORM_STEP_OPTIONS = [
-  { number: 1, label: 'Informasi Dasar' },
-  { number: 2, label: 'Kualifikasi' },
-  { number: 3, label: 'Kuis' },
-  { number: 4, label: 'Preview dan Pengaturan' },
+  { number: 1, label: 'Informasi' },
+  { number: 2, label: 'Kriteria' },
+  { number: 3, label: 'Pertanyaan' },
+  { number: 4, label: 'Melihat dan Sunting' },
 ];
 
 const GENDER_OPTIONS = [
@@ -36,17 +36,22 @@ const GENDER_OPTIONS = [
 ];
 
 const CANDIDATE_EXPERIENCE_OPTIONS = [
-  { value: 'fresh-graduate', label: 'Tanpa Pengalaman Bekerja' },
-  { value: 'experienced', label: 'Berpengalaman' },
+  { value: 'entry', label: 'Entry Level (Freshgraduate)' },
+  { value: 'junior', label: 'Junior Level (1 - 3 tahun)' },
+  { value: 'mid', label: 'Mid Level (3 - 5 tahun)' },
+  { value: 'senior', label: 'Senior Level (5 + tahun)' },
 ];
 
 const EDUCATION_OPTIONS = [
   'Tidak ada minimal pendidikan',
+  'TK / sederajat',
+  'SD / sederajat',
   'SMP / sederajat',
   'SMA / SMK',
-  'Diploma (D1-D3)',
+  'Diploma (D1-D4)',
   'Sarjana (S1)',
   'Magister (S2)',
+  'Doktor (S3)',
 ];
 
 const PHOTO_REQUIREMENT_OPTIONS = [
@@ -177,13 +182,13 @@ const EXPERIENCE_LEVEL_OPTIONS = [
 const VIDEO_SCREENING_OPTIONS = [
   {
     value: 'required',
-    label: 'Wajib',
-    description: 'Kandidat wajib menyiapkan video yang menceritakan identitas mereka.',
+    label: 'Aktif',
+    description: 'Kandidat wajib menyiapkan video identitas sebelum mengirim lamaran.',
   },
   {
     value: 'optional',
-    label: 'Tidak wajib',
-    description: 'Fleksibel dan tidak mengharuskan kandidat menceritakan identitas mereka.',
+    label: 'Nonaktif',
+    description: 'Lamaran tetap bisa dikirim tanpa video identitas tambahan.',
   },
 ];
 
@@ -406,6 +411,7 @@ const INITIAL_FORM = {
   candidate_domicile: '',
   candidate_skills: [],
   candidate_custom_skill: '',
+  internal_recruiter_link: '',
   video_screening_requirement: 'optional',
   quiz_screening_questions: ['ready-to-work'],
   quiz_question_1: '',
@@ -441,6 +447,7 @@ const FIELD_NAVIGATION_ORDER = [
   'candidate_domicile',
   'candidate_skills',
   'candidate_custom_skill',
+  'internal_recruiter_link',
   'video_screening_requirement',
   'quiz_screening_questions',
 ];
@@ -551,6 +558,11 @@ const FIELD_METADATA = {
     step: 2,
     section: 'Keahlian yang dibutuhkan',
   },
+  internal_recruiter_link: {
+    label: 'Link Internal Recruiter',
+    step: 2,
+    section: 'Lokasi Kandidat',
+  },
   video_screening_requirement: {
     label: 'Video Skrining',
     step: 2,
@@ -602,6 +614,27 @@ const normalizeDigitInput = (value = '') => {
   }
 
   return digitOnlyValue.replace(/^0+(?=\d)/, '') || '0';
+};
+
+/**
+ * Menghitung jumlah kata untuk validasi deskripsi lowongan yang lebih dekat dengan brief recruiter.
+ */
+const countWords = (value = '') =>
+  String(value)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+/**
+ * Validasi URL ringan untuk link internal recruiter atau tracking eksternal.
+ */
+const isValidUrl = (value = '') => {
+  try {
+    const url = new URL(String(value).trim());
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 };
 
 /**
@@ -862,7 +895,7 @@ const RecruiterJobCreatePage = () => {
     };
   }, [currentStep, pendingFieldNavigation]);
 
-  const descriptionLength = formData.description.trim().length;
+  const descriptionWordCount = countWords(formData.description);
   const addressDetailLength = addressFormData.detail.trim().length;
   const minimumExpiryDate = new Date().toISOString().split('T')[0];
   const selectedAddress =
@@ -871,20 +904,24 @@ const RecruiterJobCreatePage = () => {
   const placementCity = selectedAddress?.city || formData.location || 'Area Penempatan';
   const candidateDomicileOptions = [
     {
-      value: 'same-province',
-      label: `Provinsi sesuai penempatan kerja (${placementProvince})`,
+      value: 'radius-10',
+      label: 'Radius 10 km dari area penempatan',
+    },
+    {
+      value: 'radius-25',
+      label: 'Radius 25 km dari area penempatan',
     },
     {
       value: 'same-city',
       label: `Kota/kabupaten sesuai penempatan kerja (${placementCity})`,
     },
     {
-      value: 'same-area',
-      label: 'Domisili sekitar area penempatan',
+      value: 'same-province',
+      label: `Provinsi sesuai penempatan kerja (${placementProvince})`,
     },
     {
-      value: 'open',
-      label: 'Tidak ada batasan domisili',
+      value: 'national',
+      label: 'Seluruh Indonesia',
     },
   ];
   const currentStepNote =
@@ -892,7 +929,7 @@ const RecruiterJobCreatePage = () => {
       1: 'Info yang Anda masukkan akan ditampilkan secara publik. Pastikan data diisi dengan lengkap dan benar.',
       2: 'Kriteria profil kandidat yang Anda tentukan akan tampil sebagai persyaratan minimum pada lowongan. Semakin longgar kriterianya, semakin banyak pilihan kandidat Anda.',
       3: 'Buat pertanyaan yang sesuai dengan kebutuhan Anda. Seleksi kandidat lebih ketat sesuai kualifikasi.',
-      4: 'Periksa kembali ringkasan lowongan sebelum dipublikasikan ke kandidat.',
+      4: 'Periksa kembali ringkasan lowongan sebelum dikirim ke review recruiter.',
     }[currentStep] ||
     'Info lowongan sedang disiapkan. Pastikan seluruh data sudah sesuai.';
   const selectedGenderLabel =
@@ -981,7 +1018,7 @@ const RecruiterJobCreatePage = () => {
   };
 
   const handleTopbarSectionNavigate = (section) => {
-    navigate(section === 'overview' ? '/recruiter' : `/recruiter#${section}`);
+    navigate(section === 'jobs' ? APP_ROUTES.recruiterDashboard : `/recruiter#${section}`);
   };
 
   const clearSubmitFeedback = () => {
@@ -1334,8 +1371,8 @@ const RecruiterJobCreatePage = () => {
 
     if (!formData.description.trim()) {
       nextErrors.description = 'Deskripsi pekerjaan wajib diisi.';
-    } else if (formData.description.trim().length < 75) {
-      nextErrors.description = 'Deskripsi pekerjaan minimal 75 karakter.';
+    } else if (countWords(formData.description) < 60) {
+      nextErrors.description = 'Deskripsi pekerjaan minimal 60 kata.';
     }
 
     if (!formData.job_type) {
@@ -1356,10 +1393,14 @@ const RecruiterJobCreatePage = () => {
 
     if (!formData.salary_min) {
       nextErrors.salary_min = 'Gaji minimum wajib diisi.';
+    } else if (String(formData.salary_min).length < 6) {
+      nextErrors.salary_min = 'Gaji minimum harus berisi minimal 6 digit.';
     }
 
     if (!formData.salary_max) {
       nextErrors.salary_max = 'Gaji maksimum wajib diisi.';
+    } else if (String(formData.salary_max).length < 6) {
+      nextErrors.salary_max = 'Gaji maksimum harus berisi minimal 6 digit.';
     }
 
     if (
@@ -1431,6 +1472,13 @@ const RecruiterJobCreatePage = () => {
       !formData.candidate_custom_skill.trim()
     ) {
       nextErrors.candidate_custom_skill = 'Tuliskan referensi keahlian lainnya.';
+    }
+
+    if (
+      formData.internal_recruiter_link.trim() &&
+      !isValidUrl(formData.internal_recruiter_link.trim())
+    ) {
+      nextErrors.internal_recruiter_link = 'Link internal recruiter harus berupa URL yang valid.';
     }
 
     return nextErrors;
@@ -1507,24 +1555,37 @@ const RecruiterJobCreatePage = () => {
         openings_count: formData.openings_count === '' ? 0 : Number(formData.openings_count),
         interview_type: formData.interview_type,
         interview_note: formData.interview_note.trim(),
+        shift_night: formData.shift_night,
+        expiry_date: formData.expiry_date,
+        candidate_gender: formData.candidate_gender,
+        candidate_experience: formData.candidate_experience,
+        candidate_education: formData.candidate_education,
+        candidate_age_min: formData.candidate_no_age_limit ? '' : formData.candidate_age_min,
+        candidate_age_max: formData.candidate_no_age_limit ? '' : formData.candidate_age_max,
+        candidate_no_age_limit: formData.candidate_no_age_limit,
+        candidate_photo_requirement: formData.candidate_photo_requirement,
+        candidate_domicile: formData.candidate_domicile,
+        candidate_skills: formData.candidate_skills,
+        candidate_custom_skill: formData.candidate_custom_skill.trim(),
+        internal_recruiter_link: formData.internal_recruiter_link.trim(),
         video_screening_requirement: formData.video_screening_requirement,
         quiz_screening_questions: buildScreeningQuestionPayload(
           selectedScreeningQuestions,
           customQuizQuestions
         ),
-        workflow_status: publishMode === 'publish' ? 'active' : 'draft',
-        status: publishMode === 'publish' ? 'active' : 'inactive',
+        workflow_status: publishMode === 'publish' ? 'review' : 'draft',
+        status: 'inactive',
       });
 
       if (response?.data?.id) {
-        saveJobWorkflowStatus(response.data.id, publishMode === 'publish' ? 'active' : 'draft');
+        saveJobWorkflowStatus(response.data.id, publishMode === 'publish' ? 'review' : 'draft');
       }
 
-      navigate('/recruiter#jobs', {
+      navigate(APP_ROUTES.recruiterDashboard, {
         state: {
           recruiterNotice:
             publishMode === 'publish'
-              ? 'Lowongan berhasil dipublikasikan dan siap menerima kandidat.'
+              ? 'Lowongan berhasil dikirim dan masuk ke status review recruiter.'
               : 'Lowongan berhasil disimpan sebagai draft.',
         },
       });
@@ -1549,7 +1610,7 @@ const RecruiterJobCreatePage = () => {
   return (
     <div className="recruiter-job-create-page">
       <RecruiterTopbar
-        sections={RECRUITER_SECTION_OPTIONS}
+        sections={RECRUITER_PRIMARY_SECTION_OPTIONS}
         activeSection="jobs"
         onSectionSelect={handleTopbarSectionNavigate}
         onBrandClick={() => persistRecruiterDashboardState({ activeSection: 'jobs' })}
@@ -1571,7 +1632,7 @@ const RecruiterJobCreatePage = () => {
             }}
           >
             <span aria-hidden="true">‹</span>
-            Tambah Lowongan Kerja
+            Kembali ke Posting Lowongan
           </button>
         </div>
 
@@ -1605,8 +1666,9 @@ const RecruiterJobCreatePage = () => {
           <div className="recruiter-job-create-note recruiter-job-create-note-warning" role="status">
             <span aria-hidden="true">!</span>
             <p>
-              Profil company belum lengkap untuk publish lowongan. Anda masih bisa menyimpan draft
-              sekarang, lalu lengkapi profil company di dashboard recruiter sebelum mempublikasikan.
+              Profil company belum lengkap untuk mengirim lowongan ke review. Anda masih bisa
+              menyimpan draft sekarang, lalu lengkapi profil company di dashboard recruiter sebelum
+              mengajukan lowongan.
             </p>
           </div>
         )}
@@ -1643,8 +1705,8 @@ const RecruiterJobCreatePage = () => {
               <>
                 <div className="recruiter-job-create-section">
                   <div className="recruiter-job-create-section-copy">
-                    <h2>Loker yang ingin Anda pasang</h2>
-                    <p>Tuliskan lowongan dan deskripsi pekerjaan yang Anda butuhkan.</p>
+                    <h2>Informasi Lowongan</h2>
+                    <p>Tuliskan posisi, kategori, dan deskripsi kerja secara jelas sebelum lowongan diajukan.</p>
                   </div>
 
                   <div className="recruiter-job-create-fields">
@@ -1703,7 +1765,7 @@ const RecruiterJobCreatePage = () => {
                       className="recruiter-job-create-field recruiter-job-create-field-full"
                       ref={registerFieldRef('description')}
                     >
-                      <span>Deskripsi Pekerjaan (minimal 75 karakter)*</span>
+                      <span>Deskripsi Pekerjaan (minimal 60 kata)*</span>
                       <textarea
                         name="description"
                         rows="7"
@@ -1717,7 +1779,7 @@ const RecruiterJobCreatePage = () => {
                         <small>
                           {formErrors.description || 'Jelaskan tugas inti, target, dan ritme kerja.'}
                         </small>
-                        <span>{descriptionLength}/75</span>
+                        <span>{descriptionWordCount}/60 kata</span>
                       </div>
                     </label>
                   </div>
@@ -1726,7 +1788,7 @@ const RecruiterJobCreatePage = () => {
                 <div className="recruiter-job-create-section">
                   <div className="recruiter-job-create-section-copy">
                     <h2>Detil Pekerjaan</h2>
-                    <p>Lengkapi spesifikasi pekerjaan agar kandidat melihat konteks yang jelas.</p>
+                    <p>Lengkapi status kerja, penempatan, dan rentang gaji agar lowongan lebih mudah dipahami pelamar.</p>
                   </div>
 
                   <div className="recruiter-job-create-fields">
@@ -1792,7 +1854,7 @@ const RecruiterJobCreatePage = () => {
                       className="recruiter-job-create-field recruiter-job-create-field-full"
                       ref={registerFieldRef('openings_count')}
                     >
-                      <span>Jumlah Kandidat yang Dibutuhkan</span>
+                      <span>Jumlah Pelamar yang Dibutuhkan</span>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -1930,7 +1992,7 @@ const RecruiterJobCreatePage = () => {
                 <div className="recruiter-job-create-section">
                   <div className="recruiter-job-create-section-copy">
                     <h2>Informasi wawancara</h2>
-                    <p>Beritahu kandidat mengenai persiapan wawancara dan format seleksi awal.</p>
+                    <p>Beritahu kandidat mengenai format interview dan catatan yang harus mereka persiapkan.</p>
                   </div>
 
                   <div className="recruiter-job-create-fields">
@@ -1970,7 +2032,7 @@ const RecruiterJobCreatePage = () => {
                 <div className="recruiter-job-create-section">
                   <div className="recruiter-job-create-section-copy">
                     <h2>Jangka waktu penayangan loker</h2>
-                    <p>Atur batas tayang lowongan agar proses hiring tetap terukur.</p>
+                    <p>Atur masa tayang lowongan berdasarkan target hiring yang ingin Anda kejar.</p>
                   </div>
 
                   <div className="recruiter-job-create-fields">
@@ -2010,7 +2072,7 @@ const RecruiterJobCreatePage = () => {
                 <div className="recruiter-job-create-section">
                   <div className="recruiter-job-create-section-copy">
                     <h2>Kriteria Kandidat</h2>
-                    <p>Tentukan kriteria profil kandidat yang Anda inginkan.</p>
+                    <p>Tentukan jenis kandidat yang relevan agar hasil pelamar lebih terarah sejak awal.</p>
                   </div>
 
                   <div className="recruiter-job-create-fields">
@@ -2149,8 +2211,8 @@ const RecruiterJobCreatePage = () => {
 
                 <div className="recruiter-job-create-section">
                   <div className="recruiter-job-create-section-copy">
-                    <h2>Lokasi Kandidat</h2>
-                    <p>Tentukan preferensi domisili kandidat.</p>
+                    <h2>Domisili dan Link Internal</h2>
+                    <p>Pilih cakupan domisili kandidat dan lampirkan link internal recruiter bila diperlukan.</p>
                   </div>
 
                   <div className="recruiter-job-create-fields">
@@ -2173,13 +2235,31 @@ const RecruiterJobCreatePage = () => {
                       </select>
                       {formErrors.candidate_domicile && <small>{formErrors.candidate_domicile}</small>}
                     </label>
+
+                    <label
+                      className="recruiter-job-create-field recruiter-job-create-field-full"
+                      ref={registerFieldRef('internal_recruiter_link')}
+                    >
+                      <span>Link Internal Recruiter</span>
+                      <input
+                        type="url"
+                        name="internal_recruiter_link"
+                        placeholder="Contoh: https://wa.me/62812xxxxxx atau link tracking internal"
+                        value={formData.internal_recruiter_link}
+                        onChange={handleInputChange}
+                      />
+                      <small>
+                        {formErrors.internal_recruiter_link ||
+                          'Opsional. Dipakai untuk catatan recruiter atau tracking internal bila ada.'}
+                      </small>
+                    </label>
                   </div>
                 </div>
 
                 <div className="recruiter-job-create-section">
                   <div className="recruiter-job-create-section-copy">
-                    <h2>Keahlian yang dibutuhkan (opsional)</h2>
-                    <p>Pilih keahlian yang Anda harapkan dimiliki kandidat.</p>
+                    <h2>Keahlian yang Dibutuhkan</h2>
+                    <p>Pilih keahlian yang Anda harapkan dimiliki kandidat sebelum mereka masuk proses screening.</p>
                   </div>
 
                   <div className="recruiter-job-create-fields">
@@ -2287,7 +2367,7 @@ const RecruiterJobCreatePage = () => {
                       className="recruiter-job-create-field recruiter-job-create-field-full recruiter-job-create-radio-group"
                       ref={registerFieldRef('video_screening_requirement')}
                     >
-                      <legend>Video Skrining</legend>
+                      <legend>Video Identitas</legend>
                       <div className="recruiter-job-create-radio-options">
                         {VIDEO_SCREENING_OPTIONS.map((option) => (
                           <label key={option.value} className="recruiter-job-create-radio">
@@ -2310,7 +2390,7 @@ const RecruiterJobCreatePage = () => {
                       <small className="recruiter-job-create-chip-helper">
                         {formData.video_screening_requirement === 'required'
                           ? 'Label "Video Identitas Wajib" akan muncul di sisi pelamar.'
-                          : 'Tidak ada label tambahan yang tampil di lowongan bila video skrining tidak diwajibkan.'}
+                          : 'Video identitas tidak diwajibkan pada lowongan ini.'}
                       </small>
                     </fieldset>
                   </div>
@@ -2334,7 +2414,7 @@ const RecruiterJobCreatePage = () => {
               <>
                 <div className="recruiter-job-create-section">
                   <div className="recruiter-job-create-section-copy">
-                    <h2>Kuis</h2>
+                    <h2>Pertanyaan</h2>
                     <p>Buat pertanyaan yang sesuai dengan kebutuhan Anda untuk menyaring kandidat.</p>
                   </div>
 
@@ -2350,7 +2430,7 @@ const RecruiterJobCreatePage = () => {
                           <div className="recruiter-job-create-phone-notch" />
                           <div className="recruiter-job-create-phone-screen">
                             <div className="recruiter-job-create-phone-header">
-                              <strong>Kuis</strong>
+                              <strong>Pertanyaan</strong>
                               <span>{formData.title || 'Lowongan Baru'}</span>
                             </div>
 
@@ -2515,8 +2595,8 @@ const RecruiterJobCreatePage = () => {
               <>
                 <div className="recruiter-job-create-section">
                   <div className="recruiter-job-create-section-copy">
-                    <h2>Preview dan Pengaturan</h2>
-                    <p>Periksa kembali detail lowongan sebelum dipublikasikan.</p>
+                    <h2>Melihat dan Sunting</h2>
+                    <p>Periksa kembali detail lowongan sebelum dikirim ke review recruiter.</p>
                   </div>
 
                   <div className="recruiter-job-create-fields recruiter-job-create-summary-grid">
@@ -2527,6 +2607,10 @@ const RecruiterJobCreatePage = () => {
                     <div className="recruiter-job-create-summary-card">
                       <strong>Kategori</strong>
                       <span>{formData.category || '-'}</span>
+                    </div>
+                    <div className="recruiter-job-create-summary-card recruiter-job-create-summary-card-full">
+                      <strong>Deskripsi Pekerjaan</strong>
+                      <span>{formData.description || '-'}</span>
                     </div>
                     <div className="recruiter-job-create-summary-card">
                       <strong>Level Kandidat</strong>
@@ -2563,6 +2647,10 @@ const RecruiterJobCreatePage = () => {
                       <span>{selectedGenderLabel}</span>
                     </div>
                     <div className="recruiter-job-create-summary-card">
+                      <strong>Pendidikan Minimal</strong>
+                      <span>{formData.candidate_education || '-'}</span>
+                    </div>
+                    <div className="recruiter-job-create-summary-card">
                       <strong>Pengalaman Bekerja</strong>
                       <span>{selectedExperienceLabel}</span>
                     </div>
@@ -2573,6 +2661,10 @@ const RecruiterJobCreatePage = () => {
                     <div className="recruiter-job-create-summary-card">
                       <strong>Upload Foto</strong>
                       <span>{selectedPhotoRequirementLabel}</span>
+                    </div>
+                    <div className="recruiter-job-create-summary-card recruiter-job-create-summary-card-full">
+                      <strong>Link Internal Recruiter</strong>
+                      <span>{formData.internal_recruiter_link || 'Tidak dilampirkan.'}</span>
                     </div>
                     <div className="recruiter-job-create-summary-card recruiter-job-create-summary-card-full">
                       <strong>Keahlian</strong>
@@ -2598,7 +2690,7 @@ const RecruiterJobCreatePage = () => {
                       </span>
                     </div>
                     <div className="recruiter-job-create-summary-card recruiter-job-create-summary-card-full">
-                      <strong>Kuis</strong>
+                      <strong>Pertanyaan Custom</strong>
                       <span>
                         {customQuizQuestions.join(' | ') || 'Belum ada pertanyaan custom.'}
                       </span>
@@ -2630,7 +2722,7 @@ const RecruiterJobCreatePage = () => {
                       onClick={() => handleJobSubmission('publish')}
                       disabled={isLoading || !companyCompletion.isReady}
                     >
-                      {isLoading ? 'Memasang...' : 'Publikasikan Lowongan'}
+                      {isLoading ? 'Mengirim...' : 'Kirim untuk Review'}
                     </button>
                   </div>
                 </div>

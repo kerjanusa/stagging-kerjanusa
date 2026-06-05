@@ -10,6 +10,26 @@ use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
+    private const RECRUITER_COMPANY_VERIFICATION_SENSITIVE_KEYS = [
+        'recruiterName',
+        'companyName',
+        'legalCompanyName',
+        'companyEmail',
+        'phone',
+        'companyAddress',
+        'companyLocation',
+        'industry',
+        'employeeRange',
+        'companyDescription',
+        'companyLogoFileName',
+        'companyLogoDataUrl',
+        'website',
+        'companyLegalDocumentName',
+        'companyLegalDocumentPath',
+        'companyLegalDocumentMimeType',
+        'companyLegalDocumentSize',
+    ];
+
     /**
      * Wire auth dependencies for user lifecycle and profile updates.
      */
@@ -40,6 +60,109 @@ class AuthService
     private function hashIdentifier(string $value): string
     {
         return hash('sha256', strtolower(trim($value)));
+    }
+
+    /**
+     * Check whether the recruiter company profile already satisfies the verification baseline.
+     */
+    private function isRecruiterCompanyProfileReady(array $profile): bool
+    {
+        $requiredValues = [
+            $this->trimToNull($profile['recruiterName'] ?? null),
+            $this->trimToNull($profile['companyName'] ?? null),
+            $this->trimToNull($profile['legalCompanyName'] ?? null),
+            $this->trimToNull($profile['companyEmail'] ?? null),
+            $this->trimToNull($profile['phone'] ?? null),
+            $this->trimToNull($profile['companyAddress'] ?? null),
+            $this->trimToNull($profile['industry'] ?? null),
+            $this->trimToNull($profile['employeeRange'] ?? null),
+            $this->trimToNull($profile['website'] ?? null),
+        ];
+
+        foreach ($requiredValues as $requiredValue) {
+            if (!filled($requiredValue)) {
+                return false;
+            }
+        }
+
+        if (mb_strlen((string) $this->trimToNull($profile['companyDescription'] ?? null)) < 80) {
+            return false;
+        }
+
+        if (!filled($this->trimToNull($profile['companyLogoDataUrl'] ?? null))
+            && !filled($this->trimToNull($profile['companyLogoFileName'] ?? null))) {
+            return false;
+        }
+
+        if (!filled($this->trimToNull($profile['companyLegalDocumentName'] ?? null))
+            && !filled($this->trimToNull($profile['companyLegalDocumentPath'] ?? null))) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Detect whether verification-sensitive recruiter fields changed since the last saved version.
+     */
+    private function recruiterVerificationSensitiveFieldsChanged(array $currentProfile, array $nextProfile): bool
+    {
+        foreach (self::RECRUITER_COMPANY_VERIFICATION_SENSITIVE_KEYS as $key) {
+            $currentValue = $currentProfile[$key] ?? null;
+            $nextValue = $nextProfile[$key] ?? null;
+
+            if ($key === 'companyLegalDocumentSize') {
+                if ((int) ($currentValue ?? 0) !== (int) ($nextValue ?? 0)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (trim((string) ($currentValue ?? '')) !== trim((string) ($nextValue ?? ''))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Recalculate recruiter verification state after the profile data changes.
+     */
+    private function syncRecruiterCompanyVerification(array $currentProfile, array $nextProfile): array
+    {
+        $currentStatus = strtolower(trim((string) ($currentProfile['verificationStatus'] ?? 'draft')));
+        $hasSensitiveChanges = $this->recruiterVerificationSensitiveFieldsChanged($currentProfile, $nextProfile);
+        $submittedAt = $this->trimToNull($currentProfile['verificationSubmittedAt'] ?? null)
+            ?? $this->trimToNull($nextProfile['verificationSubmittedAt'] ?? null);
+
+        if (!$this->isRecruiterCompanyProfileReady($nextProfile)) {
+            $nextProfile['verificationStatus'] = 'draft';
+            $nextProfile['verificationSubmittedAt'] = null;
+            $nextProfile['verifiedAt'] = null;
+
+            return $nextProfile;
+        }
+
+        if ($currentStatus === 'verified' && !$hasSensitiveChanges) {
+            $nextProfile['verificationStatus'] = 'verified';
+            $nextProfile['verificationSubmittedAt'] = $submittedAt ?? now()->toIso8601String();
+            $nextProfile['verifiedAt'] = $this->trimToNull($currentProfile['verifiedAt'] ?? null)
+                ?? $this->trimToNull($nextProfile['verifiedAt'] ?? null);
+
+            return $nextProfile;
+        }
+
+        $nextProfile['verificationStatus'] = 'pending';
+        $nextProfile['verificationSubmittedAt'] = (
+            $currentStatus === 'pending' && !$hasSensitiveChanges
+                ? $submittedAt
+                : null
+        ) ?? now()->toIso8601String();
+        $nextProfile['verifiedAt'] = null;
+
+        return $nextProfile;
     }
 
     /**
@@ -171,11 +294,32 @@ class AuthService
                 : null;
         }
 
-        if (array_key_exists('recruiter_profile', $data)) {
+        if ($user->hasRole(User::ROLE_RECRUITER) && (
+            array_key_exists('recruiter_profile', $data) ||
+            array_key_exists('company_legal_document', $data)
+        )) {
+            $currentRecruiterProfile = is_array($user->recruiter_profile) ? $user->recruiter_profile : [];
             $mergedProfile = [
-                ...(is_array($user->recruiter_profile) ? $user->recruiter_profile : []),
+                ...$currentRecruiterProfile,
                 ...(is_array($data['recruiter_profile']) ? $data['recruiter_profile'] : []),
             ];
+
+            $mergedProfile['companyAddress'] = $this->trimToNull($mergedProfile['companyAddress'] ?? null)
+                ?? $this->trimToNull($mergedProfile['companyLocation'] ?? null);
+            $mergedProfile['companyLocation'] = $mergedProfile['companyAddress'];
+            $mergedProfile['companyEmail'] = $this->trimToNull($mergedProfile['companyEmail'] ?? null);
+
+            if (($data['company_legal_document'] ?? null) instanceof UploadedFile) {
+                $storedPath = $this->storeCompanyLegalDocument($data['company_legal_document']);
+
+                $mergedProfile['companyLegalDocumentName'] = $data['company_legal_document']->getClientOriginalName();
+                $mergedProfile['companyLegalDocumentPath'] = $storedPath;
+                $mergedProfile['companyLegalDocumentMimeType'] = $data['company_legal_document']->getClientMimeType();
+                $mergedProfile['companyLegalDocumentSize'] = $data['company_legal_document']->getSize() ?: 0;
+                $mergedProfile['companyLegalDocumentUploadedAt'] = now()->toIso8601String();
+            }
+
+            $mergedProfile = $this->syncRecruiterCompanyVerification($currentRecruiterProfile, $mergedProfile);
 
             $nextData['recruiter_profile'] = $this->recruiterPlanService->normalizeRecruiterProfile(
                 $mergedProfile
@@ -294,6 +438,53 @@ class AuthService
 
         $this->serviceActivityLogService->info($this, 'auth_service.profile_picture_stored', [
             'action' => 'store_profile_picture',
+            'disk' => $disk,
+            'stored_path' => $storedPath,
+            'result' => 'success',
+        ]);
+
+        return $storedPath;
+    }
+
+    /**
+     * Persist one recruiter legal company document and return the stored path.
+     */
+    private function storeCompanyLegalDocument(UploadedFile $file): string
+    {
+        $disk = (string) config('filesystems.default', 'local');
+
+        if (app()->environment('production') && $disk === 'local') {
+            $this->serviceActivityLogService->warning($this, 'auth_service.company_legal_document_storage_rejected', [
+                'action' => 'store_company_legal_document',
+                'disk' => $disk,
+                'result' => 'local_disk_in_production',
+            ]);
+
+            throw ValidationException::withMessages([
+                'company_legal_document' => [
+                    'Upload dokumen legal perusahaan memerlukan storage durable. Konfigurasikan disk non-local sebelum mengaktifkan fitur ini di production.',
+                ],
+            ]);
+        }
+
+        $storedPath = Storage::disk($disk)->putFile('company-legal-documents', $file);
+
+        if (!is_string($storedPath) || $storedPath === '') {
+            $this->serviceActivityLogService->error($this, 'auth_service.company_legal_document_storage_failed', [
+                'action' => 'store_company_legal_document',
+                'disk' => $disk,
+                'result' => 'empty_path',
+            ]);
+
+            throw ValidationException::withMessages([
+                'company_legal_document' => [
+                    'Dokumen legal perusahaan belum berhasil disimpan.',
+                ],
+            ]);
+        }
+
+        $this->serviceActivityLogService->info($this, 'auth_service.company_legal_document_stored', [
+            'action' => 'store_company_legal_document',
             'disk' => $disk,
             'stored_path' => $storedPath,
             'result' => 'success',

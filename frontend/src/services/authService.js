@@ -194,6 +194,130 @@ const persistApiSession = (user, token) => {
   return normalizedUser;
 };
 
+/**
+ * Detect browser file-like values so profile updates can switch to multipart payloads only when needed.
+ */
+const isFileLike = (value) =>
+  (typeof File !== 'undefined' && value instanceof File) ||
+  (typeof Blob !== 'undefined' && value instanceof Blob);
+
+/**
+ * Check recursively whether one payload contains binary values.
+ */
+const payloadContainsBinary = (value) => {
+  if (isFileLike(value)) {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => payloadContainsBinary(item));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.values(value).some((item) => payloadContainsBinary(item));
+  }
+
+  return false;
+};
+
+/**
+ * Append one nested value into FormData using PHP-friendly bracket notation.
+ */
+const appendFormDataValue = (formData, key, value) => {
+  if (value === undefined) {
+    return;
+  }
+
+  if (value === null) {
+    formData.append(key, '');
+    return;
+  }
+
+  if (isFileLike(value)) {
+    formData.append(key, value);
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      appendFormDataValue(formData, `${key}[${index}]`, item);
+    });
+    return;
+  }
+
+  if (typeof value === 'object') {
+    Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+      appendFormDataValue(formData, `${key}[${nestedKey}]`, nestedValue);
+    });
+    return;
+  }
+
+  formData.append(key, String(value));
+};
+
+/**
+ * Build the final request payload for profile updates while preserving the old JSON flow when possible.
+ */
+const buildProfileUpdateRequestPayload = (data) => {
+  if (!payloadContainsBinary(data)) {
+    return data;
+  }
+
+  const formData = new FormData();
+  formData.append('_method', 'PUT');
+
+  Object.entries(data || {}).forEach(([key, value]) => {
+    appendFormDataValue(formData, key, value);
+  });
+
+  return formData;
+};
+
+/**
+ * Normalize mock profile updates so uploaded company documents become serializable metadata.
+ */
+const normalizeMockProfileUpdatePayload = (data) => {
+  const recruiterProfile =
+    data?.recruiter_profile && typeof data.recruiter_profile === 'object'
+      ? { ...data.recruiter_profile }
+      : data?.recruiter_profile;
+  const normalizedPayload = {
+    ...data,
+    recruiter_profile: recruiterProfile,
+  };
+  const companyLegalDocument = data?.company_legal_document;
+
+  if (isFileLike(companyLegalDocument)) {
+    normalizedPayload.recruiter_profile = {
+      ...(normalizedPayload.recruiter_profile || {}),
+      companyLegalDocumentName:
+        normalizedPayload.recruiter_profile?.companyLegalDocumentName ||
+        companyLegalDocument.name ||
+        'dokumen-perusahaan',
+      companyLegalDocumentMimeType:
+        normalizedPayload.recruiter_profile?.companyLegalDocumentMimeType ||
+        companyLegalDocument.type ||
+        '',
+      companyLegalDocumentSize:
+        Number(
+          normalizedPayload.recruiter_profile?.companyLegalDocumentSize ||
+            companyLegalDocument.size ||
+            0
+        ) || 0,
+      companyLegalDocumentUploadedAt:
+        normalizedPayload.recruiter_profile?.companyLegalDocumentUploadedAt ||
+        new Date().toISOString(),
+      companyLegalDocumentPath:
+        normalizedPayload.recruiter_profile?.companyLegalDocumentPath ||
+        `mock/company-legal-documents/${companyLegalDocument.name || 'dokumen-perusahaan'}`,
+    };
+  }
+
+  delete normalizedPayload.company_legal_document;
+
+  return normalizedPayload;
+};
+
 class AuthService {
   /**
    * Register new user
@@ -491,9 +615,10 @@ class AuthService {
         throw { message: 'Anda belum login.' };
       }
 
-      const updatedUser = normalizeAuthUser({ ...currentUser, ...data });
+      const normalizedPayload = normalizeMockProfileUpdatePayload(data);
+      const updatedUser = normalizeAuthUser({ ...currentUser, ...normalizedPayload });
       const users = getMockUsers().map((user) =>
-        user.id === currentUser.id ? normalizeAuthUser({ ...user, ...data }) : user
+        user.id === currentUser.id ? normalizeAuthUser({ ...user, ...normalizedPayload }) : user
       );
 
       saveMockUsers(users);
@@ -503,7 +628,15 @@ class AuthService {
     }
 
     try {
-      const response = await apiClient.put('/profile', data);
+      const requestPayload = buildProfileUpdateRequestPayload(data);
+      const response =
+        requestPayload instanceof FormData
+          ? await apiClient.post('/profile', requestPayload, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            })
+          : await apiClient.put('/profile', requestPayload);
       const normalizedUser = persistApiSession(response.data.user);
       return {
         ...response.data,

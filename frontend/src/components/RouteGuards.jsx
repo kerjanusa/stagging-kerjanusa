@@ -4,6 +4,7 @@ import { readCandidateApplyIntent } from '../utils/candidateApplyIntent.js';
 import {
   APP_ROUTES,
   getDefaultRouteForRole,
+  getJobApplyRoute,
   getLoginRouteForRole,
   normalizeUserRole,
 } from '../utils/routeHelpers.js';
@@ -17,7 +18,7 @@ const GuestRoute = ({ children }) => {
 
   if (user) {
     if (pendingApplyIntent && normalizeUserRole(user.role) === 'candidate') {
-      return <Navigate to={APP_ROUTES.jobs} replace />;
+      return <Navigate to={getJobApplyRoute(pendingApplyIntent.jobId)} replace />;
     }
 
     return <Navigate to={getDefaultRouteForRole(user.role)} replace />;
