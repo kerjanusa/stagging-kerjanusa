@@ -14,11 +14,6 @@ if (!$defaultDatabaseConnection) {
     } elseif (is_string($databaseUrl) && str_starts_with($databaseUrl, 'mysql')) {
         $defaultDatabaseConnection = 'mysql';
     } elseif (
-        is_string($databaseHost) &&
-        str_contains($databaseHost, '.supabase.com')
-    ) {
-        $defaultDatabaseConnection = 'pgsql';
-    } elseif (
         $databasePort === '5432' &&
         str_starts_with($databaseUsername, 'postgres')
     ) {

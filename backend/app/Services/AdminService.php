@@ -420,20 +420,33 @@ class AdminService
             ->map(function (User $recruiter) {
                 $recruiterProfile = $this->decodeArrayPayload($recruiter->recruiter_profile);
                 $profileReady = $this->extractProfileReadiness($recruiterProfile, [
+                    'recruiterName',
                     'companyName',
-                    'contactRole',
-                    'companyLocation',
+                    'legalCompanyName',
+                    'companyEmail',
+                    'phone',
+                    'companyAddress',
+                    'industry',
+                    'employeeRange',
+                    'website',
                     'companyDescription',
-                    'hiringFocus',
-                ]);
+                ]) && mb_strlen(trim((string) Arr::get($recruiterProfile, 'companyDescription', ''))) >= 80
+                    && filled(Arr::get($recruiterProfile, 'companyLogoDataUrl')
+                        ?: Arr::get($recruiterProfile, 'companyLogoFileName'))
+                    && filled(Arr::get($recruiterProfile, 'companyLegalDocumentPath')
+                        ?: Arr::get($recruiterProfile, 'companyLegalDocumentName'));
 
                 return [
                     ...$this->recruiterPlanService->getRecruiterPlanContext($recruiter),
                     'id' => $recruiter->id,
                     'name' => $recruiter->name,
                     'company_name' => $recruiter->company_name ?? $recruiter->name,
-                    'company_location' => Arr::get($recruiterProfile, 'companyLocation')
-                        ?? Arr::get($recruiterProfile, 'company_location'),
+                    'company_location' => Arr::get($recruiterProfile, 'companyAddress')
+                        ?: Arr::get($recruiterProfile, 'companyLocation')
+                        ?: Arr::get($recruiterProfile, 'company_location'),
+                    'company_address' => Arr::get($recruiterProfile, 'companyAddress')
+                        ?: Arr::get($recruiterProfile, 'companyLocation')
+                        ?: Arr::get($recruiterProfile, 'company_location'),
                     'email' => $recruiter->email,
                     'phone' => $recruiter->phone,
                     'account_status' => $recruiter->account_status ?? User::STATUS_ACTIVE,
@@ -443,13 +456,24 @@ class AdminService
                     'active_jobs_count' => (int) ($recruiter->active_jobs_count ?? 0),
                     'latest_job_title' => $recruiter->latest_job_title,
                     'verification_status' => Arr::get($recruiterProfile, 'verificationStatus')
-                        ?? ($profileReady ? 'verified' : 'pending'),
+                        ?? ($profileReady ? 'pending' : 'draft'),
                     'verification_notes' => Arr::get($recruiterProfile, 'verificationNotes'),
+                    'verification_submitted_at' => Arr::get($recruiterProfile, 'verificationSubmittedAt'),
                     'verified_at' => Arr::get($recruiterProfile, 'verifiedAt'),
+                    'recruiter_name' => Arr::get($recruiterProfile, 'recruiterName')
+                        ?: $recruiter->name,
                     'contact_role' => Arr::get($recruiterProfile, 'contactRole')
                         ?? Arr::get($recruiterProfile, 'contact_role'),
+                    'legal_company_name' => Arr::get($recruiterProfile, 'legalCompanyName'),
+                    'industry' => Arr::get($recruiterProfile, 'industry'),
+                    'employee_range' => Arr::get($recruiterProfile, 'employeeRange'),
+                    'company_email' => Arr::get($recruiterProfile, 'companyEmail')
+                        ?: $recruiter->email,
+                    'company_link' => Arr::get($recruiterProfile, 'website'),
                     'company_description' => Arr::get($recruiterProfile, 'companyDescription')
                         ?? Arr::get($recruiterProfile, 'company_description'),
+                    'company_legal_document_name' => Arr::get($recruiterProfile, 'companyLegalDocumentName'),
+                    'company_legal_document_uploaded_at' => Arr::get($recruiterProfile, 'companyLegalDocumentUploadedAt'),
                     'hiring_focus' => collect(Arr::get($recruiterProfile, 'hiringFocus', []))
                         ->filter(fn ($focus) => filled($focus))
                         ->values()

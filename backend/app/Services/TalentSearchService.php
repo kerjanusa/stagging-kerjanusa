@@ -30,6 +30,10 @@ class TalentSearchService
         $normalizedGrade = strtoupper(trim((string) ($filters['grade'] ?? '')));
         $normalizedExperienceType = strtolower(trim((string) ($filters['experience_type'] ?? '')));
         $normalizedSkill = strtolower(trim((string) ($filters['skill'] ?? '')));
+        $normalizedExperienceLevel = strtolower(trim((string) ($filters['experience_level'] ?? '')));
+        $normalizedGender = strtolower(trim((string) ($filters['gender'] ?? '')));
+        $minimumAge = (int) ($filters['age_min'] ?? 0);
+        $maximumAge = (int) ($filters['age_max'] ?? 0);
 
         $candidates = User::query()
             ->where('role', User::ROLE_CANDIDATE)
@@ -43,11 +47,16 @@ class TalentSearchService
                 $normalizedLocation,
                 $normalizedGrade,
                 $normalizedExperienceType,
-                $normalizedSkill
+                $normalizedSkill,
+                $normalizedExperienceLevel,
+                $normalizedGender,
+                $minimumAge,
+                $maximumAge
             ) {
                 $haystack = strtolower(implode(' ', array_filter([
                     $candidate['name'] ?? null,
                     $candidate['profile_summary'] ?? null,
+                    $candidate['current_address'] ?? null,
                     implode(' ', $candidate['preferred_roles'] ?? []),
                     implode(' ', $candidate['preferred_locations'] ?? []),
                     implode(' ', $candidate['skills'] ?? []),
@@ -55,7 +64,11 @@ class TalentSearchService
 
                 $matchesQuery = $normalizedQuery === '' || str_contains($haystack, $normalizedQuery);
                 $matchesLocation = $normalizedLocation === ''
-                    || collect($candidate['preferred_locations'] ?? [])
+                    || collect([
+                        $candidate['current_address'] ?? null,
+                        ...($candidate['preferred_locations'] ?? []),
+                    ])
+                        ->filter()
                         ->contains(fn ($location) => str_contains(strtolower((string) $location), $normalizedLocation));
                 $matchesGrade = $normalizedGrade === '' || strtoupper((string) $candidate['grade']) === $normalizedGrade;
                 $matchesExperienceType = $normalizedExperienceType === ''
@@ -63,16 +76,28 @@ class TalentSearchService
                 $matchesSkill = $normalizedSkill === ''
                     || collect($candidate['skills'] ?? [])
                         ->contains(fn ($skill) => str_contains(strtolower((string) $skill), $normalizedSkill));
+                $matchesExperienceLevel = $normalizedExperienceLevel === ''
+                    || strtolower((string) ($candidate['experience_level'] ?? '')) === $normalizedExperienceLevel;
+                $matchesGender = $normalizedGender === ''
+                    || strtolower((string) ($candidate['gender'] ?? '')) === $normalizedGender;
+                $candidateAge = (int) ($candidate['age'] ?? 0);
+                $matchesMinimumAge = $minimumAge <= 0 || $candidateAge >= $minimumAge;
+                $matchesMaximumAge = $maximumAge <= 0 || ($candidateAge > 0 && $candidateAge <= $maximumAge);
 
                 return $matchesQuery
                     && $matchesLocation
                     && $matchesGrade
                     && $matchesExperienceType
-                    && $matchesSkill;
+                    && $matchesSkill
+                    && $matchesExperienceLevel
+                    && $matchesGender
+                    && $matchesMinimumAge
+                    && $matchesMaximumAge;
             })
             ->sortByDesc(
                 fn (array $candidate) =>
                     ((int) $candidate['profile_readiness_percent'] * 1000)
+                    + ((int) ($candidate['experience_years_total'] ?? 0) * 100)
                     + ((int) $candidate['applications_count'] * 10)
                     + (int) $candidate['experience_entries_count']
             )
@@ -91,6 +116,10 @@ class TalentSearchService
             'location_present' => $normalizedLocation !== '',
             'grade_filter' => $normalizedGrade !== '' ? $normalizedGrade : null,
             'experience_type_filter' => $normalizedExperienceType !== '' ? $normalizedExperienceType : null,
+            'experience_level_filter' => $normalizedExperienceLevel !== '' ? $normalizedExperienceLevel : null,
+            'gender_filter' => $normalizedGender !== '' ? $normalizedGender : null,
+            'minimum_age_filter' => $minimumAge > 0 ? $minimumAge : null,
+            'maximum_age_filter' => $maximumAge > 0 ? $maximumAge : null,
             'skill_present' => $normalizedSkill !== '',
             'filtered_candidate_count' => $candidates->count(),
             'result_limit' => (int) $plan['talent_result_limit'],

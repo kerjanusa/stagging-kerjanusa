@@ -15,13 +15,18 @@ export const APP_ROUTES = {
 };
 
 /**
+ * Build the dedicated candidate-facing job apply route for one job id.
+ */
+export const getJobApplyRoute = (jobId) => `${APP_ROUTES.jobs}/${Number(jobId)}/apply`;
+
+/**
  * Normalize legacy role aliases so route decisions use one canonical role set.
  */
 export const normalizeUserRole = (role) => (role === 'internal' ? 'superadmin' : role);
 
 const ROLE_HOME_ROUTES = {
   recruiter: APP_ROUTES.recruiterDashboard,
-  candidate: APP_ROUTES.candidateDashboard,
+  candidate: `${APP_ROUTES.candidateDashboard}#profile`,
   superadmin: APP_ROUTES.adminDashboard,
   internal: APP_ROUTES.adminDashboard,
 };

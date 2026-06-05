@@ -1,5 +1,6 @@
 import apiClient from '../utils/apiClient.js';
 import { shouldUseMockData } from '../utils/mockMode.js';
+import { readCandidateProfile } from '../utils/candidateFlow.js';
 import {
   getRecruiterPlanConfig,
   mergeRecruiterPlanData,
@@ -9,6 +10,8 @@ import {
 
 const MOCK_USERS_STORAGE_KEY = 'mock_auth_users';
 const MOCK_APPLICATIONS_STORAGE_KEY = 'mock_job_applications';
+const MOCK_JOBS_STORAGE_KEY = 'mock_jobs';
+const CURRENT_CALENDAR_YEAR = new Date().getFullYear();
 
 /**
  * Read and parse JSON from local storage while falling back safely on invalid data.
@@ -39,6 +42,11 @@ const getCurrentUser = () => {
 const getMockUsers = () => readStoredJson(MOCK_USERS_STORAGE_KEY, []);
 
 /**
+ * Load mock recruiter jobs so talent search can follow recruiter job requirements in demo mode.
+ */
+const getMockJobs = () => readStoredJson(MOCK_JOBS_STORAGE_KEY, []);
+
+/**
  * Persist the updated mock user list after recruiter package changes.
  */
 const saveMockUsers = (users) => {
@@ -49,6 +57,213 @@ const saveMockUsers = (users) => {
  * Load mock applications used to compute candidate activity metrics.
  */
 const getMockApplications = () => readStoredJson(MOCK_APPLICATIONS_STORAGE_KEY, []);
+
+/**
+ * Normalize arbitrary text into a lowercase comparable token.
+ */
+const normalizeText = (value = '') => String(value || '').trim().toLowerCase();
+
+/**
+ * Normalize candidate and recruiter gender values to one of the supported filter enums.
+ */
+const normalizeGenderValue = (value = '') => {
+  const normalizedValue = normalizeText(value);
+
+  if (['male', 'pria', 'laki-laki', 'laki laki'].includes(normalizedValue)) {
+    return 'male';
+  }
+
+  if (['female', 'wanita', 'perempuan'].includes(normalizedValue)) {
+    return 'female';
+  }
+
+  return '';
+};
+
+/**
+ * Resolve the best available age value from explicit age input or date of birth.
+ */
+const resolveCandidateAge = (profile = {}) => {
+  const explicitAge = Number(profile?.age || 0);
+
+  if (explicitAge > 0) {
+    return explicitAge;
+  }
+
+  if (!profile?.dateOfBirth) {
+    return null;
+  }
+
+  const birthDate = new Date(profile.dateOfBirth);
+
+  if (Number.isNaN(birthDate.getTime())) {
+    return null;
+  }
+
+  const now = new Date();
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const monthDelta = now.getMonth() - birthDate.getMonth();
+
+  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+
+  return age > 0 ? age : null;
+};
+
+/**
+ * Parse one year-like value from candidate experience records.
+ */
+const parseExperienceYear = (value, { allowCurrent = false } = {}) => {
+  const normalizedValue = String(value || '').trim().toLowerCase();
+
+  if (allowCurrent && ['current', 'now', 'present', 'sekarang', 'saat ini', 'masih bekerja'].includes(normalizedValue)) {
+    return 'current';
+  }
+
+  const yearDigits = normalizedValue.replace(/[^\d]/g, '').slice(0, 4);
+
+  if (yearDigits.length !== 4) {
+    return '';
+  }
+
+  const parsedYear = Number(yearDigits);
+  return Number.isFinite(parsedYear) ? parsedYear : '';
+};
+
+/**
+ * Build a short duration label for one latest experience entry.
+ */
+const formatExperienceDurationLabel = (experience = {}) => {
+  const startYear = parseExperienceYear(experience.startYear || experience.year);
+  const endYear = parseExperienceYear(experience.endYear || experience.year, { allowCurrent: true });
+
+  if (!startYear && !endYear) {
+    return '';
+  }
+
+  if (startYear && endYear === 'current') {
+    return `${startYear} - Sekarang`;
+  }
+
+  if (startYear && endYear) {
+    return `${startYear} - ${endYear}`;
+  }
+
+  return String(startYear || endYear || '');
+};
+
+/**
+ * Estimate the candidate's total experience years from structured profile records.
+ */
+const resolveExperienceYearsTotal = (experiences = []) => {
+  const validExperiences = experiences.filter((item) => item?.company || item?.position);
+
+  if (!validExperiences.length) {
+    return 0;
+  }
+
+  const totalYears = validExperiences.reduce((sum, experience) => {
+    const startYear = parseExperienceYear(experience.startYear || experience.year);
+    const endYear = parseExperienceYear(experience.endYear || experience.year, {
+      allowCurrent: true,
+    });
+
+    if (!startYear) {
+      return sum + 1;
+    }
+
+    const effectiveEndYear =
+      endYear === 'current' ? CURRENT_CALENDAR_YEAR : Number(endYear || startYear);
+
+    if (!Number.isFinite(effectiveEndYear) || effectiveEndYear < startYear) {
+      return sum + 1;
+    }
+
+    return sum + Math.max(1, effectiveEndYear - startYear + 1);
+  }, 0);
+
+  return totalYears;
+};
+
+/**
+ * Bucket one candidate into the same experience levels used by recruiter job forms.
+ */
+const resolveExperienceLevel = (experienceYearsTotal, experienceEntriesCount) => {
+  if (experienceEntriesCount === 0) {
+    return 'entry';
+  }
+
+  if (experienceYearsTotal >= 5) {
+    return 'senior';
+  }
+
+  if (experienceYearsTotal >= 3) {
+    return 'mid';
+  }
+
+  return 'junior';
+};
+
+/**
+ * Pick the latest non-empty experience entry for recruiter-facing candidate cards.
+ */
+const resolveLatestExperience = (experiences = []) => {
+  const latestExperience = experiences.find((item) => item?.company || item?.position) || null;
+
+  if (!latestExperience) {
+    return null;
+  }
+
+  return {
+    company: latestExperience.company || '',
+    position: latestExperience.position || '',
+    duration_label: formatExperienceDurationLabel(latestExperience),
+  };
+};
+
+/**
+ * Score how closely one candidate profile resembles the selected recruiter job.
+ */
+const resolveTalentJobMatchScore = (candidate, job) => {
+  if (!job) {
+    return 0;
+  }
+
+  const candidateSkills = (candidate.skills || []).map((skill) => normalizeText(skill)).filter(Boolean);
+  const requiredSkills = [
+    ...(Array.isArray(job.candidate_skills) ? job.candidate_skills : []),
+    job.candidate_custom_skill || '',
+  ]
+    .map((skill) => normalizeText(skill))
+    .filter(Boolean);
+  const candidateHaystack = [
+    candidate.name,
+    candidate.profile_summary,
+    ...(candidate.preferred_roles || []),
+    ...(candidate.skills || []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  const matchedSkillCount = requiredSkills.filter((skill) =>
+    candidateSkills.some(
+      (candidateSkill) => candidateSkill === skill || candidateSkill.includes(skill) || skill.includes(candidateSkill)
+    )
+  ).length;
+
+  return (
+    (normalizeText(job.title) && candidateHaystack.includes(normalizeText(job.title)) ? 24 : 0) +
+    (normalizeText(job.category) && candidateHaystack.includes(normalizeText(job.category)) ? 14 : 0) +
+    matchedSkillCount * 10 +
+    (normalizeText(job.location) &&
+    normalizeText(candidate.current_address || candidate.preferred_locations?.[0]).includes(
+      normalizeText(job.location)
+    )
+      ? 8
+      : 0)
+  );
+};
 
 /**
  * Package a recruiter workspace collection into the same pagination shape as the backend.
@@ -96,7 +311,7 @@ const buildMockTalentCandidates = (recruiter) => {
   return getMockUsers()
     .filter((user) => user.role === 'candidate' && user.account_status !== 'suspended')
     .map((candidate) => {
-      const profile = candidate.candidate_profile || {};
+      const profile = readCandidateProfile(candidate);
       const preferredRoles = (profile.preferredRoles || []).filter(Boolean);
       const preferredLocations = (profile.preferredLocations || []).filter(Boolean);
       const skills = (profile.skills || []).filter(Boolean);
@@ -104,6 +319,9 @@ const buildMockTalentCandidates = (recruiter) => {
       const certificateFiles = (profile.certificateFiles || []).slice(
         0,
         planConfig.visible_certificate_files
+      );
+      const experiences = (profile.experiences || []).filter(
+        (item) => item?.company || item?.position
       );
       const readinessItems = [
         Boolean(profile.currentAddress),
@@ -119,6 +337,7 @@ const buildMockTalentCandidates = (recruiter) => {
       const candidateApplications = applications.filter(
         (application) => Number(application.candidate_id) === Number(candidate.id)
       );
+      const experienceYearsTotal = resolveExperienceYearsTotal(experiences);
 
       const result = {
         id: candidate.id,
@@ -126,16 +345,19 @@ const buildMockTalentCandidates = (recruiter) => {
         email: candidate.email,
         phone: candidate.phone,
         profile_summary: profile.profileSummary || '',
+        profile_photo_url: profile.photoDataUrl || '',
+        current_address: profile.currentAddress || '',
+        gender: normalizeGenderValue(profile.gender),
+        age: resolveCandidateAge(profile),
+        education_label: String(profile.education?.degree || profile.education?.major || '').trim() || 'Belum diisi',
         preferred_roles: preferredRoles,
         preferred_locations: preferredLocations,
         skills,
-        experience_type:
-          (profile.experiences || []).filter((item) => item?.company || item?.position).length > 0
-            ? 'experienced'
-            : 'fresh-graduate',
-        experience_entries_count: (profile.experiences || []).filter(
-          (item) => item?.company || item?.position
-        ).length,
+        experience_type: experiences.length > 0 ? 'experienced' : 'fresh-graduate',
+        experience_entries_count: experiences.length,
+        experience_years_total: experienceYearsTotal,
+        experience_level: resolveExperienceLevel(experienceYearsTotal, experiences.length),
+        latest_experience: resolveLatestExperience(experiences),
         applications_count: candidateApplications.length,
         profile_readiness_percent: profileReadinessPercent,
         resume_files: resumeFiles,
@@ -244,17 +466,28 @@ class RecruiterWorkspaceService {
     if (shouldUseMockData) {
       const currentUser = getCurrentUser();
       const plan = getRecruiterPlanConfig(currentUser?.recruiter_profile?.plan_code);
-      const normalizedQuery = String(filters.query || '').trim().toLowerCase();
-      const normalizedLocation = String(filters.location || '').trim().toLowerCase();
-      const normalizedSkill = String(filters.skill || '').trim().toLowerCase();
+      const normalizedQuery = normalizeText(filters.query);
+      const normalizedLocation = normalizeText(filters.location);
+      const normalizedSkill = normalizeText(filters.skill);
       const normalizedGrade = String(filters.grade || '').trim().toUpperCase();
-      const normalizedExperienceType = String(filters.experience_type || '').trim().toLowerCase();
+      const normalizedExperienceType = normalizeText(filters.experience_type);
+      const normalizedExperienceLevel = normalizeText(filters.experience_level);
+      const normalizedGender = normalizeGenderValue(filters.gender);
+      const minimumAge = Number.parseInt(String(filters.age_min || '').trim(), 10);
+      const maximumAge = Number.parseInt(String(filters.age_max || '').trim(), 10);
+      const selectedJob =
+        getMockJobs().find((job) => Number(job.id) === Number(filters.job_id)) || null;
 
       const candidates = buildMockTalentCandidates(currentUser)
+        .map((candidate) => ({
+          ...candidate,
+          job_match_score: resolveTalentJobMatchScore(candidate, selectedJob),
+        }))
         .filter((candidate) => {
           const haystack = [
             candidate.name,
             candidate.profile_summary,
+            candidate.current_address,
             ...(candidate.preferred_roles || []),
             ...(candidate.preferred_locations || []),
             ...(candidate.skills || []),
@@ -266,26 +499,44 @@ class RecruiterWorkspaceService {
           const matchesQuery = !normalizedQuery || haystack.includes(normalizedQuery);
           const matchesLocation =
             !normalizedLocation ||
-            (candidate.preferred_locations || []).some((location) =>
-              String(location).toLowerCase().includes(normalizedLocation)
-            );
+            [candidate.current_address, ...(candidate.preferred_locations || [])]
+              .filter(Boolean)
+              .some((location) => normalizeText(location).includes(normalizedLocation));
           const matchesSkill =
             !normalizedSkill ||
             (candidate.skills || []).some((skill) =>
-              String(skill).toLowerCase().includes(normalizedSkill)
+              normalizeText(skill).includes(normalizedSkill)
             );
           const matchesGrade = !normalizedGrade || candidate.grade === normalizedGrade;
           const matchesExperienceType =
             !normalizedExperienceType || candidate.experience_type === normalizedExperienceType;
+          const matchesExperienceLevel =
+            !normalizedExperienceLevel || candidate.experience_level === normalizedExperienceLevel;
+          const matchesGender = !normalizedGender || candidate.gender === normalizedGender;
+          const matchesMinimumAge =
+            !Number.isFinite(minimumAge) || minimumAge <= 0 || Number(candidate.age || 0) >= minimumAge;
+          const matchesMaximumAge =
+            !Number.isFinite(maximumAge) || maximumAge <= 0 || Number(candidate.age || 0) <= maximumAge;
 
           return (
             matchesQuery &&
             matchesLocation &&
             matchesSkill &&
             matchesGrade &&
-            matchesExperienceType
+            matchesExperienceType &&
+            matchesExperienceLevel &&
+            matchesGender &&
+            matchesMinimumAge &&
+            matchesMaximumAge
           );
         })
+        .sort(
+          (leftCandidate, rightCandidate) =>
+            rightCandidate.job_match_score - leftCandidate.job_match_score ||
+            rightCandidate.profile_readiness_percent - leftCandidate.profile_readiness_percent ||
+            rightCandidate.experience_years_total - leftCandidate.experience_years_total ||
+            rightCandidate.applications_count - leftCandidate.applications_count
+        )
         .slice(0, plan.talent_result_limit);
 
       return paginateItems(candidates, page, perPage);
@@ -300,6 +551,11 @@ class RecruiterWorkspaceService {
         ...(filters.skill ? { skill: filters.skill } : {}),
         ...(filters.grade ? { grade: filters.grade } : {}),
         ...(filters.experience_type ? { experience_type: filters.experience_type } : {}),
+        ...(filters.job_id ? { job_id: filters.job_id } : {}),
+        ...(filters.experience_level ? { experience_level: filters.experience_level } : {}),
+        ...(filters.age_min ? { age_min: filters.age_min } : {}),
+        ...(filters.age_max ? { age_max: filters.age_max } : {}),
+        ...(filters.gender ? { gender: filters.gender } : {}),
       });
       const response = await apiClient.get(`/recruiter/talent-search?${params}`);
       return response.data;

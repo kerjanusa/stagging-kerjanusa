@@ -6,19 +6,42 @@ const RECRUITER_APPLICATION_STAGE_STORAGE_KEY = 'recruiter_application_stage_sta
 
 export const RECRUITER_SECTION_OPTIONS = [
   { value: 'overview', label: 'Dashboard' },
-  { value: 'company', label: 'Profil Company' },
-  { value: 'jobs', label: 'Lowongan' },
-  { value: 'candidates', label: 'Kandidat' },
-  { value: 'talent', label: 'Talent Search' },
+  { value: 'company', label: 'Profil Perusahaan' },
+  { value: 'jobs', label: 'Posting Lowongan' },
+  { value: 'candidates', label: 'Pelamar' },
+  { value: 'talent', label: 'Kolam Pelamar' },
   { value: 'messages', label: 'Chat' },
   { value: 'package', label: 'Paket' },
 ];
 
+export const RECRUITER_PRIMARY_SECTION_OPTIONS = [
+  { value: 'company', label: 'Profil Perusahaan', mobileLabel: 'Profil' },
+  { value: 'jobs', label: 'Posting Lowongan', mobileLabel: 'Lowongan' },
+  { value: 'candidates', label: 'Pelamar', mobileLabel: 'Pelamar' },
+  { value: 'messages', label: 'Chat', mobileLabel: 'Chat' },
+];
+
+export const RECRUITER_COMPANY_EMPLOYEE_RANGE_OPTIONS = [
+  '1 - 50 Tenaga Kerja',
+  '51 - 255 Tenaga Kerja',
+  '256 - 650 Tenaga Kerja',
+  '650 - 3.000 Tenaga Kerja',
+  'Lebih dari 3000 Tenaga Kerja',
+];
+
+export const RECRUITER_COMPANY_VERIFICATION_STATUS_LABELS = {
+  draft: 'Draft',
+  pending: 'Menunggu Verifikasi',
+  verified: 'Terverifikasi',
+};
+
 export const RECRUITER_JOB_WORKFLOW_OPTIONS = [
-  { value: 'draft', label: 'Draft' },
+  { value: 'draft', label: 'Tersimpan' },
   { value: 'active', label: 'Aktif' },
-  { value: 'paused', label: 'Dijeda' },
+  { value: 'paused', label: 'Nonaktif' },
   { value: 'closed', label: 'Ditutup' },
+  { value: 'review', label: 'Dalam Review' },
+  { value: 'rejected', label: 'Ditolak' },
   { value: 'filled', label: 'Hiring Selesai' },
 ];
 
@@ -39,11 +62,27 @@ export const APPLICATION_STAGE_OPTIONS = [
 const createRecruiterCompanyProfile = (user) => ({
   recruiterName: user?.name || '',
   companyName: user?.company_name || '',
-  contactRole: '',
+  legalCompanyName: '',
+  companyEmail: user?.email || '',
   phone: user?.phone || '',
+  companyAddress: '',
   companyLocation: '',
+  industry: '',
+  employeeRange: '',
   companyDescription: '',
+  companyLogoFileName: '',
+  companyLogoDataUrl: '',
   website: '',
+  companyLegalDocumentName: '',
+  companyLegalDocumentPath: '',
+  companyLegalDocumentMimeType: '',
+  companyLegalDocumentSize: 0,
+  companyLegalDocumentUploadedAt: '',
+  verificationStatus: 'draft',
+  verificationNotes: '',
+  verificationSubmittedAt: '',
+  verifiedAt: '',
+  contactRole: '',
   hiringFocus: '',
   plan_code: 'starter',
   kn_credit: 0,
@@ -64,7 +103,25 @@ const mergeRecruiterCompanyProfile = (user, savedProfile) => {
     ...savedProfile,
     recruiterName: savedProfile.recruiterName || user?.name || '',
     companyName: savedProfile.companyName || user?.company_name || '',
+    legalCompanyName: savedProfile.legalCompanyName || '',
+    companyEmail: savedProfile.companyEmail || user?.email || '',
     phone: savedProfile.phone || user?.phone || '',
+    companyAddress: savedProfile.companyAddress || savedProfile.companyLocation || '',
+    companyLocation: savedProfile.companyLocation || savedProfile.companyAddress || '',
+    industry: savedProfile.industry || '',
+    employeeRange: savedProfile.employeeRange || '',
+    companyLegalDocumentName: savedProfile.companyLegalDocumentName || '',
+    companyLegalDocumentPath: savedProfile.companyLegalDocumentPath || '',
+    companyLegalDocumentMimeType: savedProfile.companyLegalDocumentMimeType || '',
+    companyLegalDocumentSize: Number(savedProfile.companyLegalDocumentSize || 0),
+    companyLegalDocumentUploadedAt: savedProfile.companyLegalDocumentUploadedAt || '',
+    verificationStatus:
+      savedProfile.verificationStatus === 'verified' || savedProfile.verificationStatus === 'pending'
+        ? savedProfile.verificationStatus
+        : 'draft',
+    verificationNotes: savedProfile.verificationNotes || '',
+    verificationSubmittedAt: savedProfile.verificationSubmittedAt || '',
+    verifiedAt: savedProfile.verifiedAt || '',
   });
 };
 
@@ -124,15 +181,36 @@ export const readRecruiterCompanyProfile = (user) =>
  * Normalize and persist one recruiter company profile draft.
  */
 export const saveRecruiterCompanyProfile = (user, profile) => {
+  const normalizedCompanyAddress = profile?.companyAddress?.trim?.() || '';
+
   const normalizedProfile = mergeRecruiterCompanyProfile(user, {
     ...profile,
     recruiterName: profile?.recruiterName?.trim?.() || user?.name || '',
     companyName: profile?.companyName?.trim?.() || '',
+    legalCompanyName: profile?.legalCompanyName?.trim?.() || '',
+    companyEmail: profile?.companyEmail?.trim?.() || user?.email || '',
     phone: profile?.phone?.trim?.() || user?.phone || '',
     contactRole: profile?.contactRole?.trim?.() || '',
-    companyLocation: profile?.companyLocation?.trim?.() || '',
+    companyAddress: normalizedCompanyAddress,
+    companyLocation: normalizedCompanyAddress,
+    industry: profile?.industry?.trim?.() || '',
+    employeeRange: profile?.employeeRange?.trim?.() || '',
     companyDescription: profile?.companyDescription?.trim?.() || '',
+    companyLogoFileName: profile?.companyLogoFileName?.trim?.() || '',
+    companyLogoDataUrl: profile?.companyLogoDataUrl?.trim?.() || '',
     website: profile?.website?.trim?.() || '',
+    companyLegalDocumentName: profile?.companyLegalDocumentName?.trim?.() || '',
+    companyLegalDocumentPath: profile?.companyLegalDocumentPath?.trim?.() || '',
+    companyLegalDocumentMimeType: profile?.companyLegalDocumentMimeType?.trim?.() || '',
+    companyLegalDocumentSize: Math.max(0, Number(profile?.companyLegalDocumentSize || 0)),
+    companyLegalDocumentUploadedAt: profile?.companyLegalDocumentUploadedAt?.trim?.() || '',
+    verificationStatus:
+      profile?.verificationStatus === 'verified' || profile?.verificationStatus === 'pending'
+        ? profile.verificationStatus
+        : 'draft',
+    verificationNotes: profile?.verificationNotes?.trim?.() || '',
+    verificationSubmittedAt: profile?.verificationSubmittedAt?.trim?.() || '',
+    verifiedAt: profile?.verifiedAt?.trim?.() || '',
     hiringFocus: profile?.hiringFocus?.trim?.() || '',
   });
 
@@ -142,50 +220,100 @@ export const saveRecruiterCompanyProfile = (user, profile) => {
 };
 
 /**
+ * Count the non-whitespace characters used inside the recruiter company description.
+ */
+export const getRecruiterCompanyDescriptionLength = (profile) =>
+  String(profile?.companyDescription || '').trim().length;
+
+/**
+ * Check whether the recruiter has uploaded a visible logo for the company profile.
+ */
+export const hasRecruiterCompanyLogo = (profile) =>
+  Boolean(profile?.companyLogoDataUrl?.trim?.() || profile?.companyLogoFileName?.trim?.());
+
+/**
+ * Check whether the recruiter has attached a legal company document.
+ */
+export const hasRecruiterCompanyLegalDocument = (profile) =>
+  Boolean(
+    profile?.companyLegalDocumentPath?.trim?.() || profile?.companyLegalDocumentName?.trim?.()
+  );
+
+/**
  * Build the recruiter company-profile checklist used by readiness indicators.
  */
 export const getRecruiterCompanyChecklist = (profile) => [
   {
+    key: 'companyLogo',
+    label: 'Logo perusahaan',
+    isComplete: hasRecruiterCompanyLogo(profile),
+    required: true,
+  },
+  {
     key: 'companyName',
-    label: 'Nama perusahaan',
+    label: 'Nama brand perusahaan',
     isComplete: Boolean(profile.companyName?.trim()),
     required: true,
   },
   {
-    key: 'contactRole',
-    label: 'Peran PIC recruiter',
-    isComplete: Boolean(profile.contactRole?.trim()),
+    key: 'legalCompanyName',
+    label: 'Nama legal perusahaan',
+    isComplete: Boolean(profile.legalCompanyName?.trim()),
     required: true,
   },
   {
-    key: 'phone',
-    label: 'Nomor telepon aktif',
-    isComplete: Boolean(profile.phone?.trim()),
+    key: 'industry',
+    label: 'Industri perusahaan',
+    isComplete: Boolean(profile.industry?.trim()),
     required: true,
   },
   {
-    key: 'companyLocation',
-    label: 'Lokasi utama perusahaan',
-    isComplete: Boolean(profile.companyLocation?.trim()),
-    required: true,
-  },
-  {
-    key: 'companyDescription',
-    label: 'Ringkasan perusahaan',
-    isComplete: Boolean(profile.companyDescription?.trim()),
-    required: true,
-  },
-  {
-    key: 'hiringFocus',
-    label: 'Fokus hiring saat ini',
-    isComplete: Boolean(profile.hiringFocus?.trim()),
+    key: 'employeeRange',
+    label: 'Jumlah tenaga kerja',
+    isComplete: Boolean(profile.employeeRange?.trim()),
     required: true,
   },
   {
     key: 'website',
-    label: 'Website / tautan company',
+    label: 'Website / sosial media perusahaan',
     isComplete: Boolean(profile.website?.trim()),
-    required: false,
+    required: true,
+  },
+  {
+    key: 'companyDescription',
+    label: 'Deskripsi perusahaan minimal 80 karakter',
+    isComplete: getRecruiterCompanyDescriptionLength(profile) >= 80,
+    required: true,
+  },
+  {
+    key: 'companyLegalDocument',
+    label: 'Dokumen legal perusahaan',
+    isComplete: hasRecruiterCompanyLegalDocument(profile),
+    required: true,
+  },
+  {
+    key: 'recruiterName',
+    label: 'Nama PIC perusahaan',
+    isComplete: Boolean(profile.recruiterName?.trim()),
+    required: true,
+  },
+  {
+    key: 'companyEmail',
+    label: 'Email perusahaan / PIC',
+    isComplete: Boolean(profile.companyEmail?.trim()),
+    required: true,
+  },
+  {
+    key: 'phone',
+    label: 'Nomor kontak perusahaan',
+    isComplete: Boolean(profile.phone?.trim()),
+    required: true,
+  },
+  {
+    key: 'companyAddress',
+    label: 'Alamat perusahaan',
+    isComplete: Boolean(profile.companyAddress?.trim()),
+    required: true,
   },
 ];
 
@@ -225,6 +353,27 @@ const readJobWorkflowMap = () => readStoredJson(RECRUITER_JOB_WORKFLOW_STORAGE_K
  */
 export const getJobWorkflowLabel = (status) =>
   RECRUITER_JOB_WORKFLOW_OPTIONS.find((option) => option.value === status)?.label || status;
+
+/**
+ * Menentukan tone badge recruiter dari satu status workflow lowongan.
+ */
+export const getJobWorkflowTone = (status) => {
+  switch (status) {
+    case 'active':
+      return 'success';
+    case 'review':
+      return 'warning';
+    case 'rejected':
+      return 'danger';
+    case 'closed':
+    case 'paused':
+    case 'filled':
+      return 'muted';
+    case 'draft':
+    default:
+      return 'muted';
+  }
+};
 
 /**
  * Resolve the effective recruiter workflow status for one job from API or local override state.

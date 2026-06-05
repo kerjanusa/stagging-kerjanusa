@@ -101,6 +101,22 @@ const presentUser = (user) => {
   };
 };
 
+const getCandidateFacingContactSearchLabel = (contact) => {
+  if (!contact) {
+    return '';
+  }
+
+  if (contact.role === 'superadmin') {
+    return String(contact.company_name || 'KerjaNusa').trim();
+  }
+
+  if (contact.role === 'recruiter') {
+    return String(contact.company_name || 'Perusahaan Recruiter').trim();
+  }
+
+  return String(contact.company_name || contact.name || '').trim();
+};
+
 /**
  * Decide whether two demo users are allowed to communicate in chat.
  */
@@ -235,20 +251,21 @@ class ChatService {
   static async getContacts(search = '') {
     if (shouldUseMockData) {
       const currentUser = getCurrentUser();
+      const normalizedSearch = search.trim().toLowerCase();
       const contacts = getMockUsers()
         .filter((user) => user.account_status !== 'suspended')
         .filter((user) => canCommunicateMock(currentUser, user))
         .filter((user) => {
-          if (!search.trim()) {
+          if (!normalizedSearch) {
             return true;
           }
 
-          const haystack = [user.name, user.company_name, user.email]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
+          const haystack =
+            currentUser?.role === 'candidate'
+              ? getCandidateFacingContactSearchLabel(user).toLowerCase()
+              : [user.name, user.company_name, user.email].filter(Boolean).join(' ').toLowerCase();
 
-          return haystack.includes(search.trim().toLowerCase());
+          return haystack.includes(normalizedSearch);
         })
         .map(presentUser);
 

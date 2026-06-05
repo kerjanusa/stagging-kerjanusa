@@ -6,6 +6,20 @@ const MOCK_JOBS_STORAGE_KEY = 'mock_jobs';
 const MOCK_USERS_STORAGE_KEY = 'mock_auth_users';
 
 /**
+ * Build a stable ISO timestamp for mock job mutations.
+ */
+const buildTimestamp = () => new Date().toISOString();
+
+/**
+ * Give recruiter job cards simple view metrics when demo data does not provide them yet.
+ */
+const resolveMockJobViewCount = (job) =>
+  Math.max(
+    Number(job.views_count) || 0,
+    (Number(job.applications_count) || 0) * 9 + Number(job.id || 0) * 7
+  );
+
+/**
  * Normalize free-text filters and searchable fields to one lowercase comparison format.
  */
 const normalizeText = (value = '') => String(value).trim().toLowerCase();
@@ -24,6 +38,36 @@ const normalizeMockJob = (job) => ({
   quiz_screening_questions: Array.isArray(job.quiz_screening_questions)
     ? job.quiz_screening_questions
     : [],
+  shift_night: job.shift_night || 'no',
+  expiry_date: job.expiry_date || '',
+  candidate_gender: job.candidate_gender || '',
+  candidate_experience: job.candidate_experience || '',
+  candidate_education: job.candidate_education || '',
+  candidate_age_min: job.candidate_age_min || '',
+  candidate_age_max: job.candidate_age_max || '',
+  candidate_no_age_limit: Boolean(job.candidate_no_age_limit),
+  candidate_photo_requirement: job.candidate_photo_requirement || '',
+  candidate_domicile: job.candidate_domicile || '',
+  candidate_skills: Array.isArray(job.candidate_skills) ? job.candidate_skills : [],
+  candidate_custom_skill: job.candidate_custom_skill || '',
+  internal_recruiter_link: job.internal_recruiter_link || '',
+  created_at: job.created_at || new Date().toISOString(),
+  updated_at: job.updated_at || job.created_at || new Date().toISOString(),
+  published_at:
+    job.published_at ||
+    ((job.workflow_status || job.status) === 'active' ? job.updated_at || job.created_at : ''),
+  review_requested_at:
+    job.review_requested_at ||
+    (job.workflow_status === 'review' ? job.updated_at || job.created_at : ''),
+  rejected_at:
+    job.rejected_at ||
+    (job.workflow_status === 'rejected' ? job.updated_at || job.created_at : ''),
+  closed_at:
+    job.closed_at || (job.workflow_status === 'closed' ? job.updated_at || job.created_at : ''),
+  workflow_note: job.workflow_note || '',
+  boost_count: Number(job.boost_count) || 0,
+  duplicate_source_job_id: job.duplicate_source_job_id || null,
+  views_count: resolveMockJobViewCount(job),
 });
 
 /**
@@ -105,6 +149,8 @@ const filterMockJobs = (jobs, filters = {}) => {
   const locationTerm = normalizeText(filters.location);
   const jobTypeTerm = normalizeText(filters.job_type);
   const experienceLevelTerm = normalizeText(filters.experience_level);
+  const companyTerm = normalizeText(filters.company_name);
+  const minimumSalary = Number(filters.salary_minimum || 0);
 
   return jobs.filter((job) => {
     if (normalizeText(job.status) !== 'active') {
@@ -135,8 +181,20 @@ const filterMockJobs = (jobs, filters = {}) => {
     const matchesJobType = !jobTypeTerm || normalizeText(job.job_type) === jobTypeTerm;
     const matchesExperience =
       !experienceLevelTerm || normalizeText(job.experience_level) === experienceLevelTerm;
+    const matchesCompany =
+      !companyTerm ||
+      normalizeText(job.recruiter?.company_name || job.recruiter?.name).includes(companyTerm);
+    const matchesSalary =
+      !minimumSalary || Number(job.salary_max || job.salary_min || 0) >= minimumSalary;
 
-    return matchesSearch && matchesLocation && matchesJobType && matchesExperience;
+    return (
+      matchesSearch &&
+      matchesLocation &&
+      matchesJobType &&
+      matchesExperience &&
+      matchesCompany &&
+      matchesSalary
+    );
   });
 };
 
@@ -248,12 +306,15 @@ class JobService {
     if (shouldUseMockData) {
       const currentUser = getCurrentMockUser();
       const jobs = getStoredMockJobs();
+      const createdAt = buildTimestamp();
+      const workflowStatus =
+        data.workflow_status || (data.status === 'active' ? 'active' : 'draft');
       const newJob = {
         id: getNextJobId(jobs),
         recruiter_id: currentUser?.id || 1,
         recruiter: { name: currentUser?.company_name || currentUser?.name || 'Recruiter Demo' },
         title: data.title,
-        workflow_status: data.workflow_status || (data.status === 'active' ? 'active' : 'draft'),
+        workflow_status: workflowStatus,
         description: data.description,
         category: data.category,
         salary_min: Number(data.salary_min) || 0,
@@ -269,8 +330,31 @@ class JobService {
         quiz_screening_questions: Array.isArray(data.quiz_screening_questions)
           ? data.quiz_screening_questions
           : [],
-        status: data.status || 'active',
+        shift_night: data.shift_night || 'no',
+        expiry_date: data.expiry_date || '',
+        candidate_gender: data.candidate_gender || '',
+        candidate_experience: data.candidate_experience || '',
+        candidate_education: data.candidate_education || '',
+        candidate_age_min: data.candidate_age_min || '',
+        candidate_age_max: data.candidate_age_max || '',
+        candidate_no_age_limit: Boolean(data.candidate_no_age_limit),
+        candidate_photo_requirement: data.candidate_photo_requirement || '',
+        candidate_domicile: data.candidate_domicile || '',
+        candidate_skills: Array.isArray(data.candidate_skills) ? data.candidate_skills : [],
+        candidate_custom_skill: data.candidate_custom_skill || '',
+        internal_recruiter_link: data.internal_recruiter_link || '',
+        workflow_note: data.workflow_note || '',
+        status: data.status || (workflowStatus === 'active' ? 'active' : 'inactive'),
         applications_count: 0,
+        views_count: 0,
+        boost_count: 0,
+        created_at: createdAt,
+        updated_at: createdAt,
+        published_at: workflowStatus === 'active' ? createdAt : '',
+        review_requested_at: workflowStatus === 'review' ? createdAt : '',
+        rejected_at: workflowStatus === 'rejected' ? createdAt : '',
+        closed_at: workflowStatus === 'closed' ? createdAt : '',
+        duplicate_source_job_id: data.duplicate_source_job_id || null,
       };
 
       saveMockJobs([...jobs, newJob]);
@@ -299,13 +383,31 @@ class JobService {
           return job;
         }
 
+        const nextWorkflowStatus =
+          data.workflow_status ||
+          job.workflow_status ||
+          (data.status === 'active' ? 'active' : 'draft');
+        const updatedAt = buildTimestamp();
         updatedJob = {
           ...job,
           ...data,
-          workflow_status:
-            data.workflow_status ||
-            job.workflow_status ||
-            (data.status === 'active' ? 'active' : 'draft'),
+          workflow_status: nextWorkflowStatus,
+          status: data.status || (nextWorkflowStatus === 'active' ? 'active' : 'inactive'),
+          updated_at: updatedAt,
+          published_at:
+            nextWorkflowStatus === 'active' ? job.published_at || updatedAt : job.published_at || '',
+          review_requested_at:
+            nextWorkflowStatus === 'review'
+              ? data.review_requested_at || job.review_requested_at || updatedAt
+              : job.review_requested_at || '',
+          rejected_at:
+            nextWorkflowStatus === 'rejected'
+              ? data.rejected_at || job.rejected_at || updatedAt
+              : job.rejected_at || '',
+          closed_at:
+            nextWorkflowStatus === 'closed'
+              ? data.closed_at || job.closed_at || updatedAt
+              : job.closed_at || '',
         };
         return updatedJob;
       });

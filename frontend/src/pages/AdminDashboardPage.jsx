@@ -423,6 +423,14 @@ const getRecruiterAdminStatus = (recruiter) => {
     };
   }
 
+  if ((recruiter.verification_status || 'draft') === 'draft') {
+    return {
+      key: 'review',
+      label: 'Draft',
+      tone: 'muted',
+    };
+  }
+
   if ((recruiter.verification_status || 'pending') !== 'verified') {
     return {
       key: 'review',
@@ -986,8 +994,15 @@ const AdminDashboardPage = () => {
       recruiterTable.map((recruiter) => ({
         ...recruiter,
         initials: getInitials(recruiter.company_name || recruiter.name),
-        locationLabel: recruiter.company_location || 'Lokasi belum diisi',
+        locationLabel: recruiter.company_address || recruiter.company_location || 'Alamat belum diisi',
         adminStatus: getRecruiterAdminStatus(recruiter),
+        recruiterNameLabel: recruiter.recruiter_name || recruiter.name || 'PIC belum diisi',
+        industryLabel: recruiter.industry || 'Industri belum diisi',
+        employeeRangeLabel: recruiter.employee_range || 'Skala tim belum diisi',
+        companyEmailLabel: recruiter.company_email || recruiter.email || 'Email belum diisi',
+        companyLinkLabel: recruiter.company_link || 'Link belum diisi',
+        legalDocumentLabel:
+          recruiter.company_legal_document_name || 'Dokumen legal belum diunggah',
         hiringFocusLabel:
           recruiter.hiring_focus?.slice(0, 2).join(', ') || 'Fokus hiring belum diisi',
       })),
@@ -1083,6 +1098,11 @@ const AdminDashboardPage = () => {
           recruiter.email,
           recruiter.company_name,
           recruiter.locationLabel,
+          recruiter.recruiterNameLabel,
+          recruiter.industryLabel,
+          recruiter.employeeRangeLabel,
+          recruiter.companyEmailLabel,
+          recruiter.legalDocumentLabel,
           recruiter.hiringFocusLabel,
         ]
           .filter(Boolean)
@@ -3220,20 +3240,36 @@ const AdminDashboardPage = () => {
                   </span>
                 </div>
                 <div>
-                  <label>Lokasi</label>
+                  <label>Nama PIC</label>
+                  <strong>{selectedRecruiter.recruiterNameLabel}</strong>
+                </div>
+                <div>
+                  <label>Email Perusahaan</label>
+                  <strong>{selectedRecruiter.companyEmailLabel}</strong>
+                </div>
+                <div>
+                  <label>Alamat</label>
                   <strong>{selectedRecruiter.locationLabel}</strong>
                 </div>
                 <div>
-                  <label>Role Kontak</label>
-                  <strong>{selectedRecruiter.contact_role || 'Belum diisi'}</strong>
+                  <label>Nama Legal</label>
+                  <strong>{selectedRecruiter.legal_company_name || 'Belum diisi'}</strong>
+                </div>
+                <div>
+                  <label>Industri</label>
+                  <strong>{selectedRecruiter.industryLabel}</strong>
+                </div>
+                <div>
+                  <label>Jumlah Pegawai</label>
+                  <strong>{selectedRecruiter.employeeRangeLabel}</strong>
                 </div>
                 <div>
                   <label>Lowongan Aktif</label>
                   <strong>{numberFormatter.format(selectedRecruiter.active_jobs_count ?? 0)}</strong>
                 </div>
                 <div>
-                  <label>Fokus Hiring</label>
-                  <strong>{selectedRecruiter.hiringFocusLabel}</strong>
+                  <label>Link Company</label>
+                  <strong>{selectedRecruiter.companyLinkLabel}</strong>
                 </div>
                 <div>
                   <label>Paket Recruiter</label>
@@ -3255,6 +3291,19 @@ const AdminDashboardPage = () => {
               </div>
 
               <div className="superadmin-detail-block">
+                <label>Dokumen Legal</label>
+                <p>
+                  {selectedRecruiter.company_legal_document_name
+                    ? `${selectedRecruiter.company_legal_document_name}${
+                        selectedRecruiter.company_legal_document_uploaded_at
+                          ? ` • Diunggah ${formatDateShort(selectedRecruiter.company_legal_document_uploaded_at)}`
+                          : ''
+                      }`
+                    : 'Dokumen legal perusahaan belum diunggah.'}
+                </p>
+              </div>
+
+              <div className="superadmin-detail-block">
                 <label>Catatan Verifikasi</label>
                 <p>
                   {selectedRecruiter.verification_notes ||
@@ -3262,6 +3311,8 @@ const AdminDashboardPage = () => {
                       ? selectedRecruiter.verified_at
                         ? `Diverifikasi pada ${formatDateShort(selectedRecruiter.verified_at)}.`
                         : 'Recruiter telah diverifikasi oleh admin.'
+                      : selectedRecruiter.verification_submitted_at
+                        ? `Data diajukan pada ${formatDateShort(selectedRecruiter.verification_submitted_at)} dan sedang menunggu review.`
                       : 'Belum ada catatan verifikasi khusus.')}
                 </p>
               </div>

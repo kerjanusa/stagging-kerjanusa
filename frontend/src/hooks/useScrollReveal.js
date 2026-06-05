@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useEffect } from 'react';
 
 const REVEAL_SELECTOR = '[data-reveal]';
 
@@ -6,7 +6,7 @@ const REVEAL_SELECTOR = '[data-reveal]';
  * Register scroll-based reveal animations for elements marked with the shared reveal attribute.
  */
 const useScrollReveal = (routeKey) => {
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return undefined;
     }
@@ -81,23 +81,16 @@ const useScrollReveal = (routeKey) => {
       }
     };
 
-    registerTree(document.body);
-
-    const mutationObserver = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          registerTree(node);
-        });
-      });
+    const firstFrameId = window.requestAnimationFrame(() => {
+      registerTree(document.body);
     });
-
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
+    const secondFrameId = window.requestAnimationFrame(() => {
+      registerTree(document.body);
     });
 
     return () => {
-      mutationObserver.disconnect();
+      window.cancelAnimationFrame(firstFrameId);
+      window.cancelAnimationFrame(secondFrameId);
       observer.disconnect();
     };
   }, [routeKey]);

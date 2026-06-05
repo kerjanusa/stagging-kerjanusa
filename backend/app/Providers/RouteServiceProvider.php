@@ -58,7 +58,7 @@ class RouteServiceProvider extends ServiceProvider
                 ->middleware('api')
                 ->group(base_path('routes/api.php'));
 
-            // Some Vercel PHP entrypoints arrive at Laravel with PATH_INFO stripped of the
+            // Some deployment entrypoints arrive at Laravel with PATH_INFO stripped of the
             // public /api prefix (for example /api/login can reach Laravel as /login).
             // Registering a second, unprefixed copy keeps those routes resolvable while the
             // explicit /api-prefixed group continues to serve exact wrapper routes.

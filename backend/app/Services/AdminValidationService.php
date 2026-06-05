@@ -24,7 +24,7 @@ class AdminValidationService
                 'company_name' => 'nullable|string|max:255',
                 'account_status' => ['nullable', Rule::in(User::ACCOUNT_STATUSES)],
                 'account_status_reason' => 'nullable|string|max:1000',
-                'verification_status' => ['nullable', Rule::in(['pending', 'verified'])],
+                'verification_status' => ['nullable', Rule::in(['draft', 'pending', 'verified'])],
                 'verification_notes' => 'nullable|string|max:1000',
                 'plan_code' => ['nullable', Rule::in(collect($this->recruiterPlanService->getPlanCatalog())->pluck('code')->all())],
                 'kn_credit' => 'nullable|integer|min:0',

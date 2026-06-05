@@ -58,6 +58,27 @@ const getValidationErrors = (error) =>
   typeof error === 'object' && error?.errors ? error.errors : {};
 
 /**
+ * Format the reset-request timestamp from the email link so users can spot the newest email.
+ */
+const formatRequestedAtLabel = (rawValue) => {
+  if (!rawValue) {
+    return '';
+  }
+
+  const parsedDate = new Date(rawValue);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return rawValue;
+  }
+
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'Asia/Jakarta',
+  }).format(parsedDate);
+};
+
+/**
  * Menyediakan flow penggantian password baru dari link reset yang dikirim via email.
  */
 const ResetPasswordPage = () => {
@@ -71,6 +92,7 @@ const ResetPasswordPage = () => {
 
   const token = searchParams.get('token')?.trim() || '';
   const email = searchParams.get('email')?.trim() || '';
+  const requestedAt = searchParams.get('requested_at')?.trim() || '';
   const requestedRole = searchParams.get('role');
   const entryKey =
     requestedRole === 'candidate' || requestedRole === 'recruiter'
@@ -90,6 +112,7 @@ const ResetPasswordPage = () => {
         : `${APP_ROUTES.forgotPassword}?role=${entryKey}`,
     [entryKey]
   );
+  const requestedAtLabel = useMemo(() => formatRequestedAtLabel(requestedAt), [requestedAt]);
   const isLinkMissing = !token || !email;
 
   const getFieldError = (fieldName) => validationErrors?.[fieldName]?.[0] || '';
@@ -211,12 +234,26 @@ const ResetPasswordPage = () => {
                 {error && !getFieldError('token') && !hasFieldErrors && (
                   <div className="error-message">{error}</div>
                 )}
-                {getFieldError('token') && <div className="error-message">{getFieldError('token')}</div>}
+                {getFieldError('token') && (
+                  <div className="error-message">
+                    {getFieldError('token')}
+                    {requestedAtLabel
+                      ? ` Link ini berasal dari permintaan ${requestedAtLabel}.`
+                      : ''}
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label htmlFor="reset_password_email">Email</label>
                   <input id="reset_password_email" type="email" value={email} readOnly disabled />
                 </div>
+
+                {requestedAtLabel && (
+                  <p className="auth-forgot-inline-note">
+                    Link ini dibuat pada {requestedAtLabel}. Jika Anda meminta reset lebih dari
+                    sekali, gunakan email dengan waktu paling baru.
+                  </p>
+                )}
 
                 <PasswordField
                   id="reset_password_new"
@@ -258,6 +295,14 @@ const ResetPasswordPage = () => {
                   Setelah password berhasil diubah, semua sesi login lama untuk akun ini akan
                   diminta masuk kembali.
                 </p>
+
+                {getFieldError('token') && (
+                  <div className="auth-forgot-success-actions">
+                    <Link to={forgotPasswordTo} className="btn btn-outline">
+                      Minta link reset terbaru
+                    </Link>
+                  </div>
+                )}
 
                 <p className="auth-link auth-forgot-back-link">
                   <Link to={loginTo}>Kembali ke login</Link>

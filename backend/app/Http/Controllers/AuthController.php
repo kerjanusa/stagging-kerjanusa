@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Notifications\ResetPasswordNotification;
 use App\Requests\Auth\ChangePasswordRequest;
 use App\Requests\Auth\ForgotPasswordRequest;
 use App\Requests\Auth\LoginRequest;
@@ -18,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Str;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -133,21 +135,69 @@ class AuthController extends Controller
      */
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        $validated = $request->validated();
+        $debugResetUser = null;
+        $debugResetToken = null;
 
-        PasswordBroker::sendResetLink([
-            'email' => $validated['email'],
-        ]);
-        $this->auditLogService->record('auth.password_reset_requested', [
-            'action' => 'forgot_password',
-            'step' => 'send_reset_link',
-            'identifier_hash' => $this->hashIdentifier($validated['email']),
-            'result' => 'accepted',
-        ], null, AuthService::class);
+        try {
+            $validated = $request->validated();
+            $identifierHash = $this->hashIdentifier($validated['email']);
+            $broker = PasswordBroker::broker();
+            $candidateUser = $broker->getUser([
+                'email' => $validated['email'],
+            ]);
 
-        return response()->json([
-            'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
-        ]);
+            if (is_object($candidateUser)) {
+                $debugResetUser = $candidateUser;
+                $debugResetToken = $broker->createToken($candidateUser);
+
+                try {
+                    if (method_exists($candidateUser, 'sendPasswordResetNotification')) {
+                        $candidateUser->sendPasswordResetNotification($debugResetToken);
+                    }
+                } catch (Throwable $exception) {
+                    $this->securityEventService->record('auth.password_reset_delivery_failed', [
+                        'action' => 'forgot_password',
+                        'step' => 'send_reset_link',
+                        'identifier_hash' => $identifierHash,
+                        'result' => 'degraded',
+                        'exception_class' => $exception::class,
+                        'exception_message' => $exception->getMessage(),
+                    ], null, 'error', AuthService::class);
+
+                    return response()->json([
+                        'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
+                    ] + $this->passwordResetDebugPayload($debugResetUser, $debugResetToken));
+                }
+            }
+
+            $this->auditLogService->record('auth.password_reset_requested', [
+                'action' => 'forgot_password',
+                'step' => 'send_reset_link',
+                'identifier_hash' => $identifierHash,
+                'result' => 'accepted',
+            ], null, AuthService::class);
+
+            error_log(sprintf(
+                'forgot_password_state user=%s token=%s expose=%s',
+                is_object($debugResetUser) ? get_class($debugResetUser) : 'null',
+                $debugResetToken ? 'yes' : 'no',
+                $this->shouldExposePasswordResetLink() ? 'yes' : 'no'
+            ));
+
+            return response()->json([
+                'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
+            ] + $this->passwordResetDebugPayload($debugResetUser, $debugResetToken));
+        } catch (Throwable $exception) {
+            error_log(sprintf(
+                'forgot_password_unhandled %s: %s',
+                $exception::class,
+                $exception->getMessage()
+            ));
+
+            return response()->json([
+                'message' => self::FORGOT_PASSWORD_SUCCESS_MESSAGE,
+            ] + $this->passwordResetDebugPayload($debugResetUser, $debugResetToken));
+        }
     }
 
     /**
@@ -312,5 +362,53 @@ class AuthController extends Controller
         }
 
         return hash('sha256', $normalizedValue);
+    }
+
+    /**
+     * Expose a staging-only reset URL when email delivery is not dependable.
+     */
+    private function passwordResetDebugPayload(mixed $user, ?string $token): array
+    {
+        try {
+            if (
+                !$user ||
+                !is_object($user) ||
+                !$token ||
+                (
+                    !$this->shouldExposePasswordResetLink() &&
+                    !str_contains((string) config('app.url'), 'stagging-kerjanusa')
+                )
+            ) {
+                return [];
+            }
+
+            $notification = new ResetPasswordNotification($token);
+
+            error_log(sprintf(
+                'forgot_password_debug_payload_emit email=%s',
+                (string) ($user->email ?? 'unknown')
+            ));
+
+            return [
+                'debug_reset_url' => $notification->resetUrl($user),
+                'debug_reset_expires_minutes' => $notification->expireMinutes(),
+            ];
+        } catch (Throwable $exception) {
+            error_log(sprintf(
+                'forgot_password_debug_payload_failed %s: %s',
+                $exception::class,
+                $exception->getMessage()
+            ));
+
+            return [];
+        }
+    }
+
+    /**
+     * Limit debug reset-link exposure to explicitly enabled environments such as staging.
+     */
+    private function shouldExposePasswordResetLink(): bool
+    {
+        return (bool) config('mail.password_reset_expose_link', false);
     }
 }

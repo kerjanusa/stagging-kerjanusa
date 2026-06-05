@@ -1,6 +1,15 @@
 const CANDIDATE_APPLY_INTENT_STORAGE_KEY = 'candidate_apply_intent';
 const CANDIDATE_APPLY_INTENT_TTL_MS = 30 * 60 * 1000;
-const ALLOWED_FILTER_KEYS = ['search', 'job_type', 'experience_level', 'location'];
+const ALLOWED_FILTER_KEYS = [
+  'search',
+  'company_name',
+  'job_type',
+  'experience_level',
+  'location',
+  'salary_minimum',
+  'saved_only',
+  'recent_only',
+];
 
 /**
  * Return sessionStorage only when the code runs in a browser context.

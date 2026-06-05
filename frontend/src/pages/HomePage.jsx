@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import LandingRegisterForm from '../components/LandingRegisterForm.jsx';
 import useAuth from '../hooks/useAuth.js';
+import { CONTACT_WHATSAPP_LINK } from '../utils/contactLinks.js';
+import { RECRUITER_PLAN_OPTIONS } from '../utils/recruiterPlans.js';
 import { getDefaultRouteForRole, normalizeUserRole } from '../utils/routeHelpers.js';
 import '../styles/home.css';
 
@@ -59,33 +61,120 @@ const faqItems = [
   },
 ];
 
-const comparisonRows = [
+const recruiterPackageColumns = RECRUITER_PLAN_OPTIONS.map((plan) => ({
+  code: plan.code,
+  label: plan.label,
+}));
+
+const recruiterPackageRows = [
   {
-    feature: 'Jumlah lowongan aktif gratis',
-    kerjaNusa: 'Unlimited',
-    otherPlatforms: 'Max. 1-5',
+    feature: 'Cocok untuk',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, plan.description])
+    ),
   },
   {
-    feature: 'Jumlah pelamar yang dapat diproses secara gratis',
-    kerjaNusa: 'Unlimited',
-    otherPlatforms: 'Terbatas',
+    feature: 'Lowongan aktif',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [
+        plan.code,
+        plan.job_limit === null ? 'Unlimited' : `${plan.job_limit} lowongan`,
+      ])
+    ),
   },
   {
-    feature: 'Auto-fill template undangan wawancara via WhatsApp',
-    kerjaNusa: true,
-    otherPlatforms: false,
+    feature: 'Talent search',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, `${plan.talent_result_limit} kandidat`])
+    ),
   },
   {
-    feature: 'Fitur Premium: Fleksibel, bayar sesuai penggunaan',
-    kerjaNusa: true,
-    otherPlatforms: false,
+    feature: 'CV kandidat terlihat',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, `${plan.visible_resume_files} CV`])
+    ),
   },
   {
-    feature: 'Talent Search: Langsung hubungi kandidat yang sesuai',
-    kerjaNusa: 'Rp 20K per buka CV',
-    otherPlatforms: 'Mulai dari Rp 70K per buka CV',
+    feature: 'Sertifikat kandidat terlihat',
+    values: Object.fromEntries(
+      RECRUITER_PLAN_OPTIONS.map((plan) => [
+        plan.code,
+        plan.visible_certificate_files > 0
+          ? `${plan.visible_certificate_files} sertifikat`
+          : 'Belum tersedia',
+      ])
+    ),
+  },
+  {
+    feature: 'Chat dengan kandidat',
+    values: Object.fromEntries(RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, true])),
+  },
+  {
+    feature: 'Chat dengan superadmin',
+    values: Object.fromEntries(RECRUITER_PLAN_OPTIONS.map((plan) => [plan.code, true])),
   },
 ];
+
+const recruiterPackageMobileCards = RECRUITER_PLAN_OPTIONS.map((plan) => ({
+  ...plan,
+  mobileTitle:
+    plan.code === 'starter'
+      ? 'Mulai Rekrut'
+      : plan.code === 'growth'
+        ? 'Tim Berkembang'
+        : 'Enterprise',
+  highlightLabel: plan.code === 'growth' ? 'Populer' : '',
+  featureItems: [
+    {
+      label:
+        plan.job_limit === null ? 'Unlimited lowongan' : `${plan.job_limit} lowongan aktif`,
+      available: true,
+      tone: plan.job_limit === null ? 'accent' : 'positive',
+    },
+    {
+      label: `${plan.talent_result_limit} kandidat talent search`,
+      available: true,
+      tone: 'positive',
+    },
+    {
+      label: `${plan.visible_resume_files} CV terlihat`,
+      available: true,
+      tone: 'positive',
+    },
+    {
+      label:
+        plan.visible_certificate_files > 0
+          ? `${plan.visible_certificate_files} sertifikat terlihat`
+          : 'Belum tersedia sertifikat',
+      available: plan.visible_certificate_files > 0,
+      tone: plan.visible_certificate_files > 0 ? 'positive' : 'muted',
+    },
+    {
+      label: 'Chat aktif',
+      available: true,
+      tone: 'positive',
+    },
+  ],
+}));
+
+const packageTableColumnTemplate = `minmax(240px, 1.85fr) repeat(${recruiterPackageColumns.length}, minmax(150px, 0.78fr))`;
+
+const formatPackageFeatureValue = (value) => {
+  if (typeof value === 'boolean') {
+    return (
+      <span
+        className={`comparison-status${
+          value ? ' comparison-status-positive' : ' comparison-status-negative'
+        }`}
+        aria-label={value ? 'Tersedia' : 'Tidak tersedia'}
+      >
+        {value ? '✓' : '×'}
+      </span>
+    );
+  }
+
+  return value;
+};
 
 const aboutMetrics = [
   {
@@ -121,10 +210,36 @@ const aboutPillars = [
 ];
 
 const heroBenefitItems = [
-  'Jumlah loker aktif unlimited',
-  'Screening CV lebih efisien',
-  'Cari kandidat dengan Talent Search',
-  'Jangkau 10 juta+ kandidat',
+  'Proses melamar lebih mudah dan cepat',
+  'Lowongan selalu diperbarui setiap hari',
+  'Terhubung dengan perusahaan terpercaya',
+  'Simpan lowongan favorit',
+  'Pantau status lamaran real-time',
+  'Rekomendasi kerja yang lebih tepat',
+];
+
+const heroCandidateSlides = [
+  {
+    image: '/hero-slides/review-1.jpeg',
+    badge: 'Melamar cepat',
+    title: 'Buat profil sekali, lalu lamar lebih praktis.',
+    description:
+      'Semua data inti pelamar tersimpan agar Anda tidak perlu mengulang proses dari awal setiap kali melamar.',
+  },
+  {
+    image: '/hero-slides/review-2.jpeg',
+    badge: 'Rekomendasi kerja',
+    title: 'Temukan peluang yang sesuai tujuan kariermu.',
+    description:
+      'KerjaNusa membantu menampilkan peluang kerja yang dekat dengan keahlian, pengalaman, dan minat karier Anda.',
+  },
+  {
+    image: '/hero-slides/review-3.jpeg',
+    badge: 'Pantau status',
+    title: 'Cek proses lamaran dari satu area kandidat.',
+    description:
+      'Simpan lowongan, lihat update recruiter, dan lanjutkan proses rekrutmen dari satu tampilan yang nyaman.',
+  },
 ];
 
 /**
@@ -133,6 +248,7 @@ const heroBenefitItems = [
 const HomePage = () => {
   const { user } = useAuth();
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
+  const [activeHeroSlide, setActiveHeroSlide] = useState(0);
   const userRole = normalizeUserRole(user?.role);
 
   if (user && userRole !== 'recruiter') {
@@ -145,16 +261,16 @@ const HomePage = () => {
           primary: { label: 'Pasang Loker Sekarang', to: '/recruiter/jobs/create' },
           secondary: { label: 'Dashboard Company', to: '/recruiter' },
           supportLinks: [
-            { label: 'Cari Pekerjaan', to: '/jobs' },
+            { label: 'Lowongan Kerja', to: '/jobs' },
             { label: 'Tentang Kami', to: '/platform' },
           ],
         }
       : userRole === 'candidate'
         ? {
-            primary: { label: 'Lihat Lowongan', to: '/jobs' },
-            secondary: { label: 'Info Data Diri', to: '/candidate' },
+            primary: { label: 'Lihat Lowongan Kerja', to: '/jobs' },
+            secondary: { label: 'Profil Siap Lamar', to: '/candidate#profile' },
             supportLinks: [
-              { label: 'Chat Kandidat', to: '/candidate#chat' },
+              { label: 'Chat Kandidat', to: '/candidate#messages' },
               { label: 'Tentang Kami', to: '/platform' },
             ],
           }
@@ -167,14 +283,22 @@ const HomePage = () => {
             ],
           }
     : {
-        primary: { label: 'Pasang Loker Sekarang', to: '/register?role=recruiter' },
-        secondary: { label: 'Lihat Lowongan', to: '/jobs' },
+        primary: { label: 'Daftar Sebagai Pelamar', to: '/register?role=candidate' },
+        secondary: { label: 'Lihat Lowongan Kerja', to: '/jobs' },
         supportLinks: [
-          { label: 'Login Recruiter', to: '/login?role=recruiter' },
-          { label: 'Daftar Pelamar', to: '/register?role=candidate' },
+          { label: 'Login Pelamar', to: '/login?role=candidate' },
+          { label: 'Daftar Recruiter', to: '/register?role=recruiter' },
           { label: 'Tentang Kami', to: '/platform' },
         ],
       };
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setActiveHeroSlide((currentIndex) => (currentIndex + 1) % heroCandidateSlides.length);
+    }, 3200);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   /**
    * Membuka atau menutup satu item FAQ agar interaksi accordion tetap sederhana.
@@ -188,18 +312,31 @@ const HomePage = () => {
       <section className="home-hero">
         <div className="home-shell home-hero-grid">
           <div className="hero-copy" data-reveal data-reveal-delay="40ms">
-            <span className="hero-kicker">Dashboard Awal</span>
+            <span className="hero-kicker">Selamat Datang di KerjaNusa</span>
             <h1 className="hero-headline">
-              <span className="hero-headline-line">Pasang</span>
-              <span className="hero-headline-line">Loker</span>
-              <span className="hero-headline-line">Gratis</span>
-              <span className="hero-headline-line hero-headline-accent">TANPA BATAS!</span>
+              <span className="hero-headline-line">Temukan</span>
+              <span className="hero-headline-line">pekerjaan</span>
+              <span className="hero-headline-line">yang sesuai</span>
+              <span className="hero-headline-line hero-headline-accent">dengan tujuanmu</span>
             </h1>
             <span className="hero-headline-bar" aria-hidden="true" />
             <p className="hero-description hero-description-spotlight">
-              Kelola hiring dari publikasi lowongan sampai shortlist kandidat dalam tampilan
-              yang cepat, rapi, dan mudah dipakai tim recruiter.
+              Di KerjaNusa, kamu bisa menjelajahi peluang kerja dari berbagai perusahaan
+              terpercaya, mulai dari fresh graduate hingga posisi profesional berpengalaman.
             </p>
+            <p className="hero-description hero-description-secondary">
+              Buat profilmu sekali, lalu lamar pekerjaan lebih cepat dan praktis. Pantau status
+              lamaran secara real-time, simpan lowongan favorit, dan dapatkan rekomendasi kerja
+              yang sesuai dengan keahlian serta minat kariermu.
+            </p>
+
+            <div className="hero-feature-brief" aria-live="polite">
+              <span className="hero-feature-heading">{heroCandidateSlides[activeHeroSlide].badge}</span>
+              <p className="hero-feature-summary">
+                <strong>{heroCandidateSlides[activeHeroSlide].title}</strong>{' '}
+                {heroCandidateSlides[activeHeroSlide].description}
+              </p>
+            </div>
 
             <div className="hero-benefits" aria-label="Keunggulan utama KerjaNusa">
               {heroBenefitItems.map((benefit) => (
@@ -236,27 +373,27 @@ const HomePage = () => {
 
               <div className="hero-showcase-panel">
                 <div className="hero-showcase-badge hero-showcase-badge-top">
-                  Review video interview lebih jelas
+                  {heroCandidateSlides[activeHeroSlide].badge}
                 </div>
 
                 <div className="hero-phone-frame">
                   <img
-                    src="/hero-slides/review-1.jpeg"
-                    alt="Tampilan evaluasi kandidat KerjaNusa"
+                    src={heroCandidateSlides[activeHeroSlide].image}
+                    alt={heroCandidateSlides[activeHeroSlide].title}
                     className="hero-phone-screen"
                   />
                 </div>
 
                 <div className="hero-showcase-badge hero-showcase-badge-bottom">
-                  Shortlist kandidat lebih cepat
+                  {heroCandidateSlides[activeHeroSlide].title}
                 </div>
               </div>
 
               <div className="hero-showcase-note">
-                <strong>Publikasi, screening, dan shortlist dalam satu alur.</strong>
+                <strong>Mulai perjalanan kariermu hari ini bersama KerjaNusa.</strong>
                 <span>
-                  Cocok untuk recruiter yang ingin pasang lowongan cepat tanpa proses manual
-                  yang berulang.
+                  Temukan peluang terbaik untuk masa depanmu dari alur melamar yang lebih aman
+                  dan nyaman.
                 </span>
               </div>
             </div>
@@ -370,79 +507,112 @@ const HomePage = () => {
 
       <section className="home-register-section">
         <div className="home-shell">
-          <div className="comparison-card" data-reveal>
+          <div className="comparison-card" id="daftar-paket" data-reveal>
             <div className="comparison-heading">
-              <span className="comparison-kicker">Keunggulan Platform</span>
-              <h2>Solusi Rekrutmen yang Paling Berbeda</h2>
-              <p>Bandingkan langsung manfaat utama KerjaNusa dengan platform lainnya.</p>
+              <span className="comparison-kicker">Daftar paket</span>
+              <h2>Daftar Paket KerjaNusa untuk Recruiter</h2>
+              <p>Bandingkan langsung manfaat utama setiap layanan KerjaNusa sebelum mulai rekrut kandidat.</p>
             </div>
 
-            <div className="comparison-table" role="table" aria-label="Perbandingan platform rekrutmen">
+            <div
+              className="comparison-table"
+              role="table"
+              aria-label="Perbandingan platform rekrutmen"
+              style={{
+                '--comparison-table-columns': packageTableColumnTemplate,
+                '--comparison-table-min-width': '760px',
+              }}
+            >
               <div className="comparison-table-head" role="rowgroup">
                 <div className="comparison-table-row comparison-table-row-head" role="row">
                   <div className="comparison-cell comparison-cell-feature" role="columnheader">
-                    Yang dibandingkan
+                    Fitur
                   </div>
-                  <div className="comparison-cell comparison-cell-brand comparison-cell-brand-primary" role="columnheader">
-                    KerjaNusa
-                  </div>
-                  <div className="comparison-cell comparison-cell-brand" role="columnheader">
-                    Platform Lainnya
-                  </div>
+                  {recruiterPackageColumns.map((plan, index) => (
+                    <div
+                      key={plan.code}
+                      className={`comparison-cell comparison-cell-brand${
+                        index === 0 ? ' comparison-cell-brand-primary' : ''
+                      }`}
+                      role="columnheader"
+                    >
+                      {plan.label}
+                    </div>
+                  ))}
                 </div>
               </div>
 
               <div className="comparison-table-body" role="rowgroup">
-                {comparisonRows.map((row) => (
+                {recruiterPackageRows.map((row) => (
                   <div key={row.feature} className="comparison-table-row" role="row">
                     <div
                       className="comparison-cell comparison-cell-feature"
                       role="cell"
-                      data-label="Yang dibandingkan"
+                      data-label="Fitur"
                     >
                       {row.feature}
                     </div>
-                    <div
-                      className="comparison-cell comparison-cell-value comparison-cell-value-primary"
-                      role="cell"
-                      data-label="KerjaNusa"
-                    >
-                      {typeof row.kerjaNusa === 'boolean' ? (
-                        <span
-                          className={`comparison-status${
-                            row.kerjaNusa ? ' comparison-status-positive' : ' comparison-status-negative'
-                          }`}
-                          aria-label={row.kerjaNusa ? 'Tersedia' : 'Tidak tersedia'}
-                        >
-                          {row.kerjaNusa ? '✓' : '×'}
-                        </span>
-                      ) : (
-                        row.kerjaNusa
-                      )}
-                    </div>
-                    <div
-                      className="comparison-cell comparison-cell-value"
-                      role="cell"
-                      data-label="Platform Lainnya"
-                    >
-                      {typeof row.otherPlatforms === 'boolean' ? (
-                        <span
-                          className={`comparison-status${
-                            row.otherPlatforms
-                              ? ' comparison-status-positive'
-                              : ' comparison-status-negative'
-                          }`}
-                          aria-label={row.otherPlatforms ? 'Tersedia' : 'Tidak tersedia'}
-                        >
-                          {row.otherPlatforms ? '✓' : '×'}
-                        </span>
-                      ) : (
-                        row.otherPlatforms
-                      )}
-                    </div>
+                    {recruiterPackageColumns.map((plan, index) => (
+                      <div
+                        key={`${row.feature}-${plan.code}`}
+                        className={`comparison-cell comparison-cell-value${
+                          index === 0 ? ' comparison-cell-value-primary' : ''
+                        }`}
+                        role="cell"
+                        data-label={plan.label}
+                      >
+                        {formatPackageFeatureValue(row.values[plan.code])}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="comparison-mobile-cards" aria-label="Paket recruiter untuk mobile">
+              {recruiterPackageMobileCards.map((planCard) => (
+                <article
+                  key={planCard.code}
+                  className={`comparison-mobile-card comparison-mobile-card-${planCard.code}`}
+                >
+                  {planCard.highlightLabel ? (
+                    <span className="comparison-mobile-card-badge">
+                      {planCard.highlightLabel}
+                    </span>
+                  ) : null}
+
+                  <div className="comparison-mobile-card-head">
+                    <span className="comparison-mobile-card-kicker">{planCard.label}</span>
+                    <h3>{planCard.mobileTitle}</h3>
+                    <p>{planCard.description}</p>
+                  </div>
+
+                  <div className="comparison-mobile-card-list">
+                    {planCard.featureItems.map((item) => (
+                      <div
+                        key={`${planCard.code}-${item.label}`}
+                        className={`comparison-mobile-card-item comparison-mobile-card-item-${item.tone}${
+                          item.available ? ' is-available' : ' is-unavailable'
+                        }`}
+                      >
+                        <span className="comparison-mobile-card-icon" aria-hidden="true">
+                          {item.tone === 'accent' ? '∞' : item.available ? '✓' : '×'}
+                        </span>
+                        <span>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <a
+                    className="comparison-mobile-card-button"
+                    href={CONTACT_WHATSAPP_LINK}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Pilih Paket
+                  </a>
+                </article>
+              ))}
             </div>
           </div>
 

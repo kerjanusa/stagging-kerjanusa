@@ -10,6 +10,7 @@ const HomePage = lazy(() => import('./pages/HomePage.jsx'));
 const AboutPage = lazy(() => import('./pages/AboutPage.jsx'));
 const PlatformPage = lazy(() => import('./pages/PlatformPage.jsx'));
 const JobListPage = lazy(() => import('./pages/JobListPage.jsx'));
+const JobApplyPage = lazy(() => import('./pages/JobApplyPage.jsx'));
 const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage.jsx'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage.jsx'));
@@ -144,7 +145,14 @@ function AppLayout() {
               </GuestRoute>
             }
           />
-          <Route path={APP_ROUTES.landing} element={<HomePage />} />
+          <Route
+            path={APP_ROUTES.landing}
+            element={
+              <ProtectedRoute allowedRoles={['recruiter']} loginRole="recruiter">
+                <HomePage />
+              </ProtectedRoute>
+            }
+          />
           <Route path={APP_ROUTES.about} element={<AboutPage />} />
           <Route path={APP_ROUTES.platform} element={<PlatformPage />} />
           <Route
@@ -152,6 +160,14 @@ function AppLayout() {
             element={
               <main className="app-container app-container-jobs">
                 <JobListPage />
+              </main>
+            }
+          />
+          <Route
+            path={`${APP_ROUTES.jobs}/:jobId/apply`}
+            element={
+              <main className="app-container app-container-jobs app-container-job-apply">
+                <JobApplyPage />
               </main>
             }
           />

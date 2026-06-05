@@ -15,7 +15,7 @@ return [
 
     'asset_url' => env('ASSET_URL'),
 
-    'frontend_url' => env('FRONTEND_APP_URL', 'https://uat-kerjanusa.vercel.app'),
+    'frontend_url' => env('FRONTEND_APP_URL', 'http://localhost:5173'),
 
     'timezone' => env('APP_TIMEZONE', 'UTC'),
 

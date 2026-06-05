@@ -2,8 +2,7 @@
 
 return [
 
-    // This backend is deployed as a dedicated API project on Vercel. The
-    // runtime catch-all function forwards requests without the public `/api`
+    // Some deployment adapters can forward requests without the public `/api`
     // prefix, so CORS must apply to every path the app can see internally.
     'paths' => ['*'],
 

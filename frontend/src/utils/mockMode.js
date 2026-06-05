@@ -1,4 +1,4 @@
-const PRODUCTION_API_FALLBACK = 'https://kerjanusa-backend.vercel.app/api';
+const PRODUCTION_API_FALLBACK = '';
 
 /**
  * Resolve the backend API base URL from env configuration or the production fallback.
