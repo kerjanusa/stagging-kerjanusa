@@ -34,6 +34,7 @@ $databaseHealthResponder = function (Request $request) {
             'jobs',
             'applications',
             'password_reset_tokens',
+            'personal_access_tokens',
         ];
 
         $tables = [];

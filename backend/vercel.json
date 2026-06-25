@@ -7,6 +7,10 @@
     {
       "source": "/api/(.*)",
       "destination": "/api/index.php"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.php"
     }
   ],
   "functions": {
