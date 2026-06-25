@@ -3,13 +3,16 @@
   "regions": [
     "hnd1"
   ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/api",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.php"
-    },
-    {
-      "source": "/(.*)",
       "destination": "/api/index.php"
     }
   ],
