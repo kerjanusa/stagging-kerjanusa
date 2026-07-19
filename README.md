@@ -84,6 +84,15 @@ npm run dev
 
 Frontend akan berjalan di: `http://localhost:3001`
 
+## Recommended Vercel Deployment
+
+Untuk Vercel, setup recommended project ini adalah satu repo GitHub dengan dua project Vercel terpisah:
+
+- Backend: root directory `backend`
+- Frontend: root directory `frontend`
+
+Panduan awam step-by-step ada di [VERCEL_RECOMMENDED_SETUP.md](VERCEL_RECOMMENDED_SETUP.md).
+
 ## 📚 Documentation
 
 - [Quick Start Guide](QUICK_START.md) - Setup dan testing cepat
