@@ -22,3 +22,5 @@ backend/storage/logs/
 
 # Common
 *.log
+API-KEY-BREVO.txt
+env-example-vercel.txt

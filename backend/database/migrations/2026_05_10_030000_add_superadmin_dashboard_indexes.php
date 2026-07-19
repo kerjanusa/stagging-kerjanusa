@@ -7,6 +7,14 @@ return new class extends Migration
 {
     private function indexExists(string $table, string $indexName): bool
     {
+        if (DB::getDriverName() === 'pgsql') {
+            return DB::table('pg_indexes')
+                ->where('schemaname', DB::getConfig('schema') ?: 'public')
+                ->where('tablename', $table)
+                ->where('indexname', $indexName)
+                ->exists();
+        }
+
         $databaseName = DB::getDatabaseName();
 
         if (!filled($databaseName)) {
@@ -20,13 +28,25 @@ return new class extends Migration
             ->exists();
     }
 
+    private function quoteIdentifier(string $identifier): string
+    {
+        $quote = DB::getDriverName() === 'mysql' ? '`' : '"';
+
+        return $quote . str_replace($quote, $quote . $quote, $identifier) . $quote;
+    }
+
     private function createIndexIfMissing(string $table, string $indexName, string $columns): void
     {
         if ($this->indexExists($table, $indexName)) {
             return;
         }
 
-        DB::statement(sprintf('CREATE INDEX %s ON %s (%s)', $indexName, $table, $columns));
+        DB::statement(sprintf(
+            'CREATE INDEX %s ON %s (%s)',
+            $this->quoteIdentifier($indexName),
+            $this->quoteIdentifier($table),
+            $columns
+        ));
     }
 
     private function dropIndexIfExists(string $table, string $indexName): void
@@ -35,7 +55,17 @@ return new class extends Migration
             return;
         }
 
-        DB::statement(sprintf('DROP INDEX %s ON %s', $indexName, $table));
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement(sprintf(
+                'DROP INDEX %s ON %s',
+                $this->quoteIdentifier($indexName),
+                $this->quoteIdentifier($table)
+            ));
+
+            return;
+        }
+
+        DB::statement(sprintf('DROP INDEX %s', $this->quoteIdentifier($indexName)));
     }
 
     public function up(): void
