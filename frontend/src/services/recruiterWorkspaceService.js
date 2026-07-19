@@ -282,6 +282,21 @@ const paginateItems = (items, page = 1, perPage = 12) => {
   };
 };
 
+const downloadBrowserBlob = (blob, filename) => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return;
+  }
+
+  const objectUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename || 'cv-kandidat.pdf';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(objectUrl);
+};
+
 /**
  * Derive a simple candidate grade from readiness and skill depth in demo mode.
  */
@@ -312,7 +327,13 @@ const buildMockTalentCandidates = (recruiter) => {
       const preferredRoles = (profile.preferredRoles || []).filter(Boolean);
       const preferredLocations = (profile.preferredLocations || []).filter(Boolean);
       const skills = (profile.skills || []).filter(Boolean);
-      const resumeFiles = (profile.resumeFiles || []).slice(0, planConfig.visible_resume_files);
+      const resumeFileDetails = (profile.resumeFileDetails || []).slice(
+        0,
+        planConfig.visible_resume_files
+      );
+      const resumeFiles = resumeFileDetails.length
+        ? resumeFileDetails.map((detail) => detail.name).filter(Boolean)
+        : [];
       const certificateFiles = (profile.certificateFiles || []).slice(
         0,
         planConfig.visible_certificate_files
@@ -326,7 +347,7 @@ const buildMockTalentCandidates = (recruiter) => {
         preferredRoles.length > 0,
         preferredLocations.length > 0,
         skills.length > 0,
-        (profile.resumeFiles || []).length > 0,
+        (profile.resumeFileDetails || []).length > 0,
       ];
       const profileReadinessPercent = Math.round(
         (readinessItems.filter(Boolean).length / readinessItems.length) * 100
@@ -342,7 +363,7 @@ const buildMockTalentCandidates = (recruiter) => {
         email: candidate.email,
         phone: candidate.phone,
         profile_summary: profile.profileSummary || '',
-        profile_photo_url: profile.photoDataUrl || '',
+        profile_photo_url: profile.photoDataUrl || candidate.profile_picture || '',
         current_address: profile.currentAddress || '',
         gender: normalizeGenderValue(profile.gender),
         age: resolveCandidateAge(profile),
@@ -358,14 +379,15 @@ const buildMockTalentCandidates = (recruiter) => {
         applications_count: candidateApplications.length,
         profile_readiness_percent: profileReadinessPercent,
         resume_files: resumeFiles,
+        resume_file_details: resumeFileDetails,
         certificate_files: certificateFiles,
         document_access: {
           resume_files_visible: resumeFiles.length,
-          resume_files_total: (profile.resumeFiles || []).length,
+          resume_files_total: (profile.resumeFileDetails || []).length,
           certificate_files_visible: certificateFiles.length,
           certificate_files_total: (profile.certificateFiles || []).length,
           upgrade_required:
-            resumeFiles.length < (profile.resumeFiles || []).length ||
+            resumeFiles.length < (profile.resumeFileDetails || []).length ||
             certificateFiles.length < (profile.certificateFiles || []).length,
         },
       };
@@ -559,6 +581,23 @@ class RecruiterWorkspaceService {
     } catch (error) {
       throw error.response?.data || error.message;
     }
+  }
+
+  static async downloadCandidateResume(candidateId, resumeIndex = 0, fileName = 'cv-kandidat.pdf') {
+    if (shouldUseMockData) {
+      return false;
+    }
+
+    const response = await apiClient.get(
+      `/candidate-documents/${candidateId}/resumes/${resumeIndex}`,
+      {
+        responseType: 'blob',
+      }
+    );
+
+    downloadBrowserBlob(response.data, fileName);
+
+    return true;
   }
 }
 

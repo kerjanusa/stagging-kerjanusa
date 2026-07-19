@@ -36,6 +36,8 @@ class UpdateProfileRequest extends ApiFormRequest
             'company_name' => 'nullable|string|max:255',
             'phone' => ['nullable', 'string', 'max:32', Rule::unique('users', 'phone')->ignore($this->user()?->id)],
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'candidate_resume_files' => 'nullable|array|max:3',
+            'candidate_resume_files.*' => 'file|mimes:pdf|max:2048',
             'company_legal_document' => 'nullable|file|mimes:pdf,png,jpg,jpeg|max:2048',
             'candidate_profile' => 'nullable|array',
             'recruiter_profile' => 'nullable|array',
@@ -70,6 +72,9 @@ class UpdateProfileRequest extends ApiFormRequest
     {
         return [
             'phone.unique' => 'Nomor telepon sudah digunakan. Gunakan nomor telepon lain.',
+            'candidate_resume_files.max' => 'CV kandidat maksimal 3 file.',
+            'candidate_resume_files.*.mimes' => 'CV kandidat wajib berupa PDF.',
+            'candidate_resume_files.*.max' => 'Setiap CV kandidat maksimal 2 MB.',
             'company_legal_document.mimes' => 'Dokumen legal perusahaan wajib berupa PDF, PNG, JPG, atau JPEG.',
             'company_legal_document.max' => 'Dokumen legal perusahaan maksimal 2 MB.',
             'recruiter_profile.companyEmail.email' => 'Email perusahaan / PIC wajib menggunakan format email yang valid.',

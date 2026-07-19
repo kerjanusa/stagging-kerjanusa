@@ -300,11 +300,19 @@ const normalizeMockProfileUpdatePayload = (data) => {
     data?.recruiter_profile && typeof data.recruiter_profile === 'object'
       ? { ...data.recruiter_profile }
       : data?.recruiter_profile;
+  const candidateProfile =
+    data?.candidate_profile && typeof data.candidate_profile === 'object'
+      ? { ...data.candidate_profile }
+      : data?.candidate_profile;
   const normalizedPayload = {
     ...data,
+    candidate_profile: candidateProfile,
     recruiter_profile: recruiterProfile,
   };
   const companyLegalDocument = data?.company_legal_document;
+  const candidateResumeFiles = Array.isArray(data?.candidate_resume_files)
+    ? data.candidate_resume_files.filter(isFileLike).slice(0, 3)
+    : [];
 
   if (isFileLike(companyLegalDocument)) {
     normalizedPayload.recruiter_profile = {
@@ -332,7 +340,26 @@ const normalizeMockProfileUpdatePayload = (data) => {
     };
   }
 
+  if (candidateResumeFiles.length > 0) {
+    normalizedPayload.candidate_profile = {
+      ...(normalizedPayload.candidate_profile || {}),
+      resumeFiles: candidateResumeFiles.map((file) => file.name || 'cv-kandidat.pdf'),
+      resumeFileDetails: candidateResumeFiles.map((file, index) => ({
+        name: file.name || 'cv-kandidat.pdf',
+        mimeType: file.type || 'application/pdf',
+        size: Number(file.size || 0),
+        uploadedAt: new Date().toISOString(),
+        downloadUrl: `/candidate-documents/${normalizedPayload.id || 'mock'}/resumes/${index}`,
+      })),
+    };
+  }
+
+  if (isFileLike(normalizedPayload.profile_picture)) {
+    delete normalizedPayload.profile_picture;
+  }
+
   delete normalizedPayload.company_legal_document;
+  delete normalizedPayload.candidate_resume_files;
 
   return normalizedPayload;
 };

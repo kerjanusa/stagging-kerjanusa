@@ -3,6 +3,7 @@ import { mergeRecruiterPlanData } from './recruiterPlans.js';
 const RECRUITER_COMPANY_PROFILE_STORAGE_PREFIX = 'recruiter_company_profile';
 const RECRUITER_JOB_WORKFLOW_STORAGE_KEY = 'recruiter_job_workflow_state';
 const RECRUITER_APPLICATION_STAGE_STORAGE_KEY = 'recruiter_application_stage_state';
+const isInlineDataUrl = (value = '') => String(value || '').trim().startsWith('data:');
 
 export const RECRUITER_SECTION_OPTIONS = [
   { value: 'overview', label: 'Dashboard Awal' },
@@ -109,6 +110,8 @@ const mergeRecruiterCompanyProfile = (user, savedProfile) => {
     companyLocation: savedProfile.companyLocation || savedProfile.companyAddress || '',
     industry: savedProfile.industry || '',
     employeeRange: savedProfile.employeeRange || '',
+    companyLogoFileName: savedProfile.companyLogoFileName || '',
+    companyLogoDataUrl: savedProfile.companyLogoDataUrl || user?.profile_picture || '',
     companyLegalDocumentName: savedProfile.companyLegalDocumentName || '',
     companyLegalDocumentPath: savedProfile.companyLegalDocumentPath || '',
     companyLegalDocumentMimeType: savedProfile.companyLegalDocumentMimeType || '',
@@ -123,6 +126,13 @@ const mergeRecruiterCompanyProfile = (user, savedProfile) => {
     verifiedAt: savedProfile.verifiedAt || '',
   });
 };
+
+const sanitizeRecruiterProfileForDraftStorage = (profile) => ({
+  ...profile,
+  companyLogoDataUrl: isInlineDataUrl(profile?.companyLogoDataUrl)
+    ? ''
+    : profile?.companyLogoDataUrl || '',
+});
 
 /**
  * Read JSON from local storage with a safe fallback for SSR and parse failures.
@@ -213,7 +223,10 @@ export const saveRecruiterCompanyProfile = (user, profile) => {
     hiringFocus: profile?.hiringFocus?.trim?.() || '',
   });
 
-  writeStoredJson(getRecruiterCompanyProfileStorageKey(user?.id), normalizedProfile);
+  writeStoredJson(
+    getRecruiterCompanyProfileStorageKey(user?.id),
+    sanitizeRecruiterProfileForDraftStorage(normalizedProfile)
+  );
 
   return normalizedProfile;
 };

@@ -15,7 +15,11 @@ class TalentSearchCandidatePresenter
     public function present(User $candidate, User $recruiter): array
     {
         $profile = is_array($candidate->candidate_profile) ? $candidate->candidate_profile : [];
-        $resumeFiles = Arr::get($profile, 'resumeFiles', []);
+        $resumeFileDetails = Arr::get($profile, 'resumeFileDetails', []);
+        $resumeFiles = array_values(array_filter(array_map(
+            fn ($detail) => is_array($detail) ? (string) ($detail['name'] ?? '') : '',
+            $resumeFileDetails
+        )));
         $certificateFiles = Arr::get($profile, 'certificateFiles', []);
         $experienceEntries = collect(Arr::get($profile, 'experiences', []))
             ->filter(fn ($experience) => filled($experience['company'] ?? null) || filled($experience['position'] ?? null))
@@ -39,6 +43,11 @@ class TalentSearchCandidatePresenter
         );
         $limits = $this->recruiterPlanService->getVisibleDocumentLimits($recruiter);
         $visibleResumeFiles = array_slice($resumeFiles, 0, $limits['resume_files']);
+        $visibleResumeFileDetails = array_slice(
+            $resumeFileDetails,
+            0,
+            $limits['resume_files']
+        );
         $visibleCertificateFiles = array_slice($certificateFiles, 0, $limits['certificate_files']);
         $latestApplication = Application::query()
             ->where('candidate_id', $candidate->id)
@@ -53,7 +62,7 @@ class TalentSearchCandidatePresenter
             'email' => $candidate->email,
             'phone' => $candidate->phone,
             'profile_summary' => Arr::get($profile, 'profileSummary'),
-            'profile_photo_url' => Arr::get($profile, 'photoDataUrl'),
+            'profile_photo_url' => Arr::get($profile, 'photoDataUrl') ?: $candidate->profile_picture,
             'current_address' => Arr::get($profile, 'currentAddress'),
             'gender' => $this->normalizeGenderValue((string) Arr::get($profile, 'gender', '')),
             'age' => $this->resolveCandidateAge($profile),
@@ -70,6 +79,10 @@ class TalentSearchCandidatePresenter
             'grade' => $grade,
             'profile_readiness_percent' => $profileReadinessPercent,
             'resume_files' => $visibleResumeFiles,
+            'resume_file_details' => $this->presentResumeFileDetails(
+                $visibleResumeFileDetails,
+                $candidate->id
+            ),
             'certificate_files' => $visibleCertificateFiles,
             'document_access' => [
                 'resume_files_visible' => count($visibleResumeFiles),
@@ -86,6 +99,25 @@ class TalentSearchCandidatePresenter
                 'applied_at' => optional($latestApplication->applied_at)->toIso8601String(),
             ] : null,
         ];
+    }
+
+    private function presentResumeFileDetails(mixed $resumeFileDetails, int $candidateId): array
+    {
+        if (!is_array($resumeFileDetails)) {
+            return [];
+        }
+
+        return collect($resumeFileDetails)
+            ->filter(fn ($detail) => is_array($detail) && filled($detail['path'] ?? null))
+            ->values()
+            ->map(fn (array $detail, int $index) => [
+                'name' => trim((string) ($detail['name'] ?? 'cv-kandidat.pdf')),
+                'mimeType' => trim((string) ($detail['mimeType'] ?? 'application/pdf')),
+                'size' => max(0, (int) ($detail['size'] ?? 0)),
+                'uploadedAt' => $detail['uploadedAt'] ?? null,
+                'downloadUrl' => "/candidate-documents/{$candidateId}/resumes/{$index}",
+            ])
+            ->all();
     }
 
     private function resolveCandidateGrade(

@@ -57,6 +57,15 @@ const isPdfResumeFile = (file) => {
  * Mengecek nama file resume yang tersimpan agar hanya PDF yang diterima.
  */
 const isPdfResumeFileName = (fileName = '') => getFileExtension(fileName) === 'pdf';
+const createCompressedJpegFileName = (fileName = '', fallbackName = 'profile-photo') => {
+  const baseName = String(fileName || '')
+    .trim()
+    .replace(/\.[^/.]+$/, '')
+    .replace(/[^a-z0-9-_]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return `${baseName || fallbackName}.jpg`;
+};
 const EARTH_RADIUS_IN_KILOMETERS = 6371;
 const MAX_LOCATION_FALLBACK_DISTANCE_IN_KILOMETERS = 60;
 const DEFAULT_VISIBLE_EXPERIENCE_ENTRIES = 1;
@@ -75,6 +84,7 @@ const PROFILE_PHOTO_MAX_FILE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 const PROFILE_PHOTO_MAX_DIMENSION_IN_PIXELS = 480;
 const PROFILE_PHOTO_OUTPUT_QUALITY = 0.82;
 const PROFILE_PHOTO_ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const CANDIDATE_RESUME_MAX_FILE_SIZE_IN_BYTES = 2 * 1024 * 1024;
 const CANDIDATE_GENDER_OPTIONS = [
   { value: 'male', label: 'Laki-laki' },
   { value: 'female', label: 'Perempuan' },
@@ -523,7 +533,23 @@ const convertProfilePhotoToDataUrl = (file) =>
       context.fillRect(0, 0, targetWidth, targetHeight);
       context.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-      resolve(canvas.toDataURL('image/jpeg', PROFILE_PHOTO_OUTPUT_QUALITY));
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Foto profil belum bisa dikompres di browser ini.'));
+            return;
+          }
+
+          resolve({
+            dataUrl: canvas.toDataURL('image/jpeg', PROFILE_PHOTO_OUTPUT_QUALITY),
+            file: new File([blob], createCompressedJpegFileName(file.name), {
+              type: 'image/jpeg',
+            }),
+          });
+        },
+        'image/jpeg',
+        PROFILE_PHOTO_OUTPUT_QUALITY
+      );
     };
 
     image.onerror = () => {
@@ -803,6 +829,9 @@ const CandidateDashboardPage = () => {
   const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [candidateJobFilters, setCandidateJobFilters] = useState(createCandidateJobFilters);
   const [resumePreview, setResumePreview] = useState(null);
+  const [profilePhotoFile, setProfilePhotoFile] = useState(null);
+  const [shouldClearProfilePhoto, setShouldClearProfilePhoto] = useState(false);
+  const [resumeUploadFiles, setResumeUploadFiles] = useState([]);
 
   useEffect(() => {
     setActiveSection(resolveCandidateSectionFromHash(location.hash));
@@ -815,6 +844,9 @@ const CandidateDashboardPage = () => {
     setVisibleExperienceCount(getVisibleExperienceCount(nextProfile));
     setVisibleOrganizationCount(getVisibleOrganizationCount(nextProfile));
     setVisibleSkillCount(getVisibleSkillCount(nextProfile));
+    setProfilePhotoFile(null);
+    setShouldClearProfilePhoto(false);
+    setResumeUploadFiles([]);
   }, [user]);
 
   useEffect(() => {
@@ -992,17 +1024,23 @@ const CandidateDashboardPage = () => {
   const persistedResumeName = profile.resumeFiles[0] || '';
   const persistedResumeExtension = getFileExtension(persistedResumeName);
   const hasResumePreview = Boolean(resumePreview?.url);
-  const hasStoredResume = Boolean(persistedResumeName);
+  const hasStoredResumeMetadata =
+    Array.isArray(profile.resumeFileDetails) && profile.resumeFileDetails.length > 0;
+  const hasStoredResumeName = Boolean(persistedResumeName);
   const resumePreviewLabel = hasResumePreview
     ? 'Preview resume terbaru'
-    : hasStoredResume
+    : hasStoredResumeMetadata
       ? 'Resume tersimpan'
+      : hasStoredResumeName
+        ? 'Nama CV lama'
       : 'Preview resume';
   const resumePreviewHint = hasResumePreview
     ? 'CV yang baru dipilih tampil di sini sebelum disimpan.'
-    : persistedResumeExtension === 'pdf'
+    : hasStoredResumeName && !hasStoredResumeMetadata
+      ? 'File CV lama perlu diupload ulang agar tersimpan permanen di server.'
+      : persistedResumeExtension === 'pdf'
       ? 'Upload ulang file PDF bila ingin menampilkan preview visual CV di browser ini.'
-      : hasStoredResume
+      : hasStoredResumeName
         ? 'Preview visual saat ini hanya tersedia untuk file PDF yang baru dipilih.'
         : 'Unggah CV format PDF agar preview visual muncul di sini.';
   const aboutMeValue = useMemo(
@@ -1125,13 +1163,15 @@ const CandidateDashboardPage = () => {
     }
 
     try {
-      const photoDataUrl = await convertProfilePhotoToDataUrl(photoFile);
+      const processedPhoto = await convertProfilePhotoToDataUrl(photoFile);
 
       setProfile((currentProfile) => ({
         ...currentProfile,
         photoFileName: photoFile.name,
-        photoDataUrl,
+        photoDataUrl: processedPhoto.dataUrl,
       }));
+      setProfilePhotoFile(processedPhoto.file);
+      setShouldClearProfilePhoto(false);
       setFeedback(null);
     } catch (error) {
       setFeedback({
@@ -1151,6 +1191,8 @@ const CandidateDashboardPage = () => {
       photoFileName: '',
       photoDataUrl: '',
     }));
+    setProfilePhotoFile(null);
+    setShouldClearProfilePhoto(true);
     setFeedback(null);
   };
 
@@ -1433,12 +1475,29 @@ const CandidateDashboardPage = () => {
       return;
     }
 
+    if (
+      field === 'resumeFiles' &&
+      nextFiles.some((file) => file.size > CANDIDATE_RESUME_MAX_FILE_SIZE_IN_BYTES)
+    ) {
+      if (inputElement) {
+        inputElement.value = '';
+      }
+
+      setFeedback({
+        type: 'error',
+        message: 'Ukuran setiap CV maksimal 2MB. Kompres PDF terlebih dahulu lalu upload ulang.',
+      });
+      return;
+    }
+
     setProfile((currentProfile) => ({
       ...currentProfile,
       [field]: fileNames,
+      ...(field === 'resumeFiles' ? { resumeFileDetails: [] } : {}),
     }));
 
     if (field === 'resumeFiles') {
+      setResumeUploadFiles(nextFiles);
       setResumePreview(
         primaryFile && isPdfResumeFile(primaryFile)
           ? {
@@ -1561,19 +1620,40 @@ const CandidateDashboardPage = () => {
     setProfile(savedProfile);
 
     try {
-      const response = await updateProfile({
+      const profilePayload = {
+        ...savedProfile,
+        photoDataUrl: profilePhotoFile ? '' : savedProfile.photoDataUrl,
+        resumeFileDetails: resumeUploadFiles.length > 0 ? [] : savedProfile.resumeFileDetails,
+      };
+      const updatePayload = {
         name: savedProfile.fullName.trim(),
         phone: savedProfile.phone.trim(),
-        candidate_profile: savedProfile,
-      });
+        candidate_profile: profilePayload,
+      };
+
+      if (profilePhotoFile) {
+        updatePayload.profile_picture = profilePhotoFile;
+      } else if (shouldClearProfilePhoto) {
+        updatePayload.profile_picture = null;
+      }
+
+      if (resumeUploadFiles.length > 0) {
+        updatePayload.candidate_resume_files = resumeUploadFiles;
+      }
+
+      const response = await updateProfile(updatePayload);
       const syncedProfile = readCandidateProfile(response?.user || user, {
         preferStoredDraft: false,
       });
-      const syncedCompletion = getCandidateProfileCompletion(syncedProfile);
-      setProfile(syncedProfile);
-      setVisibleExperienceCount(getVisibleExperienceCount(syncedProfile));
-      setVisibleOrganizationCount(getVisibleOrganizationCount(syncedProfile));
-      setVisibleSkillCount(getVisibleSkillCount(syncedProfile));
+      const storedSyncedProfile = saveCandidateProfile(response?.user || user, syncedProfile);
+      const syncedCompletion = getCandidateProfileCompletion(storedSyncedProfile);
+      setProfile(storedSyncedProfile);
+      setVisibleExperienceCount(getVisibleExperienceCount(storedSyncedProfile));
+      setVisibleOrganizationCount(getVisibleOrganizationCount(storedSyncedProfile));
+      setVisibleSkillCount(getVisibleSkillCount(storedSyncedProfile));
+      setProfilePhotoFile(null);
+      setShouldClearProfilePhoto(false);
+      setResumeUploadFiles([]);
 
       setFeedback({
         type: 'success',
@@ -2750,7 +2830,7 @@ const CandidateDashboardPage = () => {
                         </svg>
                       </span>
                       <strong>Pilih File CV</strong>
-                      <small>Maks 5MB</small>
+                      <small>Maks 2MB</small>
                     </label>
                     <input
                       id="candidate-resume-upload"

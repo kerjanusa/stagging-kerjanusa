@@ -44,6 +44,11 @@ Minimal yang wajib diganti:
 - `APP_URL`
 - `FRONTEND_APP_URL`
 - `DATABASE_URL`
+- `FILESYSTEM_DISK`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_BUCKET`
+- `AWS_ENDPOINT`
 - `CORS_ALLOWED_ORIGINS`
 - `SANCTUM_STATEFUL_DOMAINS`
 
@@ -54,6 +59,10 @@ php artisan key:generate --show
 ```
 
 Copy hasilnya ke env Vercel `APP_KEY`.
+
+Untuk upload CV, foto profil, logo perusahaan, dan dokumen legal, backend production harus pakai storage durable.
+Rekomendasi paling mudah untuk project ini adalah Supabase Storage S3-compatible karena database sudah memakai Supabase.
+Isi `FILESYSTEM_DISK=s3`, lalu lengkapi `AWS_*` sesuai credential storage. Jangan pakai disk `local` atau `public` di Vercel karena file serverless bisa hilang.
 
 Setelah deploy backend berhasil, cek:
 

@@ -343,7 +343,7 @@ class AdminService
                         'preferredRoles',
                         'preferredLocations',
                         'skills',
-                        'resumeFiles',
+                        'resumeFileDetails',
                     ]),
                     'applications_count' => (int) ($candidate->applications_count ?? 0),
                     'latest_application_status' => $candidate->latest_application_status,
@@ -362,7 +362,7 @@ class AdminService
                         ->filter(fn ($skill) => filled($skill))
                         ->values()
                         ->all(),
-                    'resume_files_count' => collect(Arr::get($candidateProfile, 'resumeFiles', []))
+                    'resume_files_count' => collect(Arr::get($candidateProfile, 'resumeFileDetails', []))
                         ->filter(fn ($file) => filled($file))
                         ->count(),
                     'created_at' => $candidate->created_at?->toIso8601String(),

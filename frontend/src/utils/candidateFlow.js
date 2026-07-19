@@ -293,8 +293,44 @@ export const createCandidateProfile = (user) => ({
   salaryMax: '',
   salaryPeriod: 'bulan',
   resumeFiles: [],
+  resumeFileDetails: [],
   certificateFiles: [],
 });
+
+const isInlineDataUrl = (value = '') => String(value || '').trim().startsWith('data:');
+
+const normalizeResumeFileDetails = (resumeFileDetails, resumeFiles) => {
+  if (!Array.isArray(resumeFileDetails) || !Array.isArray(resumeFiles)) {
+    return [];
+  }
+
+  const allowedResumeNames = new Set(resumeFiles);
+
+  return resumeFileDetails
+    .filter((detail) => detail && typeof detail === 'object')
+    .map((detail) => ({
+      name: trimText(detail.name),
+      mimeType: trimText(detail.mimeType) || 'application/pdf',
+      size: Math.max(0, Number(detail.size || 0)),
+      uploadedAt: trimText(detail.uploadedAt),
+      downloadUrl: trimText(detail.downloadUrl),
+    }))
+    .filter((detail) => detail.name && allowedResumeNames.has(detail.name))
+    .slice(0, 3);
+};
+
+const sanitizeCandidateProfileForDraftStorage = (profile) => ({
+  ...profile,
+  photoDataUrl: isInlineDataUrl(profile?.photoDataUrl) ? '' : trimText(profile?.photoDataUrl),
+});
+
+const sanitizeStoredCandidateProfileDraft = (profile) => {
+  if (!profile || typeof profile !== 'object') {
+    return {};
+  }
+
+  return sanitizeCandidateProfileForDraftStorage(profile);
+};
 
 /**
  * Merge stored profile data with defaults while normalizing legacy and free-form fields.
@@ -339,6 +375,15 @@ export const mergeCandidateProfile = (user, savedProfile) => {
 
   const profileSummary =
     trimText(savedProfile.profileSummary) || buildAutoProfileSummary(savedProfile);
+  const normalizedResumeFiles = Array.isArray(savedProfile.resumeFiles)
+    ? savedProfile.resumeFiles.filter(isPdfResumeFileName).slice(0, 3)
+    : [];
+  const normalizedResumeFileDetails = normalizeResumeFileDetails(
+    savedProfile.resumeFileDetails,
+    normalizedResumeFiles
+  );
+  const profilePhotoReference =
+    trimText(savedProfile.photoDataUrl) || trimText(user?.profile_picture);
 
   return {
     ...baseProfile,
@@ -349,7 +394,7 @@ export const mergeCandidateProfile = (user, savedProfile) => {
     gender: trimText(savedProfile.gender),
     age: normalizeAgeValue(savedProfile.age),
     photoFileName: trimText(savedProfile.photoFileName),
-    photoDataUrl: trimText(savedProfile.photoDataUrl),
+    photoDataUrl: profilePhotoReference,
     profileSummary,
     education: {
       ...baseProfile.education,
@@ -391,9 +436,8 @@ export const mergeCandidateProfile = (user, savedProfile) => {
     skills: normalizedSkills,
     preferredLocations: normalizedPreferredLocations,
     preferredRoles: normalizeStringList(savedProfile.preferredRoles, 5),
-    resumeFiles: Array.isArray(savedProfile.resumeFiles)
-      ? savedProfile.resumeFiles.filter(isPdfResumeFileName).slice(0, 3)
-      : [],
+    resumeFiles: normalizedResumeFiles,
+    resumeFileDetails: normalizedResumeFileDetails,
     certificateFiles: Array.isArray(savedProfile.certificateFiles)
       ? savedProfile.certificateFiles.slice(0, 5)
       : [],
@@ -427,10 +471,20 @@ const getCandidateProfileSource = (user, options = {}) => {
   try {
     const storedProfile = localStorage.getItem(getCandidateProfileStorageKey(user?.id));
     const parsedStoredProfile = storedProfile ? JSON.parse(storedProfile) : null;
+    const sanitizedStoredProfile = sanitizeStoredCandidateProfileDraft(parsedStoredProfile);
+
+    if (
+      Array.isArray(sanitizedStoredProfile.resumeFileDetails) &&
+      sanitizedStoredProfile.resumeFileDetails.length === 0 &&
+      Array.isArray(backendProfile?.resumeFileDetails) &&
+      backendProfile.resumeFileDetails.length > 0
+    ) {
+      delete sanitizedStoredProfile.resumeFileDetails;
+    }
 
     return mergeCandidateProfile(user, {
       ...(backendProfile || {}),
-      ...(parsedStoredProfile && typeof parsedStoredProfile === 'object' ? parsedStoredProfile : {}),
+      ...sanitizedStoredProfile,
     });
   } catch {
     return mergeCandidateProfile(user, backendProfile);
@@ -463,6 +517,7 @@ export const saveCandidateProfile = (user, profile) => {
     photoFileName: trimText(profile?.photoFileName),
     photoDataUrl: trimText(profile?.photoDataUrl),
     profileSummary: trimText(profile?.profileSummary) || buildAutoProfileSummary(profile),
+    resumeFileDetails: normalizeResumeFileDetails(profile?.resumeFileDetails, profile?.resumeFiles),
   });
 
   if (typeof window === 'undefined') {
@@ -472,7 +527,7 @@ export const saveCandidateProfile = (user, profile) => {
   try {
     localStorage.setItem(
       getCandidateProfileStorageKey(user?.id),
-      JSON.stringify(normalizedProfile)
+      JSON.stringify(sanitizeCandidateProfileForDraftStorage(normalizedProfile))
     );
   } catch {
     // Keep the profile usable even when the browser cannot persist the draft locally.
@@ -496,6 +551,8 @@ export const getCandidateProfileChecklist = (profile) => {
   const hasExperience = profile.experiences.some(
     (item) => item.company?.trim() || item.position?.trim()
   );
+  const hasStoredResume =
+    Array.isArray(profile.resumeFileDetails) && profile.resumeFileDetails.length > 0;
 
   return [
     { key: 'fullName', label: 'Nama lengkap', isComplete: Boolean(profile.fullName?.trim()), required: true },
@@ -534,7 +591,7 @@ export const getCandidateProfileChecklist = (profile) => {
     {
       key: 'resumeFiles',
       label: 'CV / resume',
-      isComplete: profile.resumeFiles.length > 0,
+      isComplete: hasStoredResume,
       required: true,
     },
     {

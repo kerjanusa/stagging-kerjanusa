@@ -3,9 +3,11 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CandidateDocumentController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\RecruiterWorkspaceController;
+use App\Models\Job;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -110,6 +112,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
     Route::put('/change-password', [AuthController::class, 'changePassword']);
+    Route::get('/candidate-documents/{candidateId}/resumes/{resumeIndex}', [CandidateDocumentController::class, 'downloadResume'])
+        ->whereNumber(['candidateId', 'resumeIndex']);
     Route::get('/chat/threads', [MessageController::class, 'threads']);
     Route::get('/chat/contacts', [MessageController::class, 'contacts']);
     Route::get('/chat/conversations/{userId}', [MessageController::class, 'conversation']);

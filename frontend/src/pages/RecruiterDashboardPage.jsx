@@ -57,6 +57,15 @@ const RECRUITER_COMPANY_LEGAL_DOCUMENT_ALLOWED_TYPES = new Set([
   'image/png',
   'image/jpg',
 ]);
+const createCompressedJpegFileName = (fileName = '', fallbackName = 'company-logo') => {
+  const baseName = String(fileName || '')
+    .trim()
+    .replace(/\.[^/.]+$/, '')
+    .replace(/[^a-z0-9-_]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return `${baseName || fallbackName}.jpg`;
+};
 
 const RECRUITER_MOBILE_BOTTOM_SECTIONS = [
   { value: 'company', label: 'Profil', icon: 'user' },
@@ -220,7 +229,7 @@ const formatFileSize = (value) => {
 };
 
 /**
- * Mengompres logo perusahaan menjadi data URL yang aman untuk preview dan simpan profil recruiter.
+ * Mengompres logo perusahaan menjadi preview dan file kecil untuk upload.
  */
 const convertRecruiterLogoToDataUrl = (file) =>
   new Promise((resolve, reject) => {
@@ -255,7 +264,23 @@ const convertRecruiterLogoToDataUrl = (file) =>
       context.fillRect(0, 0, targetWidth, targetHeight);
       context.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-      resolve(canvas.toDataURL('image/jpeg', RECRUITER_COMPANY_LOGO_OUTPUT_QUALITY));
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Logo perusahaan belum bisa dikompres di browser ini.'));
+            return;
+          }
+
+          resolve({
+            dataUrl: canvas.toDataURL('image/jpeg', RECRUITER_COMPANY_LOGO_OUTPUT_QUALITY),
+            file: new File([blob], createCompressedJpegFileName(file.name), {
+              type: 'image/jpeg',
+            }),
+          });
+        },
+        'image/jpeg',
+        RECRUITER_COMPANY_LOGO_OUTPUT_QUALITY
+      );
     };
 
     image.onerror = () => {
@@ -622,6 +647,8 @@ const RecruiterDashboardPage = () => {
   const [jobSearchQuery, setJobSearchQuery] = useState('');
   const [isSavingCompanyProfile, setIsSavingCompanyProfile] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [companyLogoFile, setCompanyLogoFile] = useState(null);
+  const [shouldClearCompanyLogo, setShouldClearCompanyLogo] = useState(false);
   const [companyLegalDocumentFile, setCompanyLegalDocumentFile] = useState(null);
   const [jobActionInFlightId, setJobActionInFlightId] = useState(null);
   const [applicationActionInFlightId, setApplicationActionInFlightId] = useState(null);
@@ -650,6 +677,8 @@ const RecruiterDashboardPage = () => {
 
   useEffect(() => {
     setCompanyProfile(readRecruiterCompanyProfile(user));
+    setCompanyLogoFile(null);
+    setShouldClearCompanyLogo(false);
     setCompanyLegalDocumentFile(null);
   }, [user]);
 
@@ -1244,13 +1273,15 @@ const RecruiterDashboardPage = () => {
     }
 
     try {
-      const companyLogoDataUrl = await convertRecruiterLogoToDataUrl(logoFile);
+      const processedLogo = await convertRecruiterLogoToDataUrl(logoFile);
 
       setCompanyProfile((currentProfile) => ({
         ...currentProfile,
         companyLogoFileName: logoFile.name,
-        companyLogoDataUrl,
+        companyLogoDataUrl: processedLogo.dataUrl,
       }));
+      setCompanyLogoFile(processedLogo.file);
+      setShouldClearCompanyLogo(false);
       setFeedback(null);
     } catch (error) {
       setFeedback({
@@ -1266,6 +1297,8 @@ const RecruiterDashboardPage = () => {
       companyLogoFileName: '',
       companyLogoDataUrl: '',
     }));
+    setCompanyLogoFile(null);
+    setShouldClearCompanyLogo(true);
     setFeedback(null);
   };
 
@@ -1338,18 +1371,34 @@ const RecruiterDashboardPage = () => {
     setCompanyProfile(savedProfile);
 
     try {
-      const response = await updateProfile({
+      const profilePayload = {
+        ...savedProfile,
+        companyLogoDataUrl: companyLogoFile ? '' : savedProfile.companyLogoDataUrl,
+      };
+      const updatePayload = {
         name: savedProfile.recruiterName.trim(),
         phone: savedProfile.phone.trim(),
         company_name: savedProfile.companyName.trim(),
-        recruiter_profile: savedProfile,
+        recruiter_profile: profilePayload,
         company_legal_document: companyLegalDocumentFile,
+      };
+
+      if (companyLogoFile) {
+        updatePayload.profile_picture = companyLogoFile;
+      } else if (shouldClearCompanyLogo) {
+        updatePayload.profile_picture = null;
+      }
+
+      const response = await updateProfile({
+        ...updatePayload,
       });
       const syncedProfile = saveRecruiterCompanyProfile(
         response?.user || user,
         response?.user?.recruiter_profile || savedProfile
       );
       setCompanyProfile(syncedProfile);
+      setCompanyLogoFile(null);
+      setShouldClearCompanyLogo(false);
       setCompanyLegalDocumentFile(null);
 
       setFeedback({
@@ -1414,6 +1463,8 @@ const RecruiterDashboardPage = () => {
     });
 
     setCompanyProfile(resetProfile);
+    setCompanyLogoFile(null);
+    setShouldClearCompanyLogo(true);
     setCompanyLegalDocumentFile(null);
 
     try {
@@ -1422,6 +1473,7 @@ const RecruiterDashboardPage = () => {
         phone: user?.phone || '',
         company_name: '',
         recruiter_profile: resetProfile,
+        profile_picture: null,
       });
       setCompanyProfile(
         saveRecruiterCompanyProfile(
@@ -1429,6 +1481,7 @@ const RecruiterDashboardPage = () => {
           response?.user?.recruiter_profile || resetProfile
         )
       );
+      setShouldClearCompanyLogo(false);
       setFeedback({
         type: 'success',
         message: 'Profil perusahaan berhasil direset.',
@@ -1716,6 +1769,30 @@ const RecruiterDashboardPage = () => {
     );
   };
 
+  const handleDownloadApplicationResume = async (application) => {
+    const resumeDetail = application?.candidateProfile?.resumeFileDetails?.[0];
+    const fallbackFileName = application?.candidateProfile?.resumeFiles?.[0] || 'cv-kandidat.pdf';
+
+    if (resumeDetail) {
+      try {
+        await RecruiterWorkspaceService.downloadCandidateResume(
+          application.candidate_id,
+          0,
+          resumeDetail.name || fallbackFileName
+        );
+        return;
+      } catch (error) {
+        setFeedback({
+          type: 'error',
+          message: error?.message || 'CV asli kandidat belum bisa diunduh.',
+        });
+        return;
+      }
+    }
+
+    handleDownloadApplications([application]);
+  };
+
   const handleBulkRejectApplications = async () => {
     if (!selectedFilteredApplicationIds.length) {
       setFeedback({
@@ -1812,9 +1889,28 @@ const RecruiterDashboardPage = () => {
     );
   };
 
-  const handleDownloadTalentResume = (candidate) => {
+  const handleDownloadTalentResume = async (candidate) => {
     if (!candidate?.id || !candidate.resume_files?.length) {
       return;
+    }
+
+    const resumeDetail = candidate.resume_file_details?.[0];
+
+    if (resumeDetail) {
+      try {
+        await RecruiterWorkspaceService.downloadCandidateResume(
+          candidate.id,
+          0,
+          resumeDetail.name || candidate.resume_files[0]
+        );
+        return;
+      } catch (error) {
+        setFeedback({
+          type: 'error',
+          message: error?.message || 'CV asli kandidat belum bisa diunduh.',
+        });
+        return;
+      }
     }
 
     const fileSlug = slugifyDownloadValue(candidate.name);
@@ -3402,7 +3498,11 @@ const RecruiterDashboardPage = () => {
                           <button
                             type="button"
                             className="btn btn-outline"
-                            onClick={() => handleDownloadApplications([application])}
+                            onClick={() => handleDownloadApplicationResume(application)}
+                            disabled={
+                              !application.candidateProfile.resumeFiles.length &&
+                              !application.candidateProfile.resumeFileDetails?.length
+                            }
                           >
                             Download CV
                           </button>
