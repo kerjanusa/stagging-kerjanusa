@@ -374,10 +374,7 @@ class AuthController extends Controller
                 !$user ||
                 !is_object($user) ||
                 !$token ||
-                (
-                    !$this->shouldExposePasswordResetLink() &&
-                    !str_contains((string) config('app.url'), 'stagging-kerjanusa')
-                )
+                !$this->shouldExposePasswordResetLink()
             ) {
                 return [];
             }

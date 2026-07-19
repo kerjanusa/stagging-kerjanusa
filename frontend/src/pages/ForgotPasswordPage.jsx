@@ -60,6 +60,8 @@ const FORGOT_PASSWORD_STEPS = [
   },
 ];
 
+const SHOULD_SHOW_RESET_DEBUG_LINK = import.meta.env.VITE_SHOW_RESET_DEBUG_LINK === 'true';
+
 /**
  * Menyediakan flow permintaan link reset password yang netral untuk semua role.
  */
@@ -116,8 +118,14 @@ const ForgotPasswordPage = () => {
       setSuccessMessage(
         response?.message || 'Jika email terdaftar, link reset password telah dikirim ke email Anda.'
       );
-      setDebugResetUrl(response?.debug_reset_url || '');
-      setDebugResetExpiresMinutes(Number(response?.debug_reset_expires_minutes || 60));
+      setDebugResetUrl(
+        SHOULD_SHOW_RESET_DEBUG_LINK ? response?.debug_reset_url || '' : ''
+      );
+      setDebugResetExpiresMinutes(
+        SHOULD_SHOW_RESET_DEBUG_LINK
+          ? Number(response?.debug_reset_expires_minutes || 60)
+          : 60
+      );
       setCopyFeedback('');
     } catch (submissionError) {
       setError(
@@ -217,7 +225,7 @@ const ForgotPasswordPage = () => {
                   gunakan link reset yang berlaku selama 60 menit.
                 </p>
 
-                {debugResetUrl ? (
+                {SHOULD_SHOW_RESET_DEBUG_LINK && debugResetUrl ? (
                   <div className="auth-forgot-debug">
                     <strong>Link reset staging siap dipakai</strong>
                     <p>
