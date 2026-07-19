@@ -24,10 +24,10 @@ const useAuthStore = create((set) => ({
   validationErrors: {},
 
   // Login action
-  login: async (email, password) => {
+  login: async (email, password, options = {}) => {
     set({ isLoading: true, error: null, validationErrors: {} });
     try {
-      const data = await AuthService.login(email, password);
+      const data = await AuthService.login(email, password, options);
       set({
         user: data.user,
         token: data.token,

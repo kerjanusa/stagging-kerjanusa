@@ -173,13 +173,24 @@ const buildMockResetToken = () =>
   `mock-reset-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 
 /**
+ * Terjemahkan pilihan "Ingat perangkat ini" menjadi opsi storage auth.
+ */
+const getAuthStorageOptions = (options = {}) => ({
+  ...(typeof options.rememberDevice === 'boolean'
+    ? { persistent: options.rememberDevice }
+    : {}),
+});
+
+/**
  * Persist a mock login session and return the synthetic auth token.
  */
-const persistMockSession = (user) => {
+const persistMockSession = (user, options = {}) => {
   const sessionToken = `mock-token-${user.id}`;
   const normalizedUser = stripPassword(user);
-  writeStoredAuthToken(sessionToken);
-  writeStoredAuthUser(normalizedUser);
+  const storageOptions = getAuthStorageOptions(options);
+
+  writeStoredAuthToken(sessionToken, storageOptions);
+  writeStoredAuthUser(normalizedUser, storageOptions);
 
   return sessionToken;
 };
@@ -187,15 +198,16 @@ const persistMockSession = (user) => {
 /**
  * Persist the authenticated API session payload to browser storage.
  */
-const persistApiSession = (user, token) => {
+const persistApiSession = (user, token, options = {}) => {
   const normalizedUser = normalizeAuthUser(user);
+  const storageOptions = getAuthStorageOptions(options);
 
   if (token) {
-    writeStoredAuthToken(token);
+    writeStoredAuthToken(token, storageOptions);
   }
 
   if (normalizedUser) {
-    writeStoredAuthUser(normalizedUser);
+    writeStoredAuthUser(normalizedUser, storageOptions);
   }
 
   return normalizedUser;
@@ -391,7 +403,7 @@ class AuthService {
   /**
    * Login user
    */
-  static async login(email, password) {
+  static async login(email, password, options = {}) {
     if (shouldUseMockData) {
       const users = getMockUsers();
       const matchingUser = users.find(
@@ -425,14 +437,18 @@ class AuthService {
 
       return {
         user: stripPassword(matchingUser),
-        token: persistMockSession(matchingUser),
+        token: persistMockSession(matchingUser, options),
       };
     }
 
     try {
       const response = await apiClient.post('/login', { email, password });
       if (response.data.token) {
-        const normalizedUser = persistApiSession(response.data.user, response.data.token);
+        const normalizedUser = persistApiSession(
+          response.data.user,
+          response.data.token,
+          options
+        );
         return {
           ...response.data,
           user: normalizedUser,

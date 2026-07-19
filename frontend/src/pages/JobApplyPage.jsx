@@ -310,7 +310,15 @@ const JobApplyStoryButtonIcon = ({ type }) => {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path
-        d="M13.2 3.75 6.9 12h3.95l-1.1 8.25 7.35-9.75h-4.05l.15-6.75Z"
+        d="M7.25 4.75h7.15l2.35 2.35v11.15a1 1 0 0 1-1 1h-8.5a1 1 0 0 1-1-1V5.75a1 1 0 0 1 1-1Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m8.85 12.45 2.05 2.05 4.1-4.45"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.8"

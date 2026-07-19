@@ -51,7 +51,7 @@ const LoginForm = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const authData = await login(email, password);
+      const authData = await login(email, password, { rememberDevice });
       onSuccess?.(authData);
     } catch {
       // Error is handled by Zustand store

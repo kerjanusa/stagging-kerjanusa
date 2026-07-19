@@ -2,59 +2,98 @@ const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
 const AUTH_USER_STORAGE_KEY = 'user';
 
 /**
- * Prefer sessionStorage so auth tidak bertahan ketika browser ditutup.
+ * Ambil storage browser dengan fallback aman untuk mode private/SSR.
  */
-const getPreferredAuthStorage = () => {
+const getAuthStorage = (storageName) => {
   if (typeof window === 'undefined') {
     return null;
   }
 
   try {
-    const storage = window.sessionStorage;
+    const storage = window[storageName];
     storage.getItem(AUTH_TOKEN_STORAGE_KEY);
     return storage;
   } catch {
-    try {
-      const fallbackStorage = window.localStorage;
-      fallbackStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-      return fallbackStorage;
-    } catch {
-      return null;
-    }
+    return null;
   }
 };
 
 /**
- * Local storage lama dibersihkan agar sesi auth tidak lagi persisten lintas browser close.
+ * Login default menyimpan sesi persisten karena user memilih "Ingat perangkat ini".
  */
-const getLegacyAuthStorage = () => {
-  if (typeof window === 'undefined') {
-    return null;
+const getPersistentAuthStorage = () => getAuthStorage('localStorage');
+
+/**
+ * Session pendek dipakai saat user mematikan pilihan "Ingat perangkat ini".
+ */
+const getShortLivedAuthStorage = () => getAuthStorage('sessionStorage');
+
+const getKnownAuthStorages = () => [
+  getPersistentAuthStorage(),
+  getShortLivedAuthStorage(),
+].filter(Boolean);
+
+const storageHasAuthToken = (storage) => Boolean(storage?.getItem(AUTH_TOKEN_STORAGE_KEY));
+
+const storageHasAuthUser = (storage) => Boolean(storage?.getItem(AUTH_USER_STORAGE_KEY));
+
+/**
+ * Pakai storage yang sudah memegang sesi aktif. Jika belum ada, fallback ke localStorage.
+ */
+const getActiveAuthStorage = () => {
+  const persistentStorage = getPersistentAuthStorage();
+  const shortLivedStorage = getShortLivedAuthStorage();
+
+  if (storageHasAuthToken(persistentStorage)) {
+    return persistentStorage;
   }
 
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
+  if (storageHasAuthToken(shortLivedStorage)) {
+    return shortLivedStorage;
   }
+
+  if (storageHasAuthUser(persistentStorage)) {
+    return persistentStorage;
+  }
+
+  if (storageHasAuthUser(shortLivedStorage)) {
+    return shortLivedStorage;
+  }
+
+  return persistentStorage || shortLivedStorage;
 };
 
-const clearLegacyAuthStorage = (activeStorage) => {
-  const legacyStorage = getLegacyAuthStorage();
+const getWritableAuthStorage = (options = {}) => {
+  if (typeof options.persistent === 'boolean') {
+    const preferredStorage = options.persistent
+      ? getPersistentAuthStorage()
+      : getShortLivedAuthStorage();
+    const fallbackStorage = options.persistent
+      ? getShortLivedAuthStorage()
+      : getPersistentAuthStorage();
 
-  if (!legacyStorage || legacyStorage === activeStorage) {
-    return;
+    return preferredStorage || fallbackStorage;
   }
 
-  legacyStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-  legacyStorage.removeItem(AUTH_USER_STORAGE_KEY);
+  return getActiveAuthStorage();
+};
+
+const clearInactiveAuthStorages = (activeStorage) => {
+  getKnownAuthStorages().forEach((storage) => {
+    if (storage === activeStorage) {
+      return;
+    }
+
+    storage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    storage.removeItem(AUTH_USER_STORAGE_KEY);
+  });
 };
 
 /**
  * Ambil token auth dari storage aktif.
  */
 export const readStoredAuthToken = () => {
-  const storage = getPreferredAuthStorage();
+  const storage = getActiveAuthStorage();
 
   if (!storage) {
     return '';
@@ -67,7 +106,7 @@ export const readStoredAuthToken = () => {
  * Ambil user auth dari storage aktif.
  */
 export const readStoredAuthUser = () => {
-  const storage = getPreferredAuthStorage();
+  const storage = getActiveAuthStorage();
 
   if (!storage) {
     return null;
@@ -87,10 +126,10 @@ export const readStoredAuthUser = () => {
 };
 
 /**
- * Simpan token auth ke storage aktif lalu hapus auth lama yang persisten.
+ * Simpan token auth ke storage aktif lalu hapus salinan auth di storage lain.
  */
-export const writeStoredAuthToken = (token) => {
-  const storage = getPreferredAuthStorage();
+export const writeStoredAuthToken = (token, options = {}) => {
+  const storage = getWritableAuthStorage(options);
 
   if (!storage) {
     return;
@@ -102,14 +141,14 @@ export const writeStoredAuthToken = (token) => {
     storage.removeItem(AUTH_TOKEN_STORAGE_KEY);
   }
 
-  clearLegacyAuthStorage(storage);
+  clearInactiveAuthStorages(storage);
 };
 
 /**
- * Simpan user auth ke storage aktif lalu hapus auth lama yang persisten.
+ * Simpan user auth ke storage aktif lalu hapus salinan auth di storage lain.
  */
-export const writeStoredAuthUser = (user) => {
-  const storage = getPreferredAuthStorage();
+export const writeStoredAuthUser = (user, options = {}) => {
+  const storage = getWritableAuthStorage(options);
 
   if (!storage) {
     return;
@@ -121,24 +160,15 @@ export const writeStoredAuthUser = (user) => {
     storage.removeItem(AUTH_USER_STORAGE_KEY);
   }
 
-  clearLegacyAuthStorage(storage);
+  clearInactiveAuthStorages(storage);
 };
 
 /**
- * Bersihkan auth di storage aktif maupun storage lama.
+ * Bersihkan auth di storage persisten maupun sesi pendek.
  */
 export const clearStoredAuthSession = () => {
-  const storage = getPreferredAuthStorage();
-
-  if (storage) {
+  getKnownAuthStorages().forEach((storage) => {
     storage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     storage.removeItem(AUTH_USER_STORAGE_KEY);
-  }
-
-  const legacyStorage = getLegacyAuthStorage();
-
-  if (legacyStorage && legacyStorage !== storage) {
-    legacyStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-    legacyStorage.removeItem(AUTH_USER_STORAGE_KEY);
-  }
+  });
 };

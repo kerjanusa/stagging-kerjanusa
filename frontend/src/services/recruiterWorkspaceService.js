@@ -1,6 +1,6 @@
 import apiClient from '../utils/apiClient.js';
 import { shouldUseMockData } from '../utils/mockMode.js';
-import { readStoredAuthUser } from '../utils/authSessionStorage.js';
+import { readStoredAuthUser, writeStoredAuthUser } from '../utils/authSessionStorage.js';
 import { readCandidateProfile } from '../utils/candidateFlow.js';
 import {
   getRecruiterPlanConfig,
@@ -434,7 +434,7 @@ class RecruiterWorkspaceService {
       );
 
       saveMockUsers(users);
-      localStorage.setItem('user', JSON.stringify(nextUser));
+      writeStoredAuthUser(nextUser);
 
       return {
         current: {

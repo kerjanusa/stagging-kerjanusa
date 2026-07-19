@@ -18,13 +18,13 @@ import {
   RECRUITER_SECTION_OPTIONS,
   RECRUITER_COMPANY_VERIFICATION_STATUS_LABELS,
   getApplicationStage,
-    getApplicationStageLabel,
-    getJobWorkflowLabel,
-    getJobWorkflowStatus,
-    getJobWorkflowTone,
-    getRecruiterCompanyDescriptionLength,
-    getRecruiterApplicationStageMeta,
-    getRecruiterCompanyCompletion,
+  getApplicationStageLabel,
+  getJobWorkflowLabel,
+  getJobWorkflowStatus,
+  getJobWorkflowTone,
+  getRecruiterCompanyDescriptionLength,
+  getRecruiterApplicationStageMeta,
+  getRecruiterCompanyCompletion,
   getRecruiterOverviewNextAction,
   hasRecruiterCompanyLegalDocument,
   hasRecruiterCompanyLogo,
@@ -35,10 +35,10 @@ import {
   saveApplicationStage,
   saveJobWorkflowStatus,
   saveRecruiterCompanyProfile,
-  } from '../utils/recruiterFlow.js';
-  import { formatRecruiterPlanDocuments } from '../utils/recruiterPlans.js';
-  import { formatExperienceLevel, formatWorkMode } from '../utils/jobFormatters.js';
-  import { APP_ROUTES, getJobApplyRoute } from '../utils/routeHelpers.js';
+} from '../utils/recruiterFlow.js';
+import { formatRecruiterPlanDocuments } from '../utils/recruiterPlans.js';
+import { formatExperienceLevel, formatWorkMode } from '../utils/jobFormatters.js';
+import { APP_ROUTES, getJobApplyRoute } from '../utils/routeHelpers.js';
 import '../styles/workspace.css';
 import '../styles/recruiterDashboard.css';
 const RECRUITER_SUPPORT_WHATSAPP_LINK = CONTACT_WHATSAPP_LINK;
@@ -64,9 +64,14 @@ const RECRUITER_MOBILE_BOTTOM_SECTIONS = [
   { value: 'messages', label: 'Chat', icon: 'message' },
 ];
 
-const RECRUITER_MENU_SHORTCUT_SECTIONS = RECRUITER_SECTION_OPTIONS.filter(
-  (section) => section.value !== 'candidates'
-);
+const RECRUITER_MENU_SHORTCUT_SECTIONS = [
+  { value: 'company', label: 'Profil Perusahaan' },
+  { value: 'jobs', label: 'Posting Lowongan' },
+  { value: 'messages', label: 'Chat' },
+  { value: 'talent', label: 'Kolam Pelamar' },
+  { value: 'package', label: 'Info Paket Perusahaan' },
+  { value: 'overview', label: 'Dashboard Awal' },
+];
 
 const RECRUITER_FAVORITE_APPLICATIONS_STORAGE_PREFIX = 'recruiter_favorite_applications';
 const RECRUITER_FAVORITE_TALENTS_STORAGE_PREFIX = 'recruiter_favorite_talents';
@@ -604,6 +609,7 @@ const RecruiterDashboardPage = () => {
   const [companyProfile, setCompanyProfile] = useState(() => readRecruiterCompanyProfile(user));
   const [feedback, setFeedback] = useState(null);
   const [selectedJobId, setSelectedJobId] = useState(null);
+  const [isJobApplicantPanelOpen, setIsJobApplicantPanelOpen] = useState(false);
   const [candidateSearchQuery, setCandidateSearchQuery] = useState('');
   const [candidateStageFilter, setCandidateStageFilter] = useState('all');
   const [candidateFavoriteFilter, setCandidateFavoriteFilter] = useState('all');
@@ -1494,6 +1500,20 @@ const RecruiterDashboardPage = () => {
   const handleResetJobFilters = () => {
     setJobSearchQuery('');
     setJobWorkflowFilter('all');
+  };
+
+  const handleOpenJobApplicants = (job) => {
+    setSelectedJobId(job.id);
+    setIsJobApplicantPanelOpen(true);
+    handleResetCandidateFilters();
+
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        document
+          .getElementById('recruiter-flow-inline-applicants')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+    }
   };
 
   const handlePreviewJob = (job) => {
@@ -2677,10 +2697,7 @@ const RecruiterDashboardPage = () => {
                         <button
                           type="button"
                           className="btn btn-outline"
-                          onClick={() => {
-                            setSelectedJobId(job.id);
-                            handleSectionChange('candidates');
-                          }}
+                          onClick={() => handleOpenJobApplicants(job)}
                         >
                           Lihat Pelamar
                         </button>
@@ -2719,6 +2736,195 @@ const RecruiterDashboardPage = () => {
                     </article>
                   ))}
                 </div>
+              )}
+
+              {isJobApplicantPanelOpen && (
+                <section
+                  id="recruiter-flow-inline-applicants"
+                  className="recruiter-flow-inline-applicants"
+                >
+                  <div className="recruiter-flow-inline-applicants-head">
+                    <div>
+                      <span className="recruiter-flow-spotlight-eyebrow">Pelamar lowongan</span>
+                      <h3>{selectedJob?.title || 'Pilih lowongan'}</h3>
+                      <p>
+                        Kelola pelamar dari fitur Lowongan tanpa pindah menu. Gunakan filter tahap
+                        untuk mempercepat shortlist dan follow up.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => setIsJobApplicantPanelOpen(false)}
+                    >
+                      Tutup Panel
+                    </button>
+                  </div>
+
+                  <div className="workspace-action-row recruiter-flow-toolbar recruiter-flow-toolbar-dense">
+                    <select
+                      className="recruiter-flow-select"
+                      value={selectedJobId ?? ''}
+                      onChange={(event) => {
+                        setSelectedJobId(Number(event.target.value));
+                        handleResetCandidateFilters();
+                      }}
+                    >
+                      {recruiterJobs.length === 0 ? (
+                        <option value="">Belum ada lowongan recruiter</option>
+                      ) : (
+                        recruiterJobs.map((job) => (
+                          <option key={job.id} value={job.id}>
+                            {job.title} • {job.location}
+                          </option>
+                        ))
+                      )}
+                    </select>
+
+                    <input
+                      type="search"
+                      className="recruiter-flow-search"
+                      placeholder="Cari nama, email, skill, atau alamat kandidat"
+                      value={candidateSearchQuery}
+                      onChange={(event) => setCandidateSearchQuery(event.target.value)}
+                    />
+
+                    <select
+                      className="recruiter-flow-select"
+                      value={candidateStageFilter}
+                      onChange={(event) => setCandidateStageFilter(event.target.value)}
+                    >
+                      <option value="all">Semua tahap kandidat</option>
+                      {APPLICATION_STAGE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline recruiter-flow-reset-button"
+                      onClick={handleResetCandidateFilters}
+                    >
+                      Reset
+                    </button>
+                  </div>
+
+                  <div className="workspace-application-filter-row recruiter-flow-inline-stage-row">
+                    <button
+                      type="button"
+                      className={`workspace-filter-chip${
+                        candidateStageFilter === 'all' ? ' is-active' : ''
+                      }`}
+                      onClick={() => setCandidateStageFilter('all')}
+                    >
+                      Semua ({candidateStageCounts.all || 0})
+                    </button>
+                    {APPLICATION_STAGE_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`workspace-filter-chip${
+                          candidateStageFilter === option.value ? ' is-active' : ''
+                        }`}
+                        onClick={() => setCandidateStageFilter(option.value)}
+                      >
+                        {option.label} ({candidateStageCounts[option.value] || 0})
+                      </button>
+                    ))}
+                  </div>
+
+                  {applicationsError && <div className="error">{applicationsError}</div>}
+
+                  {!selectedJob ? (
+                    <article className="workspace-subcard">
+                      <div className="workspace-subcard-heading">
+                        <strong>Belum ada lowongan terpilih</strong>
+                        <span>Pilih lowongan untuk melihat pelamar.</span>
+                      </div>
+                    </article>
+                  ) : isLoadingApplications ? (
+                    <div className="loading">Memuat pelamar untuk {selectedJob.title}...</div>
+                  ) : filteredApplications.length === 0 ? (
+                    <article className="workspace-subcard">
+                      <div className="workspace-subcard-heading">
+                        <strong>Belum ada pelamar di filter ini</strong>
+                        <span>{selectedJob.title}</span>
+                      </div>
+                      <p>Coba ubah tahap atau kata kunci agar daftar pelamar tampil lebih luas.</p>
+                    </article>
+                  ) : (
+                    <div className="recruiter-flow-inline-applicant-list">
+                      {filteredApplications.slice(0, 6).map((application) => {
+                        const candidateLabel = application.candidate?.name || 'Kandidat';
+                        const candidateInitials = buildRecruiterInitials(candidateLabel);
+
+                        return (
+                          <article
+                            key={application.id}
+                            className="workspace-subcard recruiter-flow-inline-applicant-card"
+                          >
+                            <div className="recruiter-flow-candidate-primary">
+                              <div className="recruiter-flow-candidate-avatar">
+                                {application.candidateProfile.photoDataUrl ? (
+                                  <img
+                                    src={application.candidateProfile.photoDataUrl}
+                                    alt={candidateLabel}
+                                  />
+                                ) : (
+                                  <span>{candidateInitials}</span>
+                                )}
+                              </div>
+
+                              <div className="recruiter-flow-candidate-copy">
+                                <strong>{candidateLabel}</strong>
+                                <span>
+                                  {application.candidate?.email || '-'} •{' '}
+                                  {application.candidate?.phone || '-'}
+                                </span>
+                                <small>
+                                  Screening {application.screening_summary?.completion_rate || 0}% •{' '}
+                                  Dikirim {formatDateTime(application.applied_at)}
+                                </small>
+                              </div>
+                            </div>
+
+                            <div className="recruiter-flow-inline-applicant-actions">
+                              <span
+                                className={`workspace-status-pill workspace-status-pill-${
+                                  application.stageMeta.tone === 'danger'
+                                    ? 'danger'
+                                    : application.stageMeta.tone === 'success'
+                                      ? 'success'
+                                      : application.stageMeta.tone === 'warning'
+                                        ? 'warning'
+                                        : 'muted'
+                                }`}
+                              >
+                                {application.stageLabel}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() => handleOpenConversation(application.candidate)}
+                              >
+                                Chat
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => handleSectionChange('candidates')}
+                              >
+                                Detail Lengkap
+                              </button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
               )}
             </article>
           </section>

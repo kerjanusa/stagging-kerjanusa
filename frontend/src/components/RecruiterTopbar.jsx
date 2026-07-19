@@ -80,6 +80,15 @@ const RecruiterTopbar = ({
   };
 
   /**
+   * Mengarahkan recruiter ke informasi paket dari tombol strip-3.
+   */
+  const handlePremiumClick = () => {
+    closeMobileMenu();
+    scrollToTop();
+    onPremiumClick?.();
+  };
+
+  /**
    * Menutup menu lalu meneruskan aksi logout ke parent.
    */
   const handleLogoutClick = () => {
@@ -105,6 +114,24 @@ const RecruiterTopbar = ({
             <img src="/kerjanusa-logo-cutout.png" alt="KerjaNusa Recruitment Platform" />
           </Link>
 
+          <nav
+            className="recruiter-topbar-nav recruiter-topbar-nav-primary"
+            aria-label="Navigasi utama recruiter"
+          >
+            {sections.map((section) => (
+              <button
+                key={section.value}
+                type="button"
+                className={`recruiter-topbar-link${
+                  activeSection === section.value ? ' active' : ''
+                }`}
+                onClick={() => handleSectionClick(section.value)}
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+
           <button
             type="button"
             className="recruiter-topbar-toggle"
@@ -122,54 +149,19 @@ const RecruiterTopbar = ({
             id="recruiter-topbar-panel"
             className={`recruiter-topbar-panel${isMobileMenuOpen ? ' is-open' : ''}`}
           >
-            <nav className="recruiter-topbar-nav" aria-label="Navigasi recruiter">
-              {sections.map((section) => (
-                <button
-                  key={section.value}
-                  type="button"
-                  className={`recruiter-topbar-link${
-                    activeSection === section.value ? ' active' : ''
-                  }`}
-                  onClick={() => handleSectionClick(section.value)}
-                >
-                  {section.label}
-                </button>
-              ))}
-            </nav>
-
             <div className="recruiter-topbar-actions">
               <button
                 type="button"
                 className="recruiter-premium-button"
-                onClick={onPremiumClick}
+                onClick={handlePremiumClick}
               >
-                Info Paket {recruiterPlanLabel}
+                Info Paket Perusahaan
+                <span>{recruiterPlanLabel}</span>
               </button>
               <div className="recruiter-credit-chip" aria-label="KerjaNusa Credit">
                 <span>KN Credit</span>
                 <strong>{recruiterCredit}</strong>
               </div>
-              <div className="recruiter-profile-chip">
-                <span className="recruiter-profile-avatar" aria-hidden="true">
-                  {companyLogoUrl ? (
-                    <img src={companyLogoUrl} alt="" />
-                  ) : (
-                    <span>{companyInitials}</span>
-                  )}
-                </span>
-                <div className="recruiter-profile-copy">
-                  <strong>{recruiterDisplayName}</strong>
-                  <span>{companyDisplayName}</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="recruiter-logout-button"
-                onClick={handleLogoutClick}
-                disabled={isLoggingOut}
-              >
-                {isLoggingOut ? 'Keluar...' : 'Logout'}
-              </button>
             </div>
 
             <div className="recruiter-topbar-menu-footer">
