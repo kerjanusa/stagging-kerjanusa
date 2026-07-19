@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Resources\CandidateResumeResource;
 use App\Models\User;
 use Illuminate\Support\Arr;
 
@@ -20,7 +21,7 @@ class CandidateDocumentAccessService
             [$profile, $documentAccess] = $this->buildRecruiterScopedCandidateProfile($profile, $viewer);
         }
 
-        $profile['resumeFileDetails'] = $this->presentResumeFileDetails(
+        $profile['resumeFileDetails'] = CandidateResumeResource::collectionForCandidate(
             $profile['resumeFileDetails'] ?? [],
             $candidate->id
         );
@@ -90,24 +91,5 @@ class CandidateDocumentAccessService
         ];
 
         return [$profile, $documentAccess];
-    }
-
-    private function presentResumeFileDetails(mixed $resumeFileDetails, int $candidateId): array
-    {
-        if (!is_array($resumeFileDetails)) {
-            return [];
-        }
-
-        return collect($resumeFileDetails)
-            ->filter(fn ($detail) => is_array($detail) && filled($detail['path'] ?? null))
-            ->values()
-            ->map(fn (array $detail, int $index) => [
-                'name' => trim((string) ($detail['name'] ?? 'cv-kandidat.pdf')),
-                'mimeType' => trim((string) ($detail['mimeType'] ?? 'application/pdf')),
-                'size' => max(0, (int) ($detail['size'] ?? 0)),
-                'uploadedAt' => $detail['uploadedAt'] ?? null,
-                'downloadUrl' => "/candidate-documents/{$candidateId}/resumes/{$index}",
-            ])
-            ->all();
     }
 }

@@ -3,20 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\RecruiterPlanService;
+use App\Services\ProfileFileStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class CandidateDocumentController extends Controller
 {
-    private const RESUME_STORAGE_DIRECTORY = 'candidate-resumes';
-
-    public function __construct(private RecruiterPlanService $recruiterPlanService)
-    {
-    }
-
     /**
      * Download one stored candidate resume with role-aware access control.
      */
@@ -30,7 +25,7 @@ class CandidateDocumentController extends Controller
             return $this->notFoundResponse();
         }
 
-        if (!$this->canDownloadResume($request->user(), $candidate, $resumeIndex)) {
+        if (!Gate::allows('download-candidate-resume', [$candidate, $resumeIndex])) {
             return response()->json([
                 'message' => 'Forbidden',
             ], 403);
@@ -62,25 +57,6 @@ class CandidateDocumentController extends Controller
         }
     }
 
-    private function canDownloadResume(User $viewer, User $candidate, int $resumeIndex): bool
-    {
-        if ($viewer->hasRole(User::ROLE_CANDIDATE)) {
-            return $viewer->id === $candidate->id;
-        }
-
-        if ($viewer->hasRole(User::ROLE_SUPERADMIN)) {
-            return true;
-        }
-
-        if ($viewer->hasRole(User::ROLE_RECRUITER)) {
-            $limits = $this->recruiterPlanService->getVisibleDocumentLimits($viewer);
-
-            return $resumeIndex >= 0 && $resumeIndex < (int) $limits['resume_files'];
-        }
-
-        return false;
-    }
-
     private function normalizeResumeDetails(mixed $resumeDetails): array
     {
         if (!is_array($resumeDetails)) {
@@ -96,7 +72,7 @@ class CandidateDocumentController extends Controller
 
             $path = trim((string) ($detail['path'] ?? ''));
 
-            if ($path === '' || !str_starts_with($path, self::RESUME_STORAGE_DIRECTORY . '/')) {
+            if ($path === '' || !str_starts_with($path, ProfileFileStorageService::CANDIDATE_RESUME_STORAGE_DIRECTORY . '/')) {
                 continue;
             }
 
