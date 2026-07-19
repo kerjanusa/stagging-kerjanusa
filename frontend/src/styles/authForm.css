@@ -592,3 +592,34 @@
     line-height: 1.28;
   }
 }
+
+@media (max-width: 480px) {
+  .auth-page-register .auth-form {
+    gap: 0.82rem;
+  }
+
+  .auth-page-register .auth-form .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0.72rem;
+  }
+
+  .auth-page-register .auth-form .form-group label {
+    margin-bottom: 0.36rem;
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .auth-page-register .auth-form .form-group input,
+  .auth-page-register .auth-form .form-group select {
+    min-height: 2.68rem;
+    padding: 0.64rem 0.82rem;
+    border-radius: 0.84rem;
+    font-size: 16px;
+    line-height: 1.28;
+  }
+
+  .auth-page-register .auth-form button[type="submit"] {
+    min-height: 2.7rem;
+    font-size: 0.8rem;
+  }
+}

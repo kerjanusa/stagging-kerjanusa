@@ -73,10 +73,11 @@
 }
 
 .recruiter-topbar-toggle-line {
-  width: 1.1rem;
-  height: 0.13rem;
+  width: 1.24rem;
+  height: 0.16rem;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--recruiter-brand-primary), #7c476d);
+  background: var(--recruiter-brand-primary-dark);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.52);
   transition: transform 0.22s ease, opacity 0.22s ease;
 }
 

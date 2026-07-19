@@ -3221,3 +3221,72 @@
     font-size: 0.82rem;
   }
 }
+
+@media (max-width: 720px) {
+  .job-list-page {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .filter-section {
+    position: static;
+    top: auto;
+    z-index: auto;
+    width: 100%;
+    gap: 0.78rem;
+    padding: 1rem;
+    border-radius: 1.16rem;
+  }
+
+  .filter-section h2 {
+    margin-bottom: 0.2rem;
+    font-size: 1.08rem;
+    line-height: 1.12;
+  }
+
+  .filter-row {
+    grid-template-columns: 1fr;
+    gap: 0.66rem;
+  }
+
+  .filter-group,
+  .filter-actions,
+  .filter-row {
+    width: 100%;
+    padding-inline: 0;
+  }
+
+  .filter-group input,
+  .filter-control,
+  .filter-row select,
+  .filter-location-group select,
+  .location-dropdown-trigger,
+  .filter-reset-button,
+  .location-trigger-button {
+    min-height: 2.78rem;
+    padding: 0.72rem 0.8rem;
+    border-radius: 0.88rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .jobs-section {
+    gap: 0.95rem;
+  }
+
+  .jobs-grid {
+    grid-template-columns: 1fr;
+    gap: 0.82rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .filter-section {
+    padding: 0.92rem;
+    border-radius: 1.08rem;
+  }
+
+  .job-results-hero h1 {
+    max-width: none;
+  }
+}

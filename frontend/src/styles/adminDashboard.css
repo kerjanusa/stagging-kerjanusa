@@ -3911,3 +3911,90 @@
     min-width: 0;
   }
 }
+
+@media (max-width: 640px) {
+  .superadmin-monitoring-logpanel .superadmin-table-wrap {
+    overflow-x: visible;
+  }
+
+  .superadmin-table.superadmin-table-monitoring {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .superadmin-table-monitoring thead {
+    display: none;
+  }
+
+  .superadmin-table-monitoring tbody {
+    display: grid;
+    gap: 0.72rem;
+    width: 100%;
+  }
+
+  .superadmin-table-monitoring tbody tr {
+    display: grid;
+    gap: 0.52rem;
+    width: 100%;
+    padding: 0.82rem;
+    border: 1px solid rgba(15, 24, 48, 0.08);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 8px 18px rgba(15, 24, 48, 0.035);
+  }
+
+  .superadmin-table-monitoring tbody td {
+    display: grid;
+    grid-template-columns: minmax(4.9rem, 0.38fr) minmax(0, 1fr);
+    gap: 0.6rem;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    color: #333849;
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .superadmin-table-monitoring tbody td::before {
+    color: #8a7d8e;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .superadmin-table-monitoring tbody td:nth-child(1)::before {
+    content: 'Waktu';
+  }
+
+  .superadmin-table-monitoring tbody td:nth-child(2)::before {
+    content: 'Entitas';
+  }
+
+  .superadmin-table-monitoring tbody td:nth-child(3)::before {
+    content: 'Aktivitas';
+  }
+
+  .superadmin-table-monitoring tbody td:nth-child(4)::before {
+    content: 'Status';
+  }
+
+  .superadmin-table-monitoring tbody td:nth-child(5)::before {
+    content: 'Admin';
+  }
+
+  .superadmin-table-monitoring tbody td[colspan] {
+    display: block;
+  }
+
+  .superadmin-table-monitoring tbody td[colspan]::before {
+    content: none;
+  }
+
+  .superadmin-table-monitoring .superadmin-empty-state {
+    padding: 1.35rem 0.75rem;
+  }
+}

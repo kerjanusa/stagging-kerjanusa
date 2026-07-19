@@ -2231,3 +2231,31 @@
     line-height: 1.64;
   }
 }
+
+@media (max-width: 480px) {
+  .auth-page-register {
+    align-items: stretch;
+    justify-content: flex-start;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .auth-page-register .auth-container-register {
+    width: 100%;
+    max-width: 22rem;
+    margin: 0 auto;
+  }
+
+  .auth-page-register .auth-card-register {
+    width: 100%;
+  }
+
+  .auth-page-register [data-reveal].reveal-ready,
+  .auth-page-register [data-reveal].reveal-ready.is-visible {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+    will-change: auto;
+  }
+}
