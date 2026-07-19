@@ -91,6 +91,13 @@ const EXPERIENCE_YEAR_OPTIONS = Array.from(
   (_, index) => String(CURRENT_CALENDAR_YEAR - index)
 );
 
+const createCandidateJobFilters = () => ({
+  search: '',
+  location: '',
+  workMode: '',
+  experienceLevel: '',
+});
+
 /**
  * Menyediakan template kosong untuk satu entri pengalaman kerja kandidat.
  */
@@ -794,6 +801,7 @@ const CandidateDashboardPage = () => {
   const [selectedChatContact, setSelectedChatContact] = useState(null);
   const [chatDraftMessage, setChatDraftMessage] = useState('');
   const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [candidateJobFilters, setCandidateJobFilters] = useState(createCandidateJobFilters);
   const [resumePreview, setResumePreview] = useState(null);
 
   useEffect(() => {
@@ -916,7 +924,60 @@ const CandidateDashboardPage = () => {
       ),
     [applications, jobs, persistedProfile]
   );
-  const spotlightJobs = recommendedJobs.slice(0, 6);
+  const candidateJobLocationOptions = useMemo(
+    () =>
+      [...new Set(recommendedJobs.map((job) => String(job.location || '').trim()).filter(Boolean))].sort(
+        (leftValue, rightValue) => leftValue.localeCompare(rightValue, 'id')
+      ),
+    [recommendedJobs]
+  );
+  const candidateJobWorkModeOptions = useMemo(
+    () =>
+      [...new Set(recommendedJobs.map((job) => String(job.work_mode || '').trim()).filter(Boolean))],
+    [recommendedJobs]
+  );
+  const candidateJobExperienceOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          recommendedJobs.map((job) => String(job.experience_level || '').trim()).filter(Boolean)
+        ),
+      ],
+    [recommendedJobs]
+  );
+  const filteredRecommendedJobs = useMemo(() => {
+    const normalizedSearchQuery = String(candidateJobFilters.search || '').trim().toLowerCase();
+
+    return recommendedJobs.filter((job) => {
+      const recruiterName = String(
+        job.recruiter?.company_name || job.recruiter?.name || ''
+      ).trim();
+      const searchableText = [job.title, recruiterName, job.category, job.location, job.description]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const matchesSearch =
+        !normalizedSearchQuery || searchableText.includes(normalizedSearchQuery);
+      const matchesLocation =
+        !candidateJobFilters.location ||
+        String(job.location || '').trim() === candidateJobFilters.location;
+      const matchesWorkMode =
+        !candidateJobFilters.workMode ||
+        String(job.work_mode || '').trim() === candidateJobFilters.workMode;
+      const matchesExperienceLevel =
+        !candidateJobFilters.experienceLevel ||
+        String(job.experience_level || '').trim() === candidateJobFilters.experienceLevel;
+
+      return matchesSearch && matchesLocation && matchesWorkMode && matchesExperienceLevel;
+    });
+  }, [candidateJobFilters, recommendedJobs]);
+  const hasActiveCandidateJobFilters = Boolean(
+    candidateJobFilters.search ||
+      candidateJobFilters.location ||
+      candidateJobFilters.workMode ||
+      candidateJobFilters.experienceLevel
+  );
   const primaryPreferredRole = firstFilledItem(persistedProfile.preferredRoles, 'Belum diisi');
   const primaryPreferredLocation = firstFilledItem(
     persistedProfile.preferredLocations,
@@ -1005,6 +1066,17 @@ const CandidateDashboardPage = () => {
 
   const handleOpenRecommendedJob = (job) => {
     navigate(getJobApplyRoute(job.id));
+  };
+
+  const handleCandidateJobFilterChange = (field, value) => {
+    setCandidateJobFilters((currentFilters) => ({
+      ...currentFilters,
+      [field]: value,
+    }));
+  };
+
+  const handleResetCandidateJobFilters = () => {
+    setCandidateJobFilters(createCandidateJobFilters());
   };
 
   const handleLogout = async () => {
@@ -2781,7 +2853,7 @@ const CandidateDashboardPage = () => {
                 <article className="candidate-jobs-context-card">
                   <div className="candidate-jobs-context-head">
                     <strong>Arah pencarian Anda</strong>
-                    <span>{recommendedJobs.length} peluang cocok</span>
+                    <span>{filteredRecommendedJobs.length} peluang cocok</span>
                   </div>
                   <p>{jobsFocusCaption}</p>
                   <div className="candidate-jobs-priority-row">
@@ -2809,31 +2881,128 @@ const CandidateDashboardPage = () => {
                 </p>
               </aside>
 
+              <section className="candidate-jobs-filter-panel" data-reveal data-reveal-delay="120ms">
+                <div className="candidate-jobs-filter-head">
+                  <div>
+                    <strong>Filter lowongan dashboard</strong>
+                    <span>
+                      {filteredRecommendedJobs.length} dari {recommendedJobs.length} lowongan tampil
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="candidate-jobs-filter-reset"
+                    onClick={handleResetCandidateJobFilters}
+                    disabled={!hasActiveCandidateJobFilters}
+                  >
+                    Reset Filter
+                  </button>
+                </div>
+
+                <div className="candidate-jobs-filter-grid">
+                  <label className="candidate-jobs-filter-field">
+                    <span>Cari posisi atau perusahaan</span>
+                    <input
+                      type="search"
+                      value={candidateJobFilters.search}
+                      onChange={(event) =>
+                        handleCandidateJobFilterChange('search', event.target.value)
+                      }
+                      placeholder="Contoh: admin gudang, sales, PT Nusantara"
+                    />
+                  </label>
+
+                  <label className="candidate-jobs-filter-field">
+                    <span>Lokasi</span>
+                    <select
+                      value={candidateJobFilters.location}
+                      onChange={(event) =>
+                        handleCandidateJobFilterChange('location', event.target.value)
+                      }
+                    >
+                      <option value="">Semua lokasi</option>
+                      {candidateJobLocationOptions.map((locationOption) => (
+                        <option key={locationOption} value={locationOption}>
+                          {locationOption}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="candidate-jobs-filter-field">
+                    <span>Mode kerja</span>
+                    <select
+                      value={candidateJobFilters.workMode}
+                      onChange={(event) =>
+                        handleCandidateJobFilterChange('workMode', event.target.value)
+                      }
+                    >
+                      <option value="">Semua mode</option>
+                      {candidateJobWorkModeOptions.map((workModeOption) => (
+                        <option key={workModeOption} value={workModeOption}>
+                          {formatWorkMode(workModeOption)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="candidate-jobs-filter-field">
+                    <span>Level kandidat</span>
+                    <select
+                      value={candidateJobFilters.experienceLevel}
+                      onChange={(event) =>
+                        handleCandidateJobFilterChange('experienceLevel', event.target.value)
+                      }
+                    >
+                      <option value="">Semua level</option>
+                      {candidateJobExperienceOptions.map((experienceOption) => (
+                        <option key={experienceOption} value={experienceOption}>
+                          {formatExperienceLevel(experienceOption)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </section>
+
               {jobsError && <div className="error">{jobsError}</div>}
 
               <div className="candidate-jobs-card-list">
                 {isLoadingJobs ? (
                   <div className="loading">Memuat rekomendasi lowongan...</div>
-                ) : recommendedJobs.length === 0 ? (
+                ) : filteredRecommendedJobs.length === 0 ? (
                   <article className="candidate-jobs-card candidate-jobs-card-empty">
                     <div className="candidate-jobs-empty-head">
-                      <strong>Belum ada rekomendasi kuat</strong>
-                      <span>Lengkapi minat kerja</span>
+                      <strong>
+                        {hasActiveCandidateJobFilters
+                          ? 'Belum ada lowongan yang cocok dengan filter'
+                          : 'Belum ada rekomendasi kuat'}
+                      </strong>
+                      <span>
+                        {hasActiveCandidateJobFilters ? 'Coba ubah filter' : 'Lengkapi minat kerja'}
+                      </span>
                     </div>
                     <p>
-                      Tambahkan posisi yang diminati, lokasi prioritas, dan industri target agar
-                      sistem bisa menyusun lowongan yang lebih relevan untuk Anda.
+                      {hasActiveCandidateJobFilters
+                        ? 'Sesuaikan kata kunci, lokasi, mode kerja, atau level kandidat agar hasil yang tampil lebih luas.'
+                        : 'Tambahkan posisi yang diminati, lokasi prioritas, dan industri target agar sistem bisa menyusun lowongan yang lebih relevan untuk Anda.'}
                     </p>
                     <button
                       type="button"
                       className="candidate-jobs-primary-button"
-                      onClick={() => handleSectionChange('profile')}
+                      onClick={
+                        hasActiveCandidateJobFilters
+                          ? handleResetCandidateJobFilters
+                          : () => handleSectionChange('profile')
+                      }
                     >
-                      Lengkapi Profil Siap Lamar
+                      {hasActiveCandidateJobFilters
+                        ? 'Reset Filter Dashboard'
+                        : 'Lengkapi Profil Siap Lamar'}
                     </button>
                   </article>
                 ) : (
-                  recommendedJobs.map((job, index) => {
+                  filteredRecommendedJobs.map((job, index) => {
                     const recruiterName =
                       job.recruiter?.company_name || job.recruiter?.name || 'Recruiter Demo';
                     const matchPercent = formatCandidateJobScorePercent(job);

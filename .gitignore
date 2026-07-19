@@ -4,19 +4,15 @@ backupdeploy/
 # Frontend
 frontend/node_modules/
 frontend/dist/
-frontend/.vercel/
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
-!frontend/.env.vercel.example
 
 # Backend
 backend/vendor/
-backend/.vercel/
 backend/.env
 backend/.env.*
 !backend/.env.example
-!backend/.env.vercel.example
 backend/storage/framework/cache/data/
 backend/storage/framework/sessions/
 backend/storage/framework/views/

@@ -1,5 +1,6 @@
 import apiClient from '../utils/apiClient.js';
 import { shouldUseMockData } from '../utils/mockMode.js';
+import { readStoredAuthUser } from '../utils/authSessionStorage.js';
 
 const MOCK_CHAT_STORAGE_KEY = 'mock_chat_messages';
 const MOCK_USERS_STORAGE_KEY = 'mock_auth_users';
@@ -22,11 +23,7 @@ const readStoredJson = (storageKey, fallbackValue) => {
  * Load the current authenticated user from browser storage for mock chat flows.
  */
 const getCurrentUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem('user') || 'null');
-  } catch {
-    return null;
-  }
+  return readStoredAuthUser();
 };
 
 /**

@@ -23,6 +23,7 @@ const RecruiterTopbar = ({
   sections,
   activeSection,
   onSectionSelect,
+  mobileShortcuts = [],
   onBrandClick,
   onLogout,
   isLoggingOut,
@@ -142,7 +143,7 @@ const RecruiterTopbar = ({
                 className="recruiter-premium-button"
                 onClick={onPremiumClick}
               >
-                Paket {recruiterPlanLabel}
+                Info Paket {recruiterPlanLabel}
               </button>
               <div className="recruiter-credit-chip" aria-label="KerjaNusa Credit">
                 <span>KN Credit</span>
@@ -186,6 +187,23 @@ const RecruiterTopbar = ({
                   <small>{companyDisplayRole}</small>
                 </div>
               </div>
+
+              {mobileShortcuts.length > 0 && (
+                <div className="recruiter-topbar-menu-shortcuts">
+                  {mobileShortcuts.map((shortcut) => (
+                    <button
+                      key={shortcut.value}
+                      type="button"
+                      className={`recruiter-topbar-menu-shortcut${
+                        activeSection === shortcut.value ? ' is-active' : ''
+                      }`}
+                      onClick={() => handleSectionClick(shortcut.value)}
+                    >
+                      {shortcut.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <button
                 type="button"

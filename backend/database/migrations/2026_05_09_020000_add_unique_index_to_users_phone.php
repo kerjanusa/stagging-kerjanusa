@@ -17,6 +17,29 @@ return new class extends Migration
             ->where('phone', '')
             ->update(['phone' => null]);
 
+        $duplicatePhones = DB::table('users')
+            ->select('phone')
+            ->whereNotNull('phone')
+            ->where('phone', '!=', '')
+            ->groupBy('phone')
+            ->havingRaw('COUNT(*) > 1')
+            ->pluck('phone');
+
+        foreach ($duplicatePhones as $phone) {
+            $duplicateUserIds = DB::table('users')
+                ->where('phone', $phone)
+                ->orderBy('id')
+                ->pluck('id');
+
+            if ($duplicateUserIds->count() < 2) {
+                continue;
+            }
+
+            DB::table('users')
+                ->whereIn('id', $duplicateUserIds->slice(1)->all())
+                ->update(['phone' => null]);
+        }
+
         Schema::table('users', function (Blueprint $table) {
             $table->unique('phone');
         });

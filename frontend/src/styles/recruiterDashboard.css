@@ -332,6 +332,44 @@
   font-size: 0.72rem;
 }
 
+.recruiter-topbar-menu-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.recruiter-topbar-menu-shortcut {
+  min-height: 2.7rem;
+  padding: 0.72rem 0.82rem;
+  border: 1px solid rgba(191, 157, 105, 0.18);
+  border-radius: 0.92rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: #5b234f;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.recruiter-topbar-menu-shortcut:hover,
+.recruiter-topbar-menu-shortcut:focus-visible {
+  border-color: rgba(212, 170, 68, 0.34);
+  background: rgba(255, 249, 239, 0.96);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(46, 22, 44, 0.08);
+}
+
+.recruiter-topbar-menu-shortcut.is-active {
+  border-color: rgba(212, 170, 68, 0.38);
+  background: linear-gradient(180deg, #fff6df 0%, #ffefc8 100%);
+  color: #3b172e;
+}
+
 .recruiter-topbar-menu-logout {
   width: 100%;
   justify-content: center;
@@ -3106,6 +3144,10 @@
     border-top: 1px solid rgba(191, 157, 105, 0.18);
   }
 
+  .recruiter-topbar-menu-shortcuts {
+    grid-template-columns: 1fr;
+  }
+
   .recruiter-topbar-backdrop {
     display: block;
     position: fixed;
@@ -3523,6 +3565,21 @@
     font-size: 0.66rem;
   }
 
+  .recruiter-topbar-menu-shortcut {
+    min-height: 2.92rem;
+    padding: 0.82rem 0.88rem;
+    font-size: 0.8rem;
+  }
+
+  .recruiter-flow-filter-pocket {
+    margin-bottom: 0.9rem;
+  }
+
+  .recruiter-flow-filter-floating-panel {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .recruiter-company-brand-preview {
     width: 4.7rem;
     height: 4.7rem;
@@ -3851,6 +3908,10 @@
   margin-bottom: 1rem;
 }
 
+.recruiter-flow-spotlight-grid-compact {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .recruiter-flow-spotlight-card {
   display: grid;
   gap: 0.9rem;
@@ -3900,6 +3961,29 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
+}
+
+.recruiter-flow-filter-pocket {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 1rem;
+}
+
+.recruiter-flow-filter-floating-panel {
+  display: inline-flex;
+  width: auto;
+  max-width: min(100%, 22rem);
+  padding: 0.72rem;
+  border: 1px solid rgba(183, 133, 45, 0.18);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at top left, rgba(255, 226, 168, 0.24), transparent 40%),
+    rgba(255, 252, 247, 0.96);
+  box-shadow: 0 16px 32px rgba(46, 22, 44, 0.08);
+}
+
+.recruiter-flow-filter-floating-panel .workspace-filter-chip {
+  justify-content: flex-start;
 }
 
 .recruiter-flow-job-grid {
@@ -4515,7 +4599,7 @@
     left: 0.8rem;
     z-index: 40;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.45rem;
     padding: 0.48rem;
     border: 1px solid rgba(191, 157, 105, 0.2);

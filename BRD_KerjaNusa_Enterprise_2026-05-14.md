@@ -9,7 +9,7 @@
 | Jenis aplikasi | Aplikasi web rekrutmen multi-role |
 | Lokasi source code yang dianalisis | `/home/lutfi/Dokumen/lutfi/dani/v3` |
 | Tanggal analisis | 14 Mei 2026 |
-| Dasar analisis | Source code frontend React/Vite, backend Laravel, migration database, route API, konfigurasi environment, konfigurasi deployment Vercel, dan dokumen pendukung repo |
+| Dasar analisis | Source code frontend React/Vite, backend Laravel, migration database, route API, konfigurasi environment, dan dokumen pendukung repo |
 | Versi dokumen | 1.0 |
 | Penyusun | Analisis otomatis berbasis inspeksi source code lokal |
 | Status dokumen | Draft analitis siap review bisnis, produk, dan engineering |
@@ -23,7 +23,7 @@ Dari hasil analisis source code, aplikasi ini paling kuat pada area berikut:
 2. Workflow lowongan dan lamaran yang sudah dipetakan sampai level stage.
 3. Model monetisasi awal berbasis paket recruiter.
 4. Dashboard admin yang cukup kaya untuk monitoring operasional.
-5. Arsitektur deployment yang sudah diarahkan ke Vercel dengan backend API terpisah.
+5. Arsitektur deployment yang memisahkan frontend dan backend API secara jelas.
 
 Secara bisnis, KerjaNusa berpotensi diposisikan sebagai platform hiring end-to-end untuk perusahaan skala kecil sampai menengah yang membutuhkan proses publish lowongan, screening kandidat, shortlist, komunikasi, dan kontrol admin dalam satu dashboard. Namun, ada beberapa area yang masih bersifat parsial atau belum sepenuhnya enterprise-ready, terutama pada upload berkas nyata, audit trail persisten, notifikasi operasional selain reset password, persistence untuk sebagian kriteria lowongan recruiter, dan konsistensi routing serverless pada semua endpoint produksi.
 
@@ -40,8 +40,8 @@ Stack aplikasi yang ditemukan:
 | --- | --- |
 | Frontend | React 18, React Router, Axios, Zustand, Vite |
 | Backend | Laravel 10, PHP 8.1+, Laravel Sanctum |
-| Database | MySQL/MariaDB untuk lokal, PostgreSQL/Supabase untuk production example |
-| Deployment | Vercel frontend terpisah dan Vercel PHP runtime untuk backend |
+| Database | MySQL/MariaDB untuk lokal, PostgreSQL untuk alternatif deployment |
+| Deployment | Frontend dan backend dapat dideploy terpisah sesuai kebutuhan infrastruktur |
 | Messaging email | Laravel Mail dengan mode `log` default, siap diarahkan ke SMTP |
 | Persistensi sisi browser | `localStorage` untuk session, mock mode, profil kandidat, profil recruiter, state UI tertentu |
 
@@ -556,14 +556,14 @@ Frontend React
 | Kategori | Requirement |
 | --- | --- |
 | Performance | Listing lowongan, dashboard recruiter, dan dashboard admin sebaiknya merespons < 3 detik untuk beban normal. |
-| Availability | Frontend dan backend production didesain untuk deployment terpisah di Vercel. |
+| Availability | Frontend dan backend production didesain untuk deployment terpisah. |
 | Scalability | Query dashboard admin sudah mulai dioptimasi dengan indeks tambahan pada tabel `users`, `jobs`, dan `applications`. |
 | Security | Semua endpoint protected harus memakai token Sanctum, middleware `active`, dan middleware `role` bila diperlukan. |
 | Data Integrity | Duplicate lamaran per lowongan-kandidat harus dicegah secara DB (`unique`) dan service. |
 | Maintainability | Arsitektur backend memakai pattern Controller -> Service -> Model; frontend memisahkan pages, services, hooks, utils. |
 | Usability | UI bersifat role-based, responsif, dan memakai section yang jelas untuk dashboard kandidat/recruiter/admin. |
 | Observability | Endpoint `/api/health` dan `/api/health/database` harus tersedia untuk validasi deployment. |
-| Portability | Konfigurasi database mendukung MySQL lokal dan PostgreSQL/Supabase. |
+| Portability | Konfigurasi database mendukung MySQL lokal dan PostgreSQL. |
 | Deployability | Build frontend harus lulus `vite build`; backend harus valid menjalankan route list dan migration. |
 | Privacy | Data profil kandidat, nomor telepon, email, dan dokumen harus dianggap data sensitif. |
 | Resilience | Frontend memiliki fallback mock mode saat API URL tidak tersedia, namun mode ini harus dibatasi untuk non-production usage. |
@@ -602,8 +602,8 @@ User Browser
 | State | Zustand untuk auth; hooks lokal untuk jobs, applications, chat |
 | Persistence client | localStorage untuk token, user, profile candidate/recruiter, mock data |
 | Backend business logic | Terpusat pada `AuthService`, `JobService`, `ApplicationService`, `AdminService`, `MessageService`, `RecruiterPlanService`, `TalentSearchService` |
-| Deployment adapter | Backend memakai wrapper PHP pada folder `backend/api` untuk runtime Vercel |
-| Runtime limitation | Vercel function `maxDuration` 60 detik, storage diarahkan ke `/tmp/kerjanusa-storage` |
+| Deployment adapter | Backend memakai wrapper PHP pada folder `backend/api` untuk deployment adapter yang membutuhkan entrypoint khusus |
+| Runtime limitation | Storage sementara diarahkan ke `/tmp/kerjanusa-storage` pada environment yang tidak memiliki storage persisten |
 
 ## 16. Database Analysis
 ### 16.1 Core Tables
@@ -716,10 +716,10 @@ password_reset_tokens keyed by email
 ## 19. Integration Requirements
 | Integrasi | Status | Keterangan |
 | --- | --- | --- |
-| Vercel Frontend | Ada | SPA route fallback ke `index.html` |
-| Vercel Backend | Ada | PHP runtime dengan wrapper `backend/api` |
+| Frontend static hosting | Ada | SPA route fallback ke `index.html` |
+| Backend PHP runtime | Ada | Wrapper `backend/api` tersedia untuk adapter deployment yang membutuhkan entrypoint khusus |
 | Database MySQL | Ada | Default lokal |
-| PostgreSQL/Supabase | Ada sebagai target production example | Didukung lewat env `pgsql` |
+| PostgreSQL | Ada sebagai target alternatif deployment | Didukung lewat env `pgsql` |
 | Email SMTP | Parsial | Konfigurasi tersedia, default masih `log` |
 | Browser Geolocation API | Ada | Untuk rekomendasi lokasi lowongan |
 | WhatsApp Deep Link | Ada | Floating button ke nomor support |
@@ -809,7 +809,7 @@ Catatan analisis:
 | Area | Requirement |
 | --- | --- |
 | Frontend build | `npm run build` harus lulus |
-| Backend runtime | Laravel harus dapat di-serve melalui wrapper PHP Vercel |
+| Backend runtime | Laravel harus dapat di-serve melalui web server atau adapter deployment yang sesuai |
 | Environment | `APP_KEY`, koneksi DB, CORS, SANCTUM stateful domain, mail config, `VITE_API_URL` |
 | Database migration | Semua migration harus dijalankan sebelum go-live |
 | Mail | SMTP production dibutuhkan untuk reset password nyata |
@@ -822,8 +822,8 @@ Catatan analisis:
 | Frontend runtime | Node.js 18+ untuk build |
 | Backend runtime | PHP 8.1+ |
 | Database | MySQL/MariaDB lokal atau PostgreSQL production |
-| Deployment region | Backend saat ini diarahkan ke `hnd1` di Vercel |
-| Storage sementara | `/tmp/kerjanusa-storage` pada Vercel runtime |
+| Deployment region | Ditentukan oleh infrastruktur aktif yang dipakai tim |
+| Storage sementara | `/tmp/kerjanusa-storage` pada runtime yang tidak memiliki storage persisten |
 | Secret management | Semua kredensial harus di env variable, bukan di source code |
 | Logging | Minimal stderr/log channel pada production |
 | Backup | Backup database terjadwal perlu ditetapkan di luar aplikasi |
@@ -841,7 +841,7 @@ Catatan analisis:
 | --- | --- | --- | --- |
 | Upload dokumen belum real storage | Tinggi | Tinggi | Integrasi object storage dan metadata file formal |
 | Audit trail belum persisten | Tinggi | Tinggi | Tambah logging aksi admin/recruiter yang immutable |
-| Routing Vercel untuk sebagian endpoint recruiter/chat tidak terlihat dipetakan eksplisit pada wrapper serverless | Tinggi | Menengah | Verifikasi production routing dan tambahkan rewrite/catch-all yang konsisten |
+| Routing adapter deployment untuk sebagian endpoint recruiter/chat perlu divalidasi konsistensinya | Tinggi | Menengah | Verifikasi routing production dan tambahkan rewrite/catch-all yang konsisten |
 | Kriteria lowongan di UI belum seluruhnya tersimpan di backend | Tinggi | Tinggi | Finalisasi model data requisition/candidate criteria |
 | Mailer default `log` | Menengah | Tinggi | Aktifkan SMTP production dan monitoring delivery |
 | Session token di local storage | Menengah | Menengah | Pertimbangkan hardening, CSP, dan review XSS posture |
@@ -1051,10 +1051,10 @@ Superadmin
 | Backend framework | Laravel 10 |
 | Frontend framework | React 18 |
 | Auth API | Sanctum bearer token |
-| Database | MySQL/MariaDB, PostgreSQL/Supabase |
+| Database | MySQL/MariaDB, PostgreSQL |
 | Styling | CSS custom |
 | Build tool | Vite |
-| Deployment | Vercel |
+| Deployment | Bergantung pada infrastruktur aktif |
 | Mail | Laravel Mail (`log`/SMTP) |
 | Browser API | Geolocation, localStorage |
 | External deep link | WhatsApp |
@@ -1063,4 +1063,4 @@ Superadmin
 1. Dokumen ini diturunkan dari implementasi source code terkini pada 14 Mei 2026.
 2. Beberapa requirement “to-be” ditambahkan sebagai pelengkap profesional ketika UI sudah mengindikasikan intent bisnis, tetapi backend persistence belum lengkap.
 3. Field recruiter seperti gender kandidat, batas usia, pendidikan minimum, domisili, shift, dan expiry date dianggap sebagai requirement bisnis yang direncanakan, namun saat ini belum seluruhnya masuk ke model data backend.
-4. Berdasarkan konfigurasi `backend/api` dan `backend/vercel.json`, endpoint chat dan sebagian recruiter workspace perlu divalidasi ulang pada deployment production karena tidak terlihat dipetakan eksplisit melalui wrapper serverless sebagaimana endpoint auth/jobs/admin dasar.
+4. Berdasarkan konfigurasi `backend/api`, endpoint chat dan sebagian recruiter workspace perlu divalidasi ulang pada deployment production agar routing adapter deployment tetap konsisten sebagaimana endpoint auth/jobs/admin dasar.

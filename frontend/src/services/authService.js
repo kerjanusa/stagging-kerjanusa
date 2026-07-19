@@ -2,6 +2,13 @@ import apiClient from '../utils/apiClient';
 import { shouldUseMockData } from '../utils/mockMode';
 import { clearCandidateApplyIntent } from '../utils/candidateApplyIntent.js';
 import { normalizeUserRole } from '../utils/routeHelpers.js';
+import {
+  clearStoredAuthSession,
+  readStoredAuthToken,
+  readStoredAuthUser,
+  writeStoredAuthToken,
+  writeStoredAuthUser,
+} from '../utils/authSessionStorage.js';
 
 const MOCK_USERS_STORAGE_KEY = 'mock_auth_users';
 const MOCK_PASSWORD_RESET_STORAGE_KEY = 'mock_password_reset_tokens';
@@ -171,8 +178,8 @@ const buildMockResetToken = () =>
 const persistMockSession = (user) => {
   const sessionToken = `mock-token-${user.id}`;
   const normalizedUser = stripPassword(user);
-  localStorage.setItem('auth_token', sessionToken);
-  localStorage.setItem('user', JSON.stringify(normalizedUser));
+  writeStoredAuthToken(sessionToken);
+  writeStoredAuthUser(normalizedUser);
 
   return sessionToken;
 };
@@ -184,11 +191,11 @@ const persistApiSession = (user, token) => {
   const normalizedUser = normalizeAuthUser(user);
 
   if (token) {
-    localStorage.setItem('auth_token', token);
+    writeStoredAuthToken(token);
   }
 
   if (normalizedUser) {
-    localStorage.setItem('user', JSON.stringify(normalizedUser));
+    writeStoredAuthUser(normalizedUser);
   }
 
   return normalizedUser;
@@ -442,20 +449,17 @@ class AuthService {
    */
   static async logout() {
     if (shouldUseMockData) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
+      clearStoredAuthSession();
       clearCandidateApplyIntent();
       return;
     }
 
     try {
       await apiClient.post('/logout');
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
+      clearStoredAuthSession();
       clearCandidateApplyIntent();
     } catch (error) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
+      clearStoredAuthSession();
       clearCandidateApplyIntent();
       throw error.response?.data || error.message;
     }
@@ -560,8 +564,7 @@ class AuthService {
 
       const storedUser = this.getStoredUser();
       if (storedUser?.email?.trim().toLowerCase() === normalizedEmail) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
+        clearStoredAuthSession();
       }
 
       return {
@@ -573,8 +576,7 @@ class AuthService {
       const response = await apiClient.post('/reset-password', data);
       const storedUser = this.getStoredUser();
       if (storedUser?.email?.trim().toLowerCase() === data.email?.trim().toLowerCase()) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
+        clearStoredAuthSession();
       }
       return response.data;
     } catch (error) {
@@ -622,7 +624,7 @@ class AuthService {
       );
 
       saveMockUsers(users);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      writeStoredAuthUser(updatedUser);
 
       return { user: updatedUser };
     }
@@ -691,31 +693,26 @@ class AuthService {
    * Get token from storage
    */
   static getToken() {
-    return localStorage.getItem('auth_token');
+    return readStoredAuthToken();
   }
 
   /**
    * Get stored user
    */
   static getStoredUser() {
-    const user = localStorage.getItem('user');
+    const parsedUser = readStoredAuthUser();
 
-    if (!user) {
+    if (!parsedUser) {
       return null;
     }
 
-    try {
-      const parsedUser = JSON.parse(user);
-      const normalizedUser = normalizeAuthUser(parsedUser);
+    const normalizedUser = normalizeAuthUser(parsedUser);
 
-      if (normalizedUser?.role !== parsedUser?.role) {
-        localStorage.setItem('user', JSON.stringify(normalizedUser));
-      }
-
-      return normalizedUser;
-    } catch {
-      return null;
+    if (normalizedUser?.role !== parsedUser?.role) {
+      writeStoredAuthUser(normalizedUser);
     }
+
+    return normalizedUser;
   }
 
   /**

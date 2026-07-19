@@ -386,6 +386,8 @@ const mergeAddressBook = (addresses, locations) => {
   return Array.from(existingMap.values());
 };
 
+const MAX_SCREENING_QUESTION_LIMIT = 5;
+
 const INITIAL_FORM = {
   title: '',
   experience_level: '',
@@ -413,10 +415,9 @@ const INITIAL_FORM = {
   candidate_custom_skill: '',
   internal_recruiter_link: '',
   video_screening_requirement: 'optional',
-  quiz_screening_questions: ['ready-to-work'],
-  quiz_question_1: '',
-  quiz_question_2: '',
-  quiz_question_3: '',
+  quiz_screening_questions: [],
+  quiz_question_requirements: {},
+  custom_quiz_questions: [],
 };
 
 const FORM_STEP_LABELS = FORM_STEP_OPTIONS.reduce((labels, step) => {
@@ -573,6 +574,11 @@ const FIELD_METADATA = {
     step: 3,
     section: 'Kuis',
   },
+  custom_quiz_questions: {
+    label: 'Pertanyaan Custom',
+    step: 3,
+    section: 'Kuis',
+  },
 };
 
 const FOCUSABLE_FIELD_SELECTOR =
@@ -617,13 +623,9 @@ const normalizeDigitInput = (value = '') => {
 };
 
 /**
- * Menghitung jumlah kata untuk validasi deskripsi lowongan yang lebih dekat dengan brief recruiter.
+ * Menghitung jumlah karakter efektif untuk validasi deskripsi lowongan.
  */
-const countWords = (value = '') =>
-  String(value)
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
+const countCharacters = (value = '') => String(value).trim().length;
 
 /**
  * Validasi URL ringan untuk link internal recruiter atau tracking eksternal.
@@ -690,6 +692,15 @@ const splitCustomSkillReferences = (value = '') =>
 const normalizeReferenceKey = (value = '') => String(value).trim().toLowerCase();
 
 /**
+ * Membuat satu entri pertanyaan custom dengan ID stabil untuk UI recruiter.
+ */
+const createCustomQuizQuestionEntry = () => ({
+  id: `custom-question-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  question: '',
+  required: false,
+});
+
+/**
  * Menyimpan sebagian state dashboard recruiter agar pengalaman kembali ke halaman tetap halus.
  */
 const persistRecruiterDashboardState = (partialState) => {
@@ -733,23 +744,25 @@ const getCreateJobErrorMessage = (error) => {
 /**
  * Menggabungkan pertanyaan screening bawaan dan custom menjadi payload backend yang seragam.
  */
-const buildScreeningQuestionPayload = (selectedQuestions, customQuestions) => [
+const buildScreeningQuestionPayload = (selectedQuestions, customQuestions, requirementMap) => [
   ...selectedQuestions.map((question) => ({
     id: question.id,
     type: 'single-choice',
     title: question.title,
     question: question.question,
     answers: question.answers,
-    required: true,
+    required: Boolean(requirementMap?.[question.id]),
   })),
-  ...customQuestions.map((question, index) => ({
-    id: `custom-question-${index + 1}`,
+  ...customQuestions
+    .filter((question) => String(question?.question || '').trim())
+    .map((question, index) => ({
+      id: question.id || `custom-question-${index + 1}`,
     type: 'text',
-    title: `Pertanyaan Tambahan ${index + 1}`,
-    question: question.trim(),
-    answers: [],
-    required: true,
-  })),
+      title: `Pertanyaan Custom ${index + 1}`,
+      question: String(question.question || '').trim(),
+      answers: [],
+      required: Boolean(question.required ?? requirementMap?.[question.id]),
+    })),
 ];
 
 /**
@@ -895,7 +908,7 @@ const RecruiterJobCreatePage = () => {
     };
   }, [currentStep, pendingFieldNavigation]);
 
-  const descriptionWordCount = countWords(formData.description);
+  const descriptionCharacterCount = countCharacters(formData.description);
   const addressDetailLength = addressFormData.detail.trim().length;
   const minimumExpiryDate = new Date().toISOString().split('T')[0];
   const selectedAddress =
@@ -950,23 +963,44 @@ const RecruiterJobCreatePage = () => {
   const selectedScreeningQuestionIds = Array.isArray(formData.quiz_screening_questions)
     ? formData.quiz_screening_questions
     : [];
-  const customQuizQuestions = [
-    formData.quiz_question_1,
-    formData.quiz_question_2,
-    formData.quiz_question_3,
-  ].filter((question) => question.trim());
-  const resolvedActiveQuizQuestionId = selectedScreeningQuestionIds.includes(activeQuizQuestionId)
-    ? activeQuizQuestionId
-    : selectedScreeningQuestionIds[0] || QUIZ_SCREENING_QUESTIONS[0].id;
-  const activeQuizQuestion =
-    QUIZ_SCREENING_QUESTIONS.find((question) => question.id === resolvedActiveQuizQuestionId) ||
-    QUIZ_SCREENING_QUESTIONS[0];
-  const selectedScreeningQuestionLabels = QUIZ_SCREENING_QUESTIONS.filter((question) =>
-    selectedScreeningQuestionIds.includes(question.id)
-  ).map((question) => question.label);
   const selectedScreeningQuestions = QUIZ_SCREENING_QUESTIONS.filter((question) =>
     selectedScreeningQuestionIds.includes(question.id)
   );
+  const customQuizQuestions = Array.isArray(formData.custom_quiz_questions)
+    ? formData.custom_quiz_questions
+    : [];
+  const selectedScreeningQuestionLabels = selectedScreeningQuestions.map(
+    (question) =>
+      `${question.label}${
+        formData.quiz_question_requirements?.[question.id] ? ' (Wajib diisi)' : ' (Opsional)'
+      }`
+  );
+  const configuredQuizQuestions = [
+    ...selectedScreeningQuestions.map((question) => ({
+      ...question,
+      required: Boolean(formData.quiz_question_requirements?.[question.id]),
+    })),
+    ...customQuizQuestions.map((question, index) => ({
+      id: question.id,
+      type: 'text',
+      title: `Pertanyaan Custom ${index + 1}`,
+      description: 'Jawaban pelamar akan diisi bebas sesuai arahan recruiter.',
+      question:
+        String(question.question || '').trim() || `Pertanyaan custom ${index + 1} belum diisi.`,
+      answers: [],
+      isCustom: true,
+      required: Boolean(question.required),
+    })),
+  ];
+  const resolvedActiveQuizQuestionId = configuredQuizQuestions.some(
+    (question) => question.id === activeQuizQuestionId
+  )
+    ? activeQuizQuestionId
+    : configuredQuizQuestions[0]?.id || QUIZ_SCREENING_QUESTIONS[0].id;
+  const activeQuizQuestion =
+    configuredQuizQuestions.find((question) => question.id === resolvedActiveQuizQuestionId) ||
+    QUIZ_SCREENING_QUESTIONS[0];
+  const configuredScreeningQuestionCount = configuredQuizQuestions.length;
   const customSkillReferences = splitCustomSkillReferences(formData.candidate_custom_skill);
   const companyCompletion = getRecruiterCompanyCompletion(companyProfile);
   const occupiedCustomSkillReferenceKeys = new Set([
@@ -1145,7 +1179,7 @@ const RecruiterJobCreatePage = () => {
     clearSubmitFeedback();
   };
 
-  const handleQuizQuestionToggle = (questionId, limit = 5) => {
+  const handleQuizQuestionToggle = (questionId) => {
     let reachedLimit = false;
     let nextActiveQuestionId = questionId;
 
@@ -1153,18 +1187,29 @@ const RecruiterJobCreatePage = () => {
       const currentValues = Array.isArray(current.quiz_screening_questions)
         ? current.quiz_screening_questions
         : [];
+      const currentCustomQuestions = Array.isArray(current.custom_quiz_questions)
+        ? current.custom_quiz_questions
+        : [];
+      const currentRequirements =
+        current.quiz_question_requirements && typeof current.quiz_question_requirements === 'object'
+          ? current.quiz_question_requirements
+          : {};
 
       if (currentValues.includes(questionId)) {
         const nextValues = currentValues.filter((item) => item !== questionId);
-        nextActiveQuestionId = nextValues[0] || questionId;
+        const nextRequirements = { ...currentRequirements };
+        delete nextRequirements[questionId];
+        nextActiveQuestionId =
+          nextValues[0] || currentCustomQuestions[0]?.id || QUIZ_SCREENING_QUESTIONS[0].id;
 
         return {
           ...current,
           quiz_screening_questions: nextValues,
+          quiz_question_requirements: nextRequirements,
         };
       }
 
-      if (currentValues.length >= limit) {
+      if (currentValues.length + currentCustomQuestions.length >= MAX_SCREENING_QUESTION_LIMIT) {
         reachedLimit = true;
         return current;
       }
@@ -1178,7 +1223,7 @@ const RecruiterJobCreatePage = () => {
     if (reachedLimit) {
       setFormErrors((currentErrors) => ({
         ...currentErrors,
-        quiz_screening_questions: `Maksimal ${limit} pertanyaan screening.`,
+        quiz_screening_questions: `Maksimal ${MAX_SCREENING_QUESTION_LIMIT} pertanyaan screening.`,
       }));
       clearSubmitFeedback();
       return;
@@ -1186,6 +1231,123 @@ const RecruiterJobCreatePage = () => {
 
     setActiveQuizQuestionId(nextActiveQuestionId);
     clearFormError('quiz_screening_questions');
+    clearSubmitFeedback();
+  };
+
+  const handleQuizRequirementToggle = (questionId) => {
+    setFormData((current) => {
+      const currentRequirements =
+        current.quiz_question_requirements && typeof current.quiz_question_requirements === 'object'
+          ? current.quiz_question_requirements
+          : {};
+      const nextRequiredValue = !Boolean(currentRequirements[questionId]);
+      const nextRequirements = { ...currentRequirements };
+
+      if (nextRequiredValue) {
+        nextRequirements[questionId] = true;
+      } else {
+        delete nextRequirements[questionId];
+      }
+
+      return {
+        ...current,
+        quiz_question_requirements: nextRequirements,
+        custom_quiz_questions: Array.isArray(current.custom_quiz_questions)
+          ? current.custom_quiz_questions.map((question) =>
+              question.id === questionId ? { ...question, required: nextRequiredValue } : question
+            )
+          : current.custom_quiz_questions,
+      };
+    });
+
+    clearSubmitFeedback();
+  };
+
+  const handleAddCustomQuizQuestion = () => {
+    let reachedLimit = false;
+    let nextQuestionId = '';
+
+    setFormData((current) => {
+      const currentValues = Array.isArray(current.quiz_screening_questions)
+        ? current.quiz_screening_questions
+        : [];
+      const currentCustomQuestions = Array.isArray(current.custom_quiz_questions)
+        ? current.custom_quiz_questions
+        : [];
+
+      if (currentValues.length + currentCustomQuestions.length >= MAX_SCREENING_QUESTION_LIMIT) {
+        reachedLimit = true;
+        return current;
+      }
+
+      const nextQuestion = createCustomQuizQuestionEntry();
+      nextQuestionId = nextQuestion.id;
+
+      return {
+        ...current,
+        custom_quiz_questions: [...currentCustomQuestions, nextQuestion],
+      };
+    });
+
+    if (reachedLimit) {
+      setFormErrors((currentErrors) => ({
+        ...currentErrors,
+        quiz_screening_questions: `Maksimal ${MAX_SCREENING_QUESTION_LIMIT} pertanyaan screening.`,
+      }));
+      clearSubmitFeedback();
+      return;
+    }
+
+    setActiveQuizQuestionId(nextQuestionId);
+    clearFormError('quiz_screening_questions');
+    clearFormError('custom_quiz_questions');
+    clearSubmitFeedback();
+  };
+
+  const handleCustomQuizQuestionChange = (questionId, value) => {
+    setFormData((current) => ({
+      ...current,
+      custom_quiz_questions: Array.isArray(current.custom_quiz_questions)
+        ? current.custom_quiz_questions.map((question) =>
+            question.id === questionId ? { ...question, question: value } : question
+          )
+        : current.custom_quiz_questions,
+    }));
+
+    clearFormError('custom_quiz_questions');
+    clearSubmitFeedback();
+  };
+
+  const handleRemoveCustomQuizQuestion = (questionId) => {
+    let nextActiveQuestionId = QUIZ_SCREENING_QUESTIONS[0].id;
+
+    setFormData((current) => {
+      const currentValues = Array.isArray(current.quiz_screening_questions)
+        ? current.quiz_screening_questions
+        : [];
+      const currentCustomQuestions = Array.isArray(current.custom_quiz_questions)
+        ? current.custom_quiz_questions
+        : [];
+      const nextCustomQuestions = currentCustomQuestions.filter((question) => question.id !== questionId);
+      const currentRequirements =
+        current.quiz_question_requirements && typeof current.quiz_question_requirements === 'object'
+          ? current.quiz_question_requirements
+          : {};
+      const nextRequirements = { ...currentRequirements };
+
+      delete nextRequirements[questionId];
+      nextActiveQuestionId =
+        currentValues[0] || nextCustomQuestions[0]?.id || QUIZ_SCREENING_QUESTIONS[0].id;
+
+      return {
+        ...current,
+        custom_quiz_questions: nextCustomQuestions,
+        quiz_question_requirements: nextRequirements,
+      };
+    });
+
+    setActiveQuizQuestionId(nextActiveQuestionId);
+    clearFormError('custom_quiz_questions');
     clearSubmitFeedback();
   };
 
@@ -1371,8 +1533,8 @@ const RecruiterJobCreatePage = () => {
 
     if (!formData.description.trim()) {
       nextErrors.description = 'Deskripsi pekerjaan wajib diisi.';
-    } else if (countWords(formData.description) < 60) {
-      nextErrors.description = 'Deskripsi pekerjaan minimal 60 kata.';
+    } else if (countCharacters(formData.description) < 60) {
+      nextErrors.description = 'Deskripsi pekerjaan minimal 60 karakter.';
     }
 
     if (!formData.job_type) {
@@ -1571,7 +1733,8 @@ const RecruiterJobCreatePage = () => {
         video_screening_requirement: formData.video_screening_requirement,
         quiz_screening_questions: buildScreeningQuestionPayload(
           selectedScreeningQuestions,
-          customQuizQuestions
+          customQuizQuestions,
+          formData.quiz_question_requirements
         ),
         workflow_status: publishMode === 'publish' ? 'review' : 'draft',
         status: 'inactive',
@@ -1765,7 +1928,7 @@ const RecruiterJobCreatePage = () => {
                       className="recruiter-job-create-field recruiter-job-create-field-full"
                       ref={registerFieldRef('description')}
                     >
-                      <span>Deskripsi Pekerjaan (minimal 60 kata)*</span>
+                      <span>Deskripsi Pekerjaan (minimal 60 karakter)*</span>
                       <textarea
                         name="description"
                         rows="7"
@@ -1779,7 +1942,7 @@ const RecruiterJobCreatePage = () => {
                         <small>
                           {formErrors.description || 'Jelaskan tugas inti, target, dan ritme kerja.'}
                         </small>
-                        <span>{descriptionWordCount}/60 kata</span>
+                        <span>{descriptionCharacterCount}/60 karakter</span>
                       </div>
                     </label>
                   </div>
@@ -2435,7 +2598,11 @@ const RecruiterJobCreatePage = () => {
                             </div>
 
                             <div className="recruiter-job-create-phone-step">
-                              <span>1 dari 5</span>
+                              <span>
+                                {configuredScreeningQuestionCount > 0
+                                  ? `1 dari ${configuredScreeningQuestionCount}`
+                                  : 'Contoh pertanyaan'}
+                              </span>
                               <div className="recruiter-job-create-phone-step-bar">
                                 <span />
                               </div>
@@ -2443,21 +2610,33 @@ const RecruiterJobCreatePage = () => {
 
                             <div className="recruiter-job-create-phone-question">
                               <p>{activeQuizQuestion.question}</p>
-                              <span>Pilih salah satu jawaban</span>
+                              <span>
+                                {Array.isArray(activeQuizQuestion.answers) &&
+                                activeQuizQuestion.answers.length > 0
+                                  ? 'Pilih salah satu jawaban'
+                                  : 'Pelamar akan mengisi jawaban bebas'}
+                              </span>
                             </div>
 
                             <div className="recruiter-job-create-phone-options">
-                              {activeQuizQuestion.answers.map((answer, index) => (
-                                <div
-                                  key={answer}
-                                  className={`recruiter-job-create-phone-option${
-                                    index === 0 ? ' is-highlighted' : ''
-                                  }`}
-                                >
-                                  <span className="recruiter-job-create-phone-option-dot" />
-                                  <span>{answer}</span>
+                              {Array.isArray(activeQuizQuestion.answers) &&
+                              activeQuizQuestion.answers.length > 0 ? (
+                                activeQuizQuestion.answers.map((answer, index) => (
+                                  <div
+                                    key={answer}
+                                    className={`recruiter-job-create-phone-option${
+                                      index === 0 ? ' is-highlighted' : ''
+                                    }`}
+                                  >
+                                    <span className="recruiter-job-create-phone-option-dot" />
+                                    <span>{answer}</span>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="recruiter-job-create-phone-option recruiter-job-create-phone-option-text">
+                                  <span>Pelamar menulis jawaban singkat di kolom teks.</span>
                                 </div>
-                              ))}
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2481,57 +2660,82 @@ const RecruiterJobCreatePage = () => {
                                 className={`recruiter-job-create-chip recruiter-job-create-quiz-chip${
                                   isSelected ? ' is-selected' : ''
                                 }`}
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setActiveQuizQuestionId(question.id);
-                                    return;
-                                  }
-
-                                  handleQuizQuestionToggle(question.id);
-                                }}
+                                onClick={() => handleQuizQuestionToggle(question.id)}
                               >
                                 <span className="recruiter-job-create-chip-icon" aria-hidden="true">
-                                  {isSelected ? '✓' : '+'}
+                                  {isSelected ? '×' : '+'}
                                 </span>
                                 <span>{question.label}</span>
                               </button>
                             );
                           })}
-
-                          <div className="recruiter-job-create-chip recruiter-job-create-quiz-chip recruiter-job-create-quiz-chip-custom">
-                            <span className="recruiter-job-create-chip-icon" aria-hidden="true">
-                              ⊕
-                            </span>
-                            <span>{`Pertanyaan Custom (${customQuizQuestions.length})`}</span>
-                          </div>
                         </div>
                         <small className="recruiter-job-create-chip-helper">
                           {formErrors.quiz_screening_questions ||
-                            'Demi menjaga kandidat potensial tetap termotivasi, kami membatasi jumlah pertanyaan hingga 5 pertanyaan.'}
+                            `Aktif ${configuredScreeningQuestionCount}/${MAX_SCREENING_QUESTION_LIMIT} pertanyaan. Klik lagi chip terpilih untuk membatalkan.`}
                         </small>
 
-                        {selectedScreeningQuestions.length > 0 && (
+                        {configuredQuizQuestions.length > 0 ? (
                           <div className="recruiter-job-create-quiz-selected-list">
-                            {selectedScreeningQuestions.map((question, index) => (
-                              <button
+                            {configuredQuizQuestions.map((question, index) => (
+                              <article
                                 key={question.id}
-                                type="button"
                                 className={`recruiter-job-create-quiz-selected-item${
                                   resolvedActiveQuizQuestionId === question.id ? ' is-active' : ''
                                 }`}
-                                onClick={() => setActiveQuizQuestionId(question.id)}
                               >
-                                <strong>{`${index + 1}. ${question.label}`}</strong>
-                                <span>{question.question}</span>
-                              </button>
+                                <button
+                                  type="button"
+                                  className="recruiter-job-create-quiz-selected-trigger"
+                                  onClick={() => setActiveQuizQuestionId(question.id)}
+                                >
+                                  <strong>{`${index + 1}. ${question.title}`}</strong>
+                                  <span>{question.question}</span>
+                                </button>
+                                <div className="recruiter-job-create-quiz-selected-actions">
+                                  <button
+                                    type="button"
+                                    className={`recruiter-job-create-quiz-required-toggle${
+                                      question.required ? ' is-active' : ''
+                                    }`}
+                                    onClick={() => handleQuizRequirementToggle(question.id)}
+                                  >
+                                    {question.required
+                                      ? 'Pelamar wajib mengisi'
+                                      : 'Tandai wajib mengisi'}
+                                  </button>
+                                  {question.isCustom && (
+                                    <button
+                                      type="button"
+                                      className="recruiter-job-create-quiz-remove"
+                                      onClick={() => handleRemoveCustomQuizQuestion(question.id)}
+                                    >
+                                      Hapus
+                                    </button>
+                                  )}
+                                </div>
+                              </article>
                             ))}
+                          </div>
+                        ) : (
+                          <div className="recruiter-job-create-quiz-empty">
+                            Belum ada pertanyaan aktif. Tambahkan chip di atas atau buat pertanyaan
+                            custom satu per satu.
                           </div>
                         )}
                       </div>
 
                       <div className="recruiter-job-create-quiz-detail-card">
-                        <h3>{activeQuizQuestion.title}</h3>
-                        <p>{activeQuizQuestion.description}</p>
+                        <h3>
+                          {configuredScreeningQuestionCount > 0
+                            ? activeQuizQuestion.title
+                            : 'Contoh Pertanyaan Screening'}
+                        </h3>
+                        <p>
+                          {configuredScreeningQuestionCount > 0
+                            ? activeQuizQuestion.description
+                            : 'Pilih pertanyaan bawaan atau tambahkan pertanyaan custom untuk mulai membangun screening.'}
+                        </p>
 
                         <div className="recruiter-job-create-quiz-detail-block">
                           <span>Pertanyaan</span>
@@ -2539,47 +2743,102 @@ const RecruiterJobCreatePage = () => {
                         </div>
 
                         <div className="recruiter-job-create-quiz-detail-block">
-                          <span>Jawaban yang benar</span>
-                          <div className="recruiter-job-create-quiz-answer-list">
-                            {activeQuizQuestion.answers.map((answer, index) => (
-                              <label
-                                key={answer}
-                                className={`recruiter-job-create-quiz-answer${
-                                  index === 0 ? ' is-recommended' : ''
-                                }`}
-                              >
-                                <input type="radio" checked={index === 0} readOnly />
-                                <span>{answer}</span>
-                              </label>
-                            ))}
-                          </div>
+                          <span>Tipe jawaban</span>
+                          {Array.isArray(activeQuizQuestion.answers) &&
+                          activeQuizQuestion.answers.length > 0 ? (
+                            <div className="recruiter-job-create-quiz-answer-list">
+                              {activeQuizQuestion.answers.map((answer, index) => (
+                                <label
+                                  key={answer}
+                                  className={`recruiter-job-create-quiz-answer${
+                                    index === 0 ? ' is-recommended' : ''
+                                  }`}
+                                >
+                                  <input type="radio" checked={index === 0} readOnly />
+                                  <span>{answer}</span>
+                                </label>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="recruiter-job-create-quiz-answer recruiter-job-create-quiz-answer-text">
+                              <span>Pelamar akan mengetik jawaban naratif singkat.</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       <div className="recruiter-job-create-field recruiter-job-create-field-full recruiter-job-create-quiz-custom-fields">
-                        <span>Pertanyaan Custom</span>
-                        <textarea
-                          name="quiz_question_1"
-                          rows="3"
-                          placeholder="Contoh: Mengapa Anda tertarik melamar posisi ini?"
-                          value={formData.quiz_question_1}
-                          onChange={handleInputChange}
-                        />
-                        <textarea
-                          name="quiz_question_2"
-                          rows="3"
-                          placeholder="Contoh: Ceritakan pengalaman yang paling relevan dengan pekerjaan ini."
-                          value={formData.quiz_question_2}
-                          onChange={handleInputChange}
-                        />
-                        <textarea
-                          name="quiz_question_3"
-                          rows="3"
-                          placeholder="Contoh: Kapan Anda siap mulai bekerja?"
-                          value={formData.quiz_question_3}
-                          onChange={handleInputChange}
-                        />
-                        <small>Tambahkan pertanyaan custom bila Anda butuh filter tambahan.</small>
+                        <div className="recruiter-job-create-quiz-custom-head">
+                          <span>Pertanyaan Custom</span>
+                          <button
+                            type="button"
+                            className="recruiter-job-create-quiz-custom-add"
+                            onClick={handleAddCustomQuizQuestion}
+                          >
+                            + Tambah Pertanyaan Custom
+                          </button>
+                        </div>
+
+                        {customQuizQuestions.length > 0 ? (
+                          <div className="recruiter-job-create-quiz-custom-list">
+                            {customQuizQuestions.map((question, index) => (
+                              <article
+                                key={question.id}
+                                className="recruiter-job-create-quiz-custom-card"
+                              >
+                                <div className="recruiter-job-create-quiz-custom-card-head">
+                                  <strong>{`Pertanyaan Custom ${index + 1}`}</strong>
+                                  <button
+                                    type="button"
+                                    className="recruiter-job-create-quiz-remove"
+                                    onClick={() => handleRemoveCustomQuizQuestion(question.id)}
+                                  >
+                                    Hapus
+                                  </button>
+                                </div>
+                                <textarea
+                                  rows="3"
+                                  placeholder="Contoh: Mengapa Anda tertarik melamar posisi ini?"
+                                  value={question.question}
+                                  onChange={(event) =>
+                                    handleCustomQuizQuestionChange(question.id, event.target.value)
+                                  }
+                                  onFocus={() => setActiveQuizQuestionId(question.id)}
+                                />
+                                <div className="recruiter-job-create-quiz-custom-actions">
+                                  <button
+                                    type="button"
+                                    className={`recruiter-job-create-quiz-required-toggle${
+                                      question.required ? ' is-active' : ''
+                                    }`}
+                                    onClick={() => handleQuizRequirementToggle(question.id)}
+                                  >
+                                    {question.required
+                                      ? 'Pelamar wajib mengisi'
+                                      : 'Tandai wajib mengisi'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="recruiter-job-create-quiz-preview-trigger"
+                                    onClick={() => setActiveQuizQuestionId(question.id)}
+                                  >
+                                    Lihat preview
+                                  </button>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="recruiter-job-create-quiz-empty">
+                            Belum ada pertanyaan custom. Pertanyaan baru hanya muncul saat tombol
+                            tambah ditekan.
+                          </div>
+                        )}
+
+                        <small>
+                          Tambah pertanyaan custom satu per satu, lalu hapus jika tidak jadi
+                          dipakai.
+                        </small>
                       </div>
                     </div>
                   </div>
@@ -2692,7 +2951,15 @@ const RecruiterJobCreatePage = () => {
                     <div className="recruiter-job-create-summary-card recruiter-job-create-summary-card-full">
                       <strong>Pertanyaan Custom</strong>
                       <span>
-                        {customQuizQuestions.join(' | ') || 'Belum ada pertanyaan custom.'}
+                        {customQuizQuestions
+                          .filter((question) => String(question.question || '').trim())
+                          .map(
+                            (question) =>
+                              `${question.question.trim()}${
+                                question.required ? ' (Wajib diisi)' : ' (Opsional)'
+                              }`
+                          )
+                          .join(' | ') || 'Belum ada pertanyaan custom.'}
                       </span>
                     </div>
                   </div>

@@ -19,7 +19,6 @@ Environment penting:
   GITHUB_SSH_KEY=/path/ke/private_key
   GITHUB_TOKEN=token_github
   GITHUB_USERNAME=username_github
-  GIT_REMOTE_BRANCH=main
   SKIP_PUSH=1
 EOF
 }
@@ -31,9 +30,9 @@ fi
 
 DEFAULT_HTTPS_REPO_URL="https://github.com/kerjanusa/stagging-kerjanusa.git"
 DEFAULT_SSH_REPO_URL="git@github.com:kerjanusa/stagging-kerjanusa.git"
-REMOTE_NAME="${GIT_REMOTE_NAME:-stagging}"
+REMOTE_NAME="stagging"
 REMOTE_MODE="${GIT_REMOTE_MODE:-ssh}"
-DEFAULT_BRANCH="${GIT_REMOTE_BRANCH:-main}"
+DEFAULT_BRANCH="main"
 BACKUP_DIR="$SCRIPT_DIR/backupdeploy"
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 BACKUP_FILE="$BACKUP_DIR/stagging-kerjanusa-backup-$TIMESTAMP.zip"
@@ -46,9 +45,7 @@ DEFAULT_INCLUDE_PATHS=(
   staggingpushgithub.sh
 )
 
-if [[ -n "${GITHUB_REPO_URL:-}" ]]; then
-  REPO_URL="$GITHUB_REPO_URL"
-elif [[ "$REMOTE_MODE" == "https" ]]; then
+if [[ "$REMOTE_MODE" == "https" ]]; then
   REPO_URL="$DEFAULT_HTTPS_REPO_URL"
 else
   REPO_URL="$DEFAULT_SSH_REPO_URL"
@@ -65,17 +62,17 @@ require_command git
 require_command zip
 
 if [[ "$REMOTE_MODE" == "ssh" && -z "$SSH_KEY_PATH" ]]; then
-  for candidate in \
-    "$HOME/.ssh/id_ed25519_reggy" \
-    "$HOME/.ssh/id_ed25519_kerjanusa" \
-    "$HOME/.ssh/id_ed25519" \
-    "$HOME/.ssh/id_rsa"
-  do
-    if [[ -f "$candidate" ]]; then
-      SSH_KEY_PATH="$candidate"
-      break
-    fi
-  done
+  SSH_KEY_PATH="$HOME/.ssh/id_ed25519_reggy"
+fi
+
+if [[ "$REMOTE_MODE" == "ssh" && ! -f "$SSH_KEY_PATH" ]]; then
+  cat <<EOF
+Error: SSH key reggy tidak ditemukan di:
+  $SSH_KEY_PATH
+
+Set GITHUB_SSH_KEY ke private key akun reggy29012025-design jika lokasinya berbeda.
+EOF
+  exit 1
 fi
 
 echo "Repo staging target: $REPO_URL"
@@ -138,7 +135,7 @@ PUSH_TARGET="$REMOTE_NAME"
 if [[ "$REMOTE_MODE" == "https" && -n "${GITHUB_TOKEN:-}" ]]; then
   if [[ "$REPO_URL" =~ ^https://github\.com/(.+)$ ]]; then
     REPO_PATH="${BASH_REMATCH[1]}"
-    GITHUB_USERNAME_VALUE="${GITHUB_USERNAME:-git}"
+    GITHUB_USERNAME_VALUE="${GITHUB_USERNAME:-reggy29012025-design}"
     PUSH_TARGET="https://${GITHUB_USERNAME_VALUE}:${GITHUB_TOKEN}@github.com/${REPO_PATH}"
   else
     echo "Error: format REPO_URL untuk mode https tidak dikenali: $REPO_URL"
@@ -159,7 +156,7 @@ Pilih salah satu cara:
    ./staggingpushgithub.sh "pesan commit"
 
 2. HTTPS + Personal Access Token (PAT)
-   export GITHUB_USERNAME="kerjanusa"
+   export GITHUB_USERNAME="reggy29012025-design"
    export GITHUB_TOKEN="token_github_anda"
    GIT_REMOTE_MODE=https ./staggingpushgithub.sh "pesan commit"
 

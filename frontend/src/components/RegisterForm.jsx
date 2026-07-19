@@ -15,6 +15,7 @@ const RegisterForm = ({ onSuccess, defaultRole = 'recruiter' }) => {
   const resolvedDefaultRole = normalizeRole(defaultRole);
   const [formData, setFormData] = useState({
     name: '',
+    company_name: '',
     email: '',
     phone: '',
     role: resolvedDefaultRole,
@@ -43,10 +44,35 @@ const RegisterForm = ({ onSuccess, defaultRole = 'recruiter' }) => {
   const handleChange = (event) => {
     const { name, value } = event.target;
 
-    setFormData((currentData) => ({
-      ...currentData,
-      [name]: value,
-    }));
+    setFormData((currentData) => {
+      if (name === 'role') {
+        const nextRole = normalizeRole(value);
+        const nextNameValue =
+          nextRole === 'recruiter'
+            ? currentData.company_name || currentData.name
+            : currentData.name || currentData.company_name;
+
+        return {
+          ...currentData,
+          role: nextRole,
+          name: nextNameValue,
+          company_name: nextRole === 'recruiter' ? nextNameValue : '',
+        };
+      }
+
+      if (name === 'name' && currentData.role === 'recruiter') {
+        return {
+          ...currentData,
+          name: value,
+          company_name: value,
+        };
+      }
+
+      return {
+        ...currentData,
+        [name]: value,
+      };
+    });
 
     if (error || Object.keys(validationErrors || {}).length > 0) {
       clearError();
@@ -71,6 +97,12 @@ const RegisterForm = ({ onSuccess, defaultRole = 'recruiter' }) => {
     formData.role === 'candidate' ? 'Buat akun kandidat' : 'Buat akun recruiter';
   const hasFieldErrors = Object.keys(validationErrors || {}).length > 0;
   const getFieldError = (fieldName) => validationErrors?.[fieldName]?.[0] || '';
+  const isRecruiterRole = formData.role === 'recruiter';
+  const nameFieldLabel = isRecruiterRole ? 'Nama Perusahaan' : 'Nama';
+  const nameFieldPlaceholder = isRecruiterRole
+    ? 'Contoh: PT KerjaNusa Digital'
+    : 'Nama lengkap';
+  const nameFieldError = getFieldError('name') || getFieldError('company_name');
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
@@ -79,19 +111,20 @@ const RegisterForm = ({ onSuccess, defaultRole = 'recruiter' }) => {
       {error && !hasFieldErrors && <div className="error-message">{error}</div>}
 
       <div className="form-grid">
-        <div className={`form-group${getFieldError('name') ? ' has-error' : ''}`}>
-          <label htmlFor="name">Nama</label>
+        <div className={`form-group${nameFieldError ? ' has-error' : ''}`}>
+          <label htmlFor="name">{nameFieldLabel}</label>
           <input
             id="name"
             name="name"
             type="text"
             value={formData.name}
             onChange={handleChange}
+            placeholder={nameFieldPlaceholder}
             required
             disabled={isLoading}
-            aria-invalid={Boolean(getFieldError('name'))}
+            aria-invalid={Boolean(nameFieldError)}
           />
-          {getFieldError('name') && <p className="field-error">{getFieldError('name')}</p>}
+          {nameFieldError && <p className="field-error">{nameFieldError}</p>}
         </div>
 
         <div className="form-group">

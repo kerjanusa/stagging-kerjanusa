@@ -61,9 +61,12 @@ const RECRUITER_COMPANY_LEGAL_DOCUMENT_ALLOWED_TYPES = new Set([
 const RECRUITER_MOBILE_BOTTOM_SECTIONS = [
   { value: 'company', label: 'Profil', icon: 'user' },
   { value: 'jobs', label: 'Lowongan', icon: 'briefcase' },
-  { value: 'candidates', label: 'Pelamar', icon: 'clipboard' },
   { value: 'messages', label: 'Chat', icon: 'message' },
 ];
+
+const RECRUITER_MENU_SHORTCUT_SECTIONS = RECRUITER_SECTION_OPTIONS.filter(
+  (section) => section.value !== 'candidates'
+);
 
 const RECRUITER_FAVORITE_APPLICATIONS_STORAGE_PREFIX = 'recruiter_favorite_applications';
 const RECRUITER_FAVORITE_TALENTS_STORAGE_PREFIX = 'recruiter_favorite_talents';
@@ -1930,6 +1933,7 @@ const RecruiterDashboardPage = () => {
         sections={RECRUITER_PRIMARY_SECTION_OPTIONS}
         activeSection={activeSection}
         onSectionSelect={handleSectionChange}
+        mobileShortcuts={RECRUITER_MENU_SHORTCUT_SECTIONS}
         onBrandClick={() => handleSectionChange('jobs')}
         onLogout={handleLogout}
         isLoggingOut={isLoggingOut}
@@ -2098,9 +2102,9 @@ const RecruiterDashboardPage = () => {
                         <button
                           type="button"
                           className="recruiter-mobile-overview-pipeline-link"
-                          onClick={() => handleSectionChange('candidates')}
+                          onClick={() => handleSectionChange('jobs')}
                         >
-                          Buka pipeline kandidat
+                          Buka daftar lowongan
                         </button>
                       </article>
                     ))
@@ -2490,7 +2494,7 @@ const RecruiterDashboardPage = () => {
                 </p>
               </div>
 
-              <div className="recruiter-flow-spotlight-grid">
+              <div className="recruiter-flow-spotlight-grid recruiter-flow-spotlight-grid-compact">
                 <article className="recruiter-flow-spotlight-card recruiter-flow-spotlight-card-notice">
                   <div className="recruiter-flow-spotlight-copy">
                     <span className="recruiter-flow-spotlight-eyebrow">Informasi Penting</span>
@@ -2508,37 +2512,6 @@ const RecruiterDashboardPage = () => {
                   >
                     Hubungi Customer Service
                   </a>
-                </article>
-
-                <article className="recruiter-flow-spotlight-card recruiter-flow-spotlight-card-promo">
-                  <div className="recruiter-flow-spotlight-copy">
-                    <span className="recruiter-flow-spotlight-eyebrow">Kolam Pelamar & Paket</span>
-                    <strong>
-                      Paket {packageOverview.current?.label || companyProfile.plan?.label || 'Starter'}
-                      {' '}aktif untuk recruiter ini.
-                    </strong>
-                    <p>
-                      {packageOverview.current?.job_limit
-                        ? `Saat ini paket Anda mendukung hingga ${packageOverview.current.job_limit} lowongan aktif sekaligus.`
-                        : 'Paket aktif mendukung lowongan aktif tanpa batas untuk kebutuhan hiring yang lebih besar.'}
-                    </p>
-                  </div>
-                  <div className="recruiter-flow-spotlight-actions">
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => handleSectionChange('talent')}
-                    >
-                      Buka Kolam Pelamar
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => handleSectionChange('package')}
-                    >
-                      Lihat Paket
-                    </button>
-                  </div>
                 </article>
               </div>
 
@@ -2577,26 +2550,28 @@ const RecruiterDashboardPage = () => {
                 </Link>
               </div>
 
-              <div className="workspace-application-filter-row recruiter-flow-filter-row">
-                <button
-                  type="button"
-                  className={`workspace-filter-chip${jobWorkflowFilter === 'all' ? ' is-active' : ''}`}
-                  onClick={() => setJobWorkflowFilter('all')}
-                >
-                  Semua ({jobWorkflowCounts.all || 0})
-                </button>
-                {RECRUITER_JOB_WORKFLOW_OPTIONS.filter((option) => option.value !== 'filled').map((option) => (
+              <div className="recruiter-flow-filter-pocket">
+                <div className="workspace-application-filter-row recruiter-flow-filter-row recruiter-flow-filter-floating-panel">
                   <button
-                    key={option.value}
                     type="button"
-                    className={`workspace-filter-chip${
-                      jobWorkflowFilter === option.value ? ' is-active' : ''
-                    }`}
-                    onClick={() => setJobWorkflowFilter(option.value)}
+                    className={`workspace-filter-chip${jobWorkflowFilter === 'all' ? ' is-active' : ''}`}
+                    onClick={() => setJobWorkflowFilter('all')}
                   >
-                    {option.label} ({jobWorkflowCounts[option.value] || 0})
+                    Semua ({jobWorkflowCounts.all || 0})
                   </button>
-                ))}
+                  {RECRUITER_JOB_WORKFLOW_OPTIONS.filter((option) => option.value !== 'filled').map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`workspace-filter-chip${
+                        jobWorkflowFilter === option.value ? ' is-active' : ''
+                      }`}
+                      onClick={() => setJobWorkflowFilter(option.value)}
+                    >
+                      {option.label} ({jobWorkflowCounts[option.value] || 0})
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {jobsError && <div className="error">{jobsError}</div>}

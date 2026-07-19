@@ -330,6 +330,19 @@ const JobApplyStoryButtonLabel = ({ icon, label }) => (
   </span>
 );
 
+const JobApplyShareIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path
+      d="M15.75 8.25a2.25 2.25 0 1 0-2.03-3.22L8.93 8.17a2.25 2.25 0 0 0 0 3.66l4.79 3.14a2.25 2.25 0 1 0 .56-1.74l-4.78-3.14a2.3 2.3 0 0 0 0-.18c0-.06 0-.12-.01-.18l4.79-3.14c.41.41.97.66 1.58.66Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 /**
  * Halaman detail/apply khusus kandidat.
  */
@@ -642,6 +655,8 @@ const JobApplyPage = () => {
   const isAlreadyApplied = appliedJobIds.has(Number(job?.id));
   const nextApplyStepFromDetail = 2;
   const storyPublishedLabel = formatJobStoryDate(job?.created_at);
+  const hasInternalRecruiterLink = Boolean(String(job?.internal_recruiter_link || '').trim());
+  const showStoryShareAction = !isSuccessStep && jobApplyStep === 4;
   const candidateName = candidateProfile.fullName || user?.name || 'Pelamar';
   const selectedResumeLabel =
     selectedResumeChoice === RESUME_SKIP_OPTION
@@ -793,6 +808,16 @@ const JobApplyPage = () => {
     });
   }, [candidateCompletion.missingRequiredItems, navigate]);
 
+  const handleOpenRecruiterLink = React.useCallback(() => {
+    const recruiterLink = String(job?.internal_recruiter_link || '').trim();
+
+    if (!recruiterLink || typeof window === 'undefined') {
+      return;
+    }
+
+    window.open(recruiterLink, '_blank', 'noopener,noreferrer');
+  }, [job?.internal_recruiter_link]);
+
   const handleAdvanceFromDetail = React.useCallback(() => {
     if (!job) {
       return;
@@ -902,33 +927,30 @@ const JobApplyPage = () => {
     <div className="job-apply-page-shell">
       <div className="job-apply-page-topbar">
         <button type="button" className="job-apply-page-backlink" onClick={() => navigate(APP_ROUTES.jobs)}>
-          ← Kembali ke Lowongan Kerja
+          Kembali ke Lowongan Kerja
         </button>
         <span className="job-apply-page-route-label">Detail lowongan & lamaran</span>
       </div>
 
       <div className="job-apply-modal job-apply-modal-standalone is-story-step">
         <div className="job-apply-modal-header job-apply-modal-header-story">
-          <button
-            type="button"
-            className="job-apply-story-topbar-button"
-            onClick={() => navigate(APP_ROUTES.jobs)}
-            aria-label="Kembali ke Lowongan Kerja"
-          >
-            ←
-          </button>
+          <span className="job-apply-story-topbar-spacer" aria-hidden="true" />
           <div className="job-apply-story-topbar-copy">
             <span>Detail lowongan</span>
             <strong id="job-apply-modal-title">{job.title}</strong>
           </div>
-          <button
-            type="button"
-            className="job-apply-story-topbar-button"
-            onClick={handleShareJob}
-            aria-label="Bagikan lowongan"
-          >
-            ↗
-          </button>
+          {showStoryShareAction ? (
+            <button
+              type="button"
+              className="job-apply-story-topbar-button"
+              onClick={handleShareJob}
+              aria-label="Bagikan lowongan"
+            >
+              <JobApplyShareIcon />
+            </button>
+          ) : (
+            <span className="job-apply-story-topbar-spacer" aria-hidden="true" />
+          )}
         </div>
 
         {!isSuccessStep && jobApplyStep > 1 && (
@@ -1543,13 +1565,19 @@ const JobApplyPage = () => {
                     type="button"
                     className="btn btn-primary"
                     disabled={jobApplyStep === 3 && isScreeningStepIncomplete}
-                    onClick={() => setJobApplyStep((currentValue) => Math.min(4, currentValue + 1))}
+                    onClick={
+                      jobApplyStep === 3 && hasInternalRecruiterLink
+                        ? handleOpenRecruiterLink
+                        : () => setJobApplyStep((currentValue) => Math.min(4, currentValue + 1))
+                    }
                   >
                     {jobApplyStep === 2
                       ? screeningQuestions.length > 0 || Boolean(job?.video_screening_requirement)
                         ? 'Lanjut ke screening'
                         : 'Lanjut ke review'
-                      : 'Lanjut ke review'}
+                      : jobApplyStep === 3 && hasInternalRecruiterLink
+                        ? 'Link Rekruter'
+                        : 'Lanjut ke review'}
                   </button>
                 ) : (
                   <button type="submit" className="btn btn-primary" disabled={isApplying}>

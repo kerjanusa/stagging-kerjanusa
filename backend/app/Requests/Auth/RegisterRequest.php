@@ -27,6 +27,7 @@ class RegisterRequest extends ApiFormRequest
     {
         return [
             'name' => 'required|string|max:255',
+            'company_name' => 'nullable|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => ['required', PasswordRule::min(8)->letters()->numbers()],
             'password_confirmation' => 'required|same:password',

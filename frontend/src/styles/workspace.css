@@ -3301,6 +3301,86 @@
   font-size: 0.98rem;
 }
 
+.candidate-jobs-filter-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.05rem 1rem;
+  border: 1px solid rgba(122, 78, 67, 0.1);
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(circle at top right, rgba(245, 219, 166, 0.2), transparent 30%),
+    rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16px 34px rgba(63, 33, 33, 0.06);
+}
+
+.candidate-jobs-filter-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.candidate-jobs-filter-head strong {
+  display: block;
+  color: #4f171d;
+  font-size: 0.98rem;
+}
+
+.candidate-jobs-filter-head span {
+  display: block;
+  margin-top: 0.22rem;
+  color: #8a7b72;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.candidate-jobs-filter-reset {
+  min-height: 2.45rem;
+  padding: 0.6rem 0.95rem;
+  border: 1px solid rgba(91, 35, 79, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #5b171d;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.candidate-jobs-filter-reset:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.candidate-jobs-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.candidate-jobs-filter-field {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.candidate-jobs-filter-field span {
+  color: #6f5750;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.candidate-jobs-filter-field input,
+.candidate-jobs-filter-field select {
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0.72rem 0.9rem;
+  border: 1px solid rgba(107, 53, 53, 0.12);
+  border-radius: 0.9rem;
+  background: #fffdfb;
+  color: #4f171d;
+  font-size: 0.88rem;
+}
+
 .candidate-jobs-card-list {
   display: grid;
   gap: 1rem;
@@ -3548,6 +3628,15 @@
     grid-template-columns: 1fr;
   }
 
+  .candidate-jobs-filter-head,
+  .candidate-jobs-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .candidate-jobs-filter-head {
+    display: grid;
+  }
+
   .candidate-jobs-card {
     padding: 1.15rem 1rem;
     border-radius: 1.2rem;
@@ -3589,6 +3678,11 @@
   .candidate-jobs-context-card,
   .candidate-jobs-safety-card {
     padding: 1rem 0.92rem;
+    border-radius: 1.05rem;
+  }
+
+  .candidate-jobs-filter-panel {
+    padding: 0.98rem 0.92rem;
     border-radius: 1.05rem;
   }
 

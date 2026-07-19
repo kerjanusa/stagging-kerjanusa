@@ -1,4 +1,9 @@
 import axios from 'axios';
+import {
+  clearStoredAuthSession,
+  readStoredAuthToken,
+  readStoredAuthUser,
+} from './authSessionStorage.js';
 import { getLoginRouteForRole } from './routeHelpers.js';
 import { resolvedApiUrl } from './mockMode.js';
 
@@ -34,19 +39,18 @@ const clearSessionAndRedirectToLogin = () => {
   let userRole = null;
 
   try {
-    userRole = JSON.parse(localStorage.getItem('user') || 'null')?.role || null;
+    userRole = readStoredAuthUser()?.role || null;
   } catch {
     userRole = null;
   }
 
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('user');
+  clearStoredAuthSession();
   window.location.replace(getLoginRouteForRole(userRole));
 };
 
 // Add token to requests
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token');
+  const token = readStoredAuthToken();
 
   if (token && !isPublicAuthRequest(config.url)) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -61,7 +65,7 @@ apiClient.interceptors.response.use(
     const shouldRedirectToLogin =
       error.response?.status === 401 &&
       !isPublicAuthRequest(error.config?.url) &&
-      Boolean(error.config?.headers?.Authorization || localStorage.getItem('auth_token'));
+      Boolean(error.config?.headers?.Authorization || readStoredAuthToken());
 
     if (shouldRedirectToLogin) {
       clearSessionAndRedirectToLogin();

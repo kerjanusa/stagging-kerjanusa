@@ -186,6 +186,19 @@ const buildRecommendationMatchLabel = (score = 0) => {
   return `${percentage}% cocok`;
 };
 
+const JobApplyShareIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path
+      d="M15.75 8.25a2.25 2.25 0 1 0-2.03-3.22L8.93 8.17a2.25 2.25 0 0 0 0 3.66l4.79 3.14a2.25 2.25 0 1 0 .56-1.74l-4.78-3.14a2.3 2.3 0 0 0 0-.18c0-.06 0-.12-.01-.18l4.79-3.14c.41.41.97.66 1.58.66Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 /**
  * Mengubah link YouTube recruiter menjadi embed URL bila memungkinkan.
  */
@@ -1298,9 +1311,13 @@ const JobListPage = () => {
     !applicationVideoIntroUrl.trim();
   const isScreeningStepIncomplete =
     unansweredRequiredScreeningCount > 0 || isRequiredVideoMissing;
+  const selectedJobHasInternalRecruiterLink = Boolean(
+    String(selectedJob?.internal_recruiter_link || '').trim()
+  );
   const isSuccessStep = jobApplyStep === JOB_APPLY_TOTAL_STEPS;
   const isDetailStoryStep = !isSuccessStep && jobApplyStep === 1;
   const nextApplyStepFromDetail = hasExtraApplicationRequirements ? 2 : 3;
+  const showSelectedJobShareAction = !isSuccessStep && jobApplyStep === JOB_APPLY_TOTAL_STEPS - 1;
   const selectedJobSuccessRecommendations =
     jobApplySuccessState?.recommendations || buildSuccessRecommendations(filteredJobs, selectedJob?.id);
   const jobApplyStepSummary =
@@ -1314,7 +1331,7 @@ const JobListPage = () => {
         ? {
             label: 'Jawab kebutuhan recruiter',
             description: hasExtraApplicationRequirements
-              ? 'Jawab pertanyaan screening dan siapkan video jika lowongan memintanya.'
+            ? 'Jawab pertanyaan screening dan siapkan video jika lowongan memintanya.'
               : 'Lowongan ini tidak meminta pertanyaan tambahan. Anda bisa langsung lanjut ke review.',
           }
         : jobApplyStep === 3
@@ -1328,6 +1345,16 @@ const JobListPage = () => {
               description:
                 'Gunakan langkah berikutnya untuk memantau status dan melanjutkan proses kandidat Anda.',
             };
+
+  const handleOpenSelectedRecruiterLink = React.useCallback(() => {
+    const recruiterLink = String(selectedJob?.internal_recruiter_link || '').trim();
+
+    if (!recruiterLink || typeof window === 'undefined') {
+      return;
+    }
+
+    window.open(recruiterLink, '_blank', 'noopener,noreferrer');
+  }, [selectedJob?.internal_recruiter_link]);
 
   return (
     <div className="job-list-page">
@@ -1736,26 +1763,12 @@ const JobListPage = () => {
           >
             {isDetailStoryStep ? (
               <div className="job-apply-modal-header job-apply-modal-header-story">
-                <button
-                  type="button"
-                  className="job-apply-story-topbar-button"
-                  onClick={closeApplyModal}
-                  aria-label="Kembali ke Lowongan Kerja"
-                >
-                  ←
-                </button>
+                <span className="job-apply-story-topbar-spacer" aria-hidden="true" />
                 <div className="job-apply-story-topbar-copy">
                   <span>Detail lowongan</span>
                   <strong id="job-apply-modal-title">{selectedJob.title}</strong>
                 </div>
-                <button
-                  type="button"
-                  className="job-apply-story-topbar-button"
-                  onClick={handleShareSelectedJob}
-                  aria-label="Bagikan lowongan"
-                >
-                  ↗
-                </button>
+                <span className="job-apply-story-topbar-spacer" aria-hidden="true" />
               </div>
             ) : (
               <div className="job-apply-modal-header">
@@ -1781,9 +1794,21 @@ const JobListPage = () => {
                     {jobApplyStepSummary.description}
                   </small>
                 </div>
-                <button type="button" className="job-apply-modal-close" onClick={closeApplyModal}>
-                  ×
-                </button>
+                <div className="job-apply-modal-header-actions">
+                  {showSelectedJobShareAction && (
+                    <button
+                      type="button"
+                      className="job-apply-story-topbar-button job-apply-modal-share-button"
+                      onClick={handleShareSelectedJob}
+                      aria-label="Bagikan lowongan"
+                    >
+                      <JobApplyShareIcon />
+                    </button>
+                  )}
+                  <button type="button" className="job-apply-modal-close" onClick={closeApplyModal}>
+                    ×
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2297,9 +2322,18 @@ const JobListPage = () => {
                         type="button"
                         className="btn btn-primary"
                         disabled={jobApplyStep === 2 && isScreeningStepIncomplete}
-                        onClick={() => setJobApplyStep((currentValue) => Math.min(3, currentValue + 1))}
+                        onClick={
+                          jobApplyStep === 2 && selectedJobHasInternalRecruiterLink
+                            ? handleOpenSelectedRecruiterLink
+                            : () =>
+                                setJobApplyStep((currentValue) => Math.min(3, currentValue + 1))
+                        }
                       >
-                        {jobApplyStep === 1 ? 'Lanjut ke screening' : 'Lanjut ke review'}
+                        {jobApplyStep === 1
+                          ? 'Lanjut ke screening'
+                          : selectedJobHasInternalRecruiterLink
+                            ? 'Link Rekruter'
+                            : 'Lanjut ke review'}
                       </button>
                     ) : (
                       <button type="submit" className="btn btn-primary" disabled={isApplying}>

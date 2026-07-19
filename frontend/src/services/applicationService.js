@@ -1,6 +1,7 @@
 import apiClient from '../utils/apiClient';
 import mockJobs from '../data/mockJobs.js';
 import { shouldUseMockData } from '../utils/mockMode';
+import { readStoredAuthUser } from '../utils/authSessionStorage.js';
 
 const MOCK_APPLICATIONS_STORAGE_KEY = 'mock_job_applications';
 const MOCK_JOBS_STORAGE_KEY = 'mock_jobs';
@@ -137,8 +138,7 @@ const saveMockApplications = (applications) => {
  * Load the currently authenticated demo user from browser storage.
  */
 const getCurrentMockUser = () => {
-  const storedUser = localStorage.getItem('user');
-  return storedUser ? JSON.parse(storedUser) : null;
+  return readStoredAuthUser();
 };
 
 /**

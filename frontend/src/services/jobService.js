@@ -1,6 +1,7 @@
 import apiClient from '../utils/apiClient';
 import mockJobs from '../data/mockJobs';
 import { shouldUseMockData } from '../utils/mockMode';
+import { readStoredAuthUser } from '../utils/authSessionStorage.js';
 
 const MOCK_JOBS_STORAGE_KEY = 'mock_jobs';
 const MOCK_USERS_STORAGE_KEY = 'mock_auth_users';
@@ -228,8 +229,7 @@ const getNextJobId = (jobs) => jobs.reduce((largestId, job) => Math.max(largestI
  * Load the current demo user from browser session storage.
  */
 const getCurrentMockUser = () => {
-  const storedUser = localStorage.getItem('user');
-  return storedUser ? JSON.parse(storedUser) : null;
+  return readStoredAuthUser();
 };
 
 class JobService {

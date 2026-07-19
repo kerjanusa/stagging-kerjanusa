@@ -544,6 +544,12 @@
   line-height: 1.65;
 }
 
+.job-apply-modal-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .job-apply-modal-close {
   width: 2rem;
   height: 2rem;
@@ -2307,6 +2313,9 @@
 }
 
 .job-apply-story-topbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 2.35rem;
   height: 2.35rem;
   border: none;
@@ -2322,6 +2331,21 @@
 .job-apply-story-topbar-button:hover {
   background: rgba(255, 255, 255, 0.14);
   transform: translateY(-1px);
+}
+
+.job-apply-story-topbar-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.job-apply-story-topbar-spacer {
+  width: 2.35rem;
+  height: 2.35rem;
+}
+
+.job-apply-modal-share-button {
+  background: rgba(91, 35, 79, 0.08);
+  color: var(--primary-dark);
 }
 
 .job-apply-story-topbar-copy {

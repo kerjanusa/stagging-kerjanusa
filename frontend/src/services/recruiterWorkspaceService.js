@@ -1,5 +1,6 @@
 import apiClient from '../utils/apiClient.js';
 import { shouldUseMockData } from '../utils/mockMode.js';
+import { readStoredAuthUser } from '../utils/authSessionStorage.js';
 import { readCandidateProfile } from '../utils/candidateFlow.js';
 import {
   getRecruiterPlanConfig,
@@ -29,11 +30,7 @@ const readStoredJson = (storageKey, fallbackValue) => {
  * Load the current recruiter session from browser storage for demo flows.
  */
 const getCurrentUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem('user') || 'null');
-  } catch {
-    return null;
-  }
+  return readStoredAuthUser();
 };
 
 /**

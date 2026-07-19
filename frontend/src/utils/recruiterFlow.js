@@ -5,19 +5,18 @@ const RECRUITER_JOB_WORKFLOW_STORAGE_KEY = 'recruiter_job_workflow_state';
 const RECRUITER_APPLICATION_STAGE_STORAGE_KEY = 'recruiter_application_stage_state';
 
 export const RECRUITER_SECTION_OPTIONS = [
-  { value: 'overview', label: 'Dashboard' },
+  { value: 'overview', label: 'Dashboard Awal' },
   { value: 'company', label: 'Profil Perusahaan' },
   { value: 'jobs', label: 'Posting Lowongan' },
-  { value: 'candidates', label: 'Pelamar' },
+  { value: 'candidates', label: 'Kelola Pelamar Lowongan' },
   { value: 'talent', label: 'Kolam Pelamar' },
   { value: 'messages', label: 'Chat' },
-  { value: 'package', label: 'Paket' },
+  { value: 'package', label: 'Info Paket Perusahaan' },
 ];
 
 export const RECRUITER_PRIMARY_SECTION_OPTIONS = [
   { value: 'company', label: 'Profil Perusahaan', mobileLabel: 'Profil' },
   { value: 'jobs', label: 'Posting Lowongan', mobileLabel: 'Lowongan' },
-  { value: 'candidates', label: 'Pelamar', mobileLabel: 'Pelamar' },
   { value: 'messages', label: 'Chat', mobileLabel: 'Chat' },
 ];
 
