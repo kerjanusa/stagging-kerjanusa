@@ -274,6 +274,7 @@ class AuthService
         }
 
         $nextData = [];
+        $obsoleteCandidateResumeDetails = [];
 
         if (array_key_exists('name', $data)) {
             $nextData['name'] = $this->trimToNull($data['name']) ?? $user->name;
@@ -306,6 +307,26 @@ class AuthService
             $incomingCandidateProfile = is_array($data['candidate_profile'] ?? null)
                 ? $data['candidate_profile']
                 : [];
+            $currentCandidateResumeNames = $this->profileFileStorageService->normalizePdfFileNames(
+                $currentCandidateProfile['resumeFiles'] ?? []
+            );
+            $currentCandidateResumeDetails = $this->profileFileStorageService->normalizeCandidateResumeFileDetails(
+                $currentCandidateProfile['resumeFileDetails'] ?? [],
+                $currentCandidateResumeNames
+            );
+            $currentCandidateResumeDetailsWithDuplicates = $this->profileFileStorageService->normalizeCandidateResumeFileDetails(
+                $currentCandidateProfile['resumeFileDetails'] ?? [],
+                $currentCandidateResumeNames,
+                false
+            );
+            $activeCurrentResumePaths = array_flip(array_filter(array_map(
+                fn (array $resumeFile) => $resumeFile['path'] ?? null,
+                $currentCandidateResumeDetails
+            )));
+            $obsoleteCandidateResumeDetails = array_values(array_filter(
+                $currentCandidateResumeDetailsWithDuplicates,
+                fn (array $resumeFile) => !isset($activeCurrentResumePaths[$resumeFile['path'] ?? ''])
+            ));
             $mergedCandidateProfile = [
                 ...$currentCandidateProfile,
                 ...$incomingCandidateProfile,
@@ -320,12 +341,23 @@ class AuthService
             }
 
             if (array_key_exists('candidate_resume_files', $data)) {
-                $storedResumeDetails = $this->profileFileStorageService->storeCandidateResumeFiles($data['candidate_resume_files'] ?? []);
+                $storedResumeDetails = $this->profileFileStorageService->storeCandidateResumeFiles(
+                    $data['candidate_resume_files'] ?? [],
+                    $currentCandidateResumeDetails
+                );
                 $mergedCandidateProfile['resumeFiles'] = array_map(
                     fn (array $resumeFile) => $resumeFile['name'],
                     $storedResumeDetails
                 );
                 $mergedCandidateProfile['resumeFileDetails'] = $storedResumeDetails;
+                $activeResumePaths = array_flip(array_filter(array_map(
+                    fn (array $resumeFile) => $resumeFile['path'] ?? null,
+                    $storedResumeDetails
+                )));
+                $obsoleteCandidateResumeDetails = array_values(array_filter(
+                    $currentCandidateResumeDetailsWithDuplicates,
+                    fn (array $resumeFile) => !isset($activeResumePaths[$resumeFile['path'] ?? ''])
+                ));
             } else {
                 $mergedCandidateProfile = $this->preserveCandidateResumeMetadata(
                     $currentCandidateProfile,
@@ -400,6 +432,10 @@ class AuthService
             ],
             $user
         );
+
+        if ($updated && !empty($obsoleteCandidateResumeDetails)) {
+            $this->profileFileStorageService->deleteStoredCandidateResumeFiles($obsoleteCandidateResumeDetails);
+        }
 
         return $updated;
     }

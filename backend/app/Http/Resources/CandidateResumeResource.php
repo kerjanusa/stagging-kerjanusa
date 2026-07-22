@@ -40,6 +40,7 @@ class CandidateResumeResource extends JsonResource
 
         return collect($resumeFileDetails)
             ->filter(fn ($detail) => is_array($detail) && filled($detail['path'] ?? null))
+            ->unique(fn (array $detail) => trim((string) ($detail['name'] ?? $detail['path'] ?? '')))
             ->values()
             ->map(fn (array $detail, int $index) => (new self($detail, $candidateId, $index))->resolve())
             ->all();

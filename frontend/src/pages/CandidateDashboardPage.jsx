@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import InboxWorkspace from '../components/InboxWorkspace.jsx';
 import locationCoordinates from '../data/locationCoordinates.js';
@@ -6,6 +6,7 @@ import useApplications from '../hooks/useApplications.js';
 import useAuth from '../hooks/useAuth.js';
 import useChat from '../hooks/useChat.js';
 import useJobs from '../hooks/useJobs.js';
+import apiClient from '../utils/apiClient.js';
 import {
   formatCandidateApplicationStatus,
   getCandidateApplicationMeta,
@@ -500,6 +501,20 @@ const buildYearRangeLabel = (startYear = '', endYear = '', currentLabel = 'Masih
 const isSupportedProfilePhotoFile = (file) =>
   Boolean(file && PROFILE_PHOTO_ALLOWED_TYPES.has(String(file.type || '').toLowerCase()));
 
+const resolveCandidateResumeDownloadPath = (candidateId, resumeDetail, resumeIndex = 0) => {
+  const downloadUrl = String(resumeDetail?.downloadUrl || '').trim();
+
+  if (downloadUrl) {
+    return downloadUrl;
+  }
+
+  if (!candidateId) {
+    return '';
+  }
+
+  return `/candidate-documents/${candidateId}/resumes/${resumeIndex}`;
+};
+
 const convertProfilePhotoToDataUrl = (file) =>
   new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -832,6 +847,7 @@ const CandidateDashboardPage = () => {
   const [profilePhotoFile, setProfilePhotoFile] = useState(null);
   const [shouldClearProfilePhoto, setShouldClearProfilePhoto] = useState(false);
   const [resumeUploadFiles, setResumeUploadFiles] = useState([]);
+  const isSavingProfileRef = useRef(false);
 
   useEffect(() => {
     setActiveSection(resolveCandidateSectionFromHash(location.hash));
@@ -862,6 +878,79 @@ const CandidateDashboardPage = () => {
   useEffect(() => {
     setResumePreview(null);
   }, [user?.id]);
+
+  const storedResumePreviewKey = useMemo(() => {
+    const resumeDetail = Array.isArray(profile.resumeFileDetails)
+      ? profile.resumeFileDetails[0]
+      : null;
+
+    if (!user?.id || !resumeDetail) {
+      return '';
+    }
+
+    return [
+      user.id,
+      resumeDetail.downloadUrl || '',
+      resumeDetail.name || profile.resumeFiles[0] || '',
+      resumeDetail.uploadedAt || '',
+      resumeDetail.size || '',
+    ].join('|');
+  }, [profile.resumeFileDetails, profile.resumeFiles, user?.id]);
+
+  useEffect(() => {
+    if (!storedResumePreviewKey || resumeUploadFiles.length > 0) {
+      return undefined;
+    }
+
+    const resumeDetail = Array.isArray(profile.resumeFileDetails)
+      ? profile.resumeFileDetails[0]
+      : null;
+    const downloadPath = resolveCandidateResumeDownloadPath(user?.id, resumeDetail, 0);
+
+    if (!resumeDetail || !downloadPath) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+    let objectUrl = '';
+
+    apiClient
+      .get(downloadPath, { responseType: 'blob' })
+      .then((response) => {
+        if (isCancelled) {
+          return;
+        }
+
+        const pdfBlob = new Blob([response.data], {
+          type: response.data?.type || resumeDetail.mimeType || 'application/pdf',
+        });
+        objectUrl = window.URL.createObjectURL(pdfBlob);
+        setResumePreview({
+          name: resumeDetail.name || profile.resumeFiles[0] || 'cv-kandidat.pdf',
+          url: objectUrl,
+          source: 'stored',
+        });
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setResumePreview(null);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+
+      if (objectUrl) {
+        window.URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [
+    profile.resumeFileDetails,
+    profile.resumeFiles,
+    resumeUploadFiles.length,
+    storedResumePreviewKey,
+    user?.id,
+  ]);
 
   useEffect(() => {
     if (user?.role !== 'candidate') {
@@ -1578,7 +1667,7 @@ const CandidateDashboardPage = () => {
   };
 
   const handleSaveProfile = async () => {
-    if (!user) {
+    if (!user || isSavingProfileRef.current) {
       return;
     }
 
@@ -1594,6 +1683,7 @@ const CandidateDashboardPage = () => {
       return;
     }
 
+    isSavingProfileRef.current = true;
     setIsSavingProfile(true);
     const normalizedProfile = {
       ...profile,
@@ -1669,6 +1759,7 @@ const CandidateDashboardPage = () => {
           'Profil lokal tersimpan, tetapi sinkronisasi nama atau telepon ke akun belum berhasil.',
       });
     } finally {
+      isSavingProfileRef.current = false;
       setIsSavingProfile(false);
     }
   };
@@ -2846,8 +2937,7 @@ const CandidateDashboardPage = () => {
                       className="candidate-profile-upload-input"
                       type="file"
                       accept=".pdf,application/pdf"
-                      multiple
-                      onChange={(event) => handleFileChange('resumeFiles', event.target, 3)}
+                      onChange={(event) => handleFileChange('resumeFiles', event.target, 1)}
                     />
                   </div>
 

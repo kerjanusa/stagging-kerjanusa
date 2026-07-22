@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\CandidateResumeResource;
 use App\Models\User;
 use App\Notifications\ResetPasswordNotification;
 use App\Requests\Auth\ChangePasswordRequest;
@@ -55,7 +56,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'User registered successfully',
-            'user' => $user,
+            'user' => $this->presentAuthenticatedUser($user),
             'token' => $token,
         ], 201);
     }
@@ -125,7 +126,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login successful',
-            'user' => $user,
+            'user' => $this->presentAuthenticatedUser($user),
             'token' => $token,
         ]);
     }
@@ -278,7 +279,7 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return response()->json([
-            'user' => $request->user(),
+            'user' => $this->presentAuthenticatedUser($request->user()),
         ]);
     }
 
@@ -306,7 +307,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Profile updated successfully',
-            'user' => $request->user()->fresh(),
+            'user' => $this->presentAuthenticatedUser($request->user()),
         ]);
     }
 
@@ -344,6 +345,26 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Password changed successfully',
         ]);
+    }
+
+    /**
+     * Present the authenticated user with browser-safe candidate document URLs.
+     */
+    private function presentAuthenticatedUser(User $user): array
+    {
+        $freshUser = $user->fresh() ?? $user;
+        $payload = $freshUser->toArray();
+
+        if ($freshUser->hasRole(User::ROLE_CANDIDATE)) {
+            $profile = is_array($freshUser->candidate_profile) ? $freshUser->candidate_profile : [];
+            $profile['resumeFileDetails'] = CandidateResumeResource::collectionForCandidate(
+                $profile['resumeFileDetails'] ?? [],
+                $freshUser->id
+            );
+            $payload['candidate_profile'] = $profile;
+        }
+
+        return $payload;
     }
 
     /**

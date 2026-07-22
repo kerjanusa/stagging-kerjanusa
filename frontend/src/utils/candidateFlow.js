@@ -305,6 +305,7 @@ const normalizeResumeFileDetails = (resumeFileDetails, resumeFiles) => {
   }
 
   const allowedResumeNames = new Set(resumeFiles);
+  const seenResumeNames = new Set();
 
   return resumeFileDetails
     .filter((detail) => detail && typeof detail === 'object')
@@ -315,7 +316,14 @@ const normalizeResumeFileDetails = (resumeFileDetails, resumeFiles) => {
       uploadedAt: trimText(detail.uploadedAt),
       downloadUrl: trimText(detail.downloadUrl),
     }))
-    .filter((detail) => detail.name && allowedResumeNames.has(detail.name))
+    .filter((detail) => {
+      if (!detail.name || !allowedResumeNames.has(detail.name) || seenResumeNames.has(detail.name)) {
+        return false;
+      }
+
+      seenResumeNames.add(detail.name);
+      return true;
+    })
     .slice(0, 3);
 };
 
@@ -376,7 +384,7 @@ export const mergeCandidateProfile = (user, savedProfile) => {
   const profileSummary =
     trimText(savedProfile.profileSummary) || buildAutoProfileSummary(savedProfile);
   const normalizedResumeFiles = Array.isArray(savedProfile.resumeFiles)
-    ? savedProfile.resumeFiles.filter(isPdfResumeFileName).slice(0, 3)
+    ? [...new Set(savedProfile.resumeFiles.map(trimText).filter(isPdfResumeFileName))].slice(0, 3)
     : [];
   const normalizedResumeFileDetails = normalizeResumeFileDetails(
     savedProfile.resumeFileDetails,

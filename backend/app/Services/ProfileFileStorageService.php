@@ -22,12 +22,24 @@ class ProfileFileStorageService
     /**
      * Store uploaded candidate resumes and return database-safe metadata only.
      */
-    public function storeCandidateResumeFiles(array $files): array
+    public function storeCandidateResumeFiles(array $files, array $currentFileDetails = []): array
     {
         $storedFiles = [];
 
         foreach (array_slice($files, 0, self::MAX_CANDIDATE_RESUME_FILES) as $file) {
             if (!$file instanceof UploadedFile) {
+                continue;
+            }
+
+            $checksum = $this->hashUploadedFile($file);
+            $reusableFileDetail = $this->findReusableCandidateResumeFileDetail(
+                $file,
+                $currentFileDetails,
+                $checksum
+            );
+
+            if ($reusableFileDetail) {
+                $storedFiles[] = $reusableFileDetail;
                 continue;
             }
 
@@ -45,6 +57,7 @@ class ProfileFileStorageService
                 'mimeType' => $file->getClientMimeType(),
                 'size' => $file->getSize() ?: 0,
                 'uploadedAt' => now()->toIso8601String(),
+                'checksum' => $checksum,
             ];
         }
 
@@ -125,13 +138,18 @@ class ProfileFileStorageService
     /**
      * Keep only server-generated candidate resume metadata that points to the resume directory.
      */
-    public function normalizeCandidateResumeFileDetails(mixed $fileDetails, array $allowedNames): array
+    public function normalizeCandidateResumeFileDetails(
+        mixed $fileDetails,
+        array $allowedNames,
+        bool $deduplicateByName = true
+    ): array
     {
         if (!is_array($fileDetails) || empty($allowedNames)) {
             return [];
         }
 
         $allowedLookup = array_flip($allowedNames);
+        $seenNames = [];
         $normalizedDetails = [];
 
         foreach ($fileDetails as $detail) {
@@ -150,6 +168,12 @@ class ProfileFileStorageService
                 continue;
             }
 
+            if ($deduplicateByName && isset($seenNames[$name])) {
+                continue;
+            }
+
+            $seenNames[$name] = true;
+
             $normalizedDetails[] = [
                 'name' => $name,
                 'path' => $path,
@@ -160,10 +184,45 @@ class ProfileFileStorageService
                 'size' => max(0, (int) ($detail['size'] ?? 0)),
                 'uploadedAt' => $this->trimToNull(is_string($detail['uploadedAt'] ?? null) ? $detail['uploadedAt'] : null)
                     ?: null,
+                'checksum' => $this->trimToNull(is_string($detail['checksum'] ?? null) ? $detail['checksum'] : null)
+                    ?: null,
             ];
         }
 
         return array_slice($normalizedDetails, 0, self::MAX_CANDIDATE_RESUME_FILES);
+    }
+
+    /**
+     * Delete stored candidate resumes that are no longer referenced by the profile.
+     */
+    public function deleteStoredCandidateResumeFiles(array $fileDetails): void
+    {
+        foreach ($fileDetails as $detail) {
+            if (!is_array($detail)) {
+                continue;
+            }
+
+            $path = $this->trimToNull(is_string($detail['path'] ?? null) ? $detail['path'] : null);
+
+            if (!$path || !str_starts_with($path, self::CANDIDATE_RESUME_STORAGE_DIRECTORY . '/')) {
+                continue;
+            }
+
+            $disk = $this->trimToNull(is_string($detail['disk'] ?? null) ? $detail['disk'] : null)
+                ?: (string) config('filesystems.default', 'local');
+
+            try {
+                Storage::disk($disk)->delete($path);
+            } catch (Throwable $exception) {
+                $this->serviceActivityLogService->warning($this, 'profile_file_storage.file_delete_failed', [
+                    'action' => 'delete_candidate_resume',
+                    'disk' => $disk,
+                    'stored_path' => $path,
+                    'exception_class' => $exception::class,
+                    'result' => 'exception',
+                ]);
+            }
+        }
     }
 
     /**
@@ -178,6 +237,79 @@ class ProfileFileStorageService
         }
 
         return $normalizedValue;
+    }
+
+    /**
+     * Reuse the active stored resume when the browser sends the same file again.
+     */
+    private function findReusableCandidateResumeFileDetail(
+        UploadedFile $file,
+        array $currentFileDetails,
+        ?string $checksum
+    ): ?array {
+        $fileName = $file->getClientOriginalName();
+        $fileSize = $file->getSize() ?: 0;
+        $fileMimeType = $file->getClientMimeType() ?: 'application/pdf';
+
+        foreach ($currentFileDetails as $detail) {
+            if (!is_array($detail)) {
+                continue;
+            }
+
+            $storedName = $this->trimToNull(is_string($detail['name'] ?? null) ? $detail['name'] : null);
+            $storedPath = $this->trimToNull(is_string($detail['path'] ?? null) ? $detail['path'] : null);
+
+            if (
+                $storedName !== $fileName ||
+                !$storedPath ||
+                !str_starts_with($storedPath, self::CANDIDATE_RESUME_STORAGE_DIRECTORY . '/')
+            ) {
+                continue;
+            }
+
+            $storedChecksum = $this->trimToNull(
+                is_string($detail['checksum'] ?? null) ? $detail['checksum'] : null
+            );
+            $isChecksumMatch = $checksum && $storedChecksum && hash_equals($storedChecksum, $checksum);
+            $isLegacyMetadataMatch =
+                !$storedChecksum &&
+                (int) ($detail['size'] ?? 0) === $fileSize;
+
+            if (!$isChecksumMatch && !$isLegacyMetadataMatch) {
+                continue;
+            }
+
+            return [
+                'name' => $fileName,
+                'path' => $storedPath,
+                'disk' => $this->trimToNull(is_string($detail['disk'] ?? null) ? $detail['disk'] : null)
+                    ?: (string) config('filesystems.default', 'local'),
+                'mimeType' => $this->trimToNull(is_string($detail['mimeType'] ?? null) ? $detail['mimeType'] : null)
+                    ?: $fileMimeType,
+                'size' => $fileSize,
+                'uploadedAt' => $this->trimToNull(is_string($detail['uploadedAt'] ?? null) ? $detail['uploadedAt'] : null)
+                    ?: now()->toIso8601String(),
+                'checksum' => $checksum ?: $storedChecksum,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Calculate a stable fingerprint for duplicate-upload detection.
+     */
+    private function hashUploadedFile(UploadedFile $file): ?string
+    {
+        $realPath = $file->getRealPath();
+
+        if (!is_string($realPath) || $realPath === '') {
+            return null;
+        }
+
+        $checksum = hash_file('sha256', $realPath);
+
+        return is_string($checksum) && $checksum !== '' ? $checksum : null;
     }
 
     /**
