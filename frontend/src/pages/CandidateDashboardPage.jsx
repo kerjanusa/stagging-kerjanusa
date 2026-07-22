@@ -866,6 +866,20 @@ const CandidateDashboardPage = () => {
   }, [user]);
 
   useEffect(() => {
+    if (!feedback || feedback.type !== 'success') {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedback((currentFeedback) => (currentFeedback === feedback ? null : currentFeedback));
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [feedback]);
+
+  useEffect(() => {
     if (!resumePreview?.url) {
       return undefined;
     }
