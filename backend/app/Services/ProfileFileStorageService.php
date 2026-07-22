@@ -279,11 +279,21 @@ class ProfileFileStorageService
                 continue;
             }
 
+            $storedDisk = $this->trimToNull(is_string($detail['disk'] ?? null) ? $detail['disk'] : null)
+                ?: (string) config('filesystems.default', 'local');
+
+            try {
+                if (!Storage::disk($storedDisk)->exists($storedPath)) {
+                    continue;
+                }
+            } catch (Throwable) {
+                continue;
+            }
+
             return [
                 'name' => $fileName,
                 'path' => $storedPath,
-                'disk' => $this->trimToNull(is_string($detail['disk'] ?? null) ? $detail['disk'] : null)
-                    ?: (string) config('filesystems.default', 'local'),
+                'disk' => $storedDisk,
                 'mimeType' => $this->trimToNull(is_string($detail['mimeType'] ?? null) ? $detail['mimeType'] : null)
                     ?: $fileMimeType,
                 'size' => $fileSize,
