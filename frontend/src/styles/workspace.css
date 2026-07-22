@@ -444,7 +444,39 @@
 }
 
 .workspace-feedback {
+  display: flex;
+  align-items: center;
+  gap: 0.72rem;
   margin-top: 1.1rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.workspace-feedback::before {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.65rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  font-size: 0.98rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.workspace-feedback.success::before {
+  content: "\2713";
+  background: #2f8a60;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(47, 138, 96, 0.22);
+}
+
+.workspace-feedback.error::before {
+  content: "!";
+  background: #c2556c;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(194, 85, 108, 0.2);
 }
 
 .workspace-section-stack {
