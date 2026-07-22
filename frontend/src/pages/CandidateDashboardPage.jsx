@@ -1822,11 +1822,20 @@ const CandidateDashboardPage = () => {
       </header>
 
       <main className="workspace-shell workspace-main">
-        {feedback && (
+        {feedback && activeSection !== 'profile' && (
           <div
             className={`${feedback.type === 'error' ? 'error' : 'success'} workspace-feedback`}
+            role="alert"
           >
-            {feedback.message}
+            <span className="workspace-feedback-message">{feedback.message}</span>
+            <button
+              type="button"
+              className="workspace-feedback-close"
+              onClick={() => setFeedback(null)}
+              aria-label="Tutup notifikasi"
+            >
+              x
+            </button>
           </div>
         )}
 
@@ -2872,6 +2881,22 @@ const CandidateDashboardPage = () => {
               </article>
 
               <div className="candidate-profile-actions">
+                {feedback && (
+                  <div
+                    className={`${feedback.type === 'error' ? 'error' : 'success'} workspace-feedback`}
+                    role="alert"
+                  >
+                    <span className="workspace-feedback-message">{feedback.message}</span>
+                    <button
+                      type="button"
+                      className="workspace-feedback-close"
+                      onClick={() => setFeedback(null)}
+                      aria-label="Tutup notifikasi"
+                    >
+                      x
+                    </button>
+                  </div>
+                )}
                 <button
                   type="button"
                   className="candidate-profile-primary-button"
