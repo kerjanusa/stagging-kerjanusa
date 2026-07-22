@@ -60,8 +60,6 @@ const FORGOT_PASSWORD_STEPS = [
   },
 ];
 
-const SHOULD_SHOW_RESET_DEBUG_LINK = import.meta.env.VITE_SHOW_RESET_DEBUG_LINK === 'true';
-
 /**
  * Menyediakan flow permintaan link reset password yang netral untuk semua role.
  */
@@ -70,10 +68,6 @@ const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [debugResetUrl, setDebugResetUrl] = useState('');
-  const [debugResetExpiresMinutes, setDebugResetExpiresMinutes] = useState(60);
-  const [isCopyingDebugUrl, setIsCopyingDebugUrl] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
@@ -118,15 +112,6 @@ const ForgotPasswordPage = () => {
       setSuccessMessage(
         response?.message || 'Jika email terdaftar, link reset password telah dikirim ke email Anda.'
       );
-      setDebugResetUrl(
-        SHOULD_SHOW_RESET_DEBUG_LINK ? response?.debug_reset_url || '' : ''
-      );
-      setDebugResetExpiresMinutes(
-        SHOULD_SHOW_RESET_DEBUG_LINK
-          ? Number(response?.debug_reset_expires_minutes || 60)
-          : 60
-      );
-      setCopyFeedback('');
     } catch (submissionError) {
       setError(
         typeof submissionError === 'string'
@@ -149,28 +134,6 @@ const ForgotPasswordPage = () => {
     setSuccessMessage('');
     setError('');
     setValidationErrors({});
-    setDebugResetUrl('');
-    setDebugResetExpiresMinutes(60);
-    setCopyFeedback('');
-  };
-
-  /**
-   * Copy the staging debug URL so internal testing can continue without email delivery.
-   */
-  const handleCopyDebugUrl = async () => {
-    if (!debugResetUrl || isCopyingDebugUrl) {
-      return;
-    }
-
-    try {
-      setIsCopyingDebugUrl(true);
-      await navigator.clipboard.writeText(debugResetUrl);
-      setCopyFeedback('Link reset berhasil disalin.');
-    } catch {
-      setCopyFeedback('Gagal menyalin link reset. Buka langsung lewat tombol di bawah.');
-    } finally {
-      setIsCopyingDebugUrl(false);
-    }
   };
 
   return (
@@ -224,37 +187,6 @@ const ForgotPasswordPage = () => {
                   Jika <strong>{submittedEmail}</strong> terdaftar, buka inbox email tersebut lalu
                   gunakan link reset yang berlaku selama 60 menit.
                 </p>
-
-                {SHOULD_SHOW_RESET_DEBUG_LINK && debugResetUrl ? (
-                  <div className="auth-forgot-debug">
-                    <strong>Link reset staging siap dipakai</strong>
-                    <p>
-                      Pengiriman email staging masih bisa terlambat. Untuk lanjut sekarang, buka
-                      link reset langsung di bawah ini. Link berlaku {debugResetExpiresMinutes}{' '}
-                      menit.
-                    </p>
-                    <div className="auth-forgot-debug-actions">
-                      <a
-                        href={debugResetUrl}
-                        className="btn btn-primary"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Buka link reset
-                      </a>
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={handleCopyDebugUrl}
-                        disabled={isCopyingDebugUrl}
-                      >
-                        {isCopyingDebugUrl ? 'Menyalin...' : 'Salin link reset'}
-                      </button>
-                    </div>
-                    <code className="auth-forgot-debug-url">{debugResetUrl}</code>
-                    {copyFeedback ? <p className="auth-forgot-debug-feedback">{copyFeedback}</p> : null}
-                  </div>
-                ) : null}
 
                 <div className="auth-forgot-success-actions">
                   <Link to={forgotPasswordCopy.loginTo} className="btn btn-primary">
