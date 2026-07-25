@@ -4,9 +4,12 @@ namespace App\Services;
 
 use App\Models\Job;
 use App\Models\Application;
+use App\Models\RecruiterJob;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class JobService
@@ -39,6 +42,69 @@ class JobService
         return $status === Job::STATUS_ACTIVE
             ? Job::WORKFLOW_ACTIVE
             : Job::WORKFLOW_DRAFT;
+    }
+
+    /**
+     * Build the duplicated payload kept in the recruiter-owned jobs table.
+     */
+    private function buildRecruiterJobPayload(Job $job): array
+    {
+        return [
+            'recruiter_id' => $job->recruiter_id,
+            'title' => $job->title,
+            'description' => $job->description,
+            'category' => $job->category,
+            'salary_min' => $job->salary_min,
+            'salary_max' => $job->salary_max,
+            'location' => $job->location,
+            'job_type' => $job->job_type,
+            'experience_level' => $job->experience_level,
+            'work_mode' => $job->work_mode,
+            'openings_count' => $job->openings_count,
+            'interview_type' => $job->interview_type,
+            'interview_note' => $job->interview_note,
+            'video_screening_requirement' => $job->video_screening_requirement,
+            'status' => $job->status,
+            'workflow_status' => $job->workflow_status,
+            'quiz_screening_questions' => $job->quiz_screening_questions,
+        ];
+    }
+
+    /**
+     * Keep recruiter-submitted jobs in a separate table without breaking public job flows.
+     */
+    private function syncRecruiterJobRecord(Job $job, bool $createIfMissing = true): void
+    {
+        if (!Schema::hasTable('recruiter_jobs')) {
+            return;
+        }
+
+        if (!$createIfMissing && !RecruiterJob::where('job_id', $job->id)->exists()) {
+            return;
+        }
+
+        RecruiterJob::updateOrCreate(
+            ['job_id' => $job->id],
+            $this->buildRecruiterJobPayload($job)
+        );
+    }
+
+    /**
+     * Count only jobs submitted through recruiter accounts so seeded public jobs do not consume quota.
+     */
+    private function countRecruiterActiveJobsForPlan(int $recruiterId): int
+    {
+        if (Schema::hasTable('recruiter_jobs')) {
+            return RecruiterJob::query()
+                ->where('recruiter_id', $recruiterId)
+                ->where('workflow_status', Job::WORKFLOW_ACTIVE)
+                ->count();
+        }
+
+        return Job::query()
+            ->where('recruiter_id', $recruiterId)
+            ->where('workflow_status', Job::WORKFLOW_ACTIVE)
+            ->count();
     }
 
     /**
@@ -102,10 +168,7 @@ class JobService
         );
 
         if (($data['workflow_status'] ?? Job::WORKFLOW_ACTIVE) === Job::WORKFLOW_ACTIVE) {
-            $currentActiveJobs = Job::query()
-                ->where('recruiter_id', $recruiterId)
-                ->where('workflow_status', Job::WORKFLOW_ACTIVE)
-                ->count();
+            $currentActiveJobs = $this->countRecruiterActiveJobsForPlan($recruiterId);
 
             if (!$this->recruiterPlanService->canPublishAdditionalJob($recruiter, $currentActiveJobs)) {
                 $plan = $this->recruiterPlanService->getRecruiterPlanContext($recruiter);
@@ -132,7 +195,12 @@ class JobService
             }
         }
 
-        $job = Job::create($data);
+        $job = DB::transaction(function () use ($data): Job {
+            $job = Job::create($data);
+            $this->syncRecruiterJobRecord($job);
+
+            return $job;
+        });
 
         $this->serviceActivityLogService->info($this, 'job_service.job_created', [
             'action' => 'create_job',
@@ -181,10 +249,7 @@ class JobService
             $recruiter = User::find($job->recruiter_id);
 
             if ($recruiter) {
-                $currentActiveJobs = Job::query()
-                    ->where('recruiter_id', $job->recruiter_id)
-                    ->where('workflow_status', Job::WORKFLOW_ACTIVE)
-                    ->count();
+                $currentActiveJobs = $this->countRecruiterActiveJobsForPlan($job->recruiter_id);
 
                 if (!$this->recruiterPlanService->canPublishAdditionalJob($recruiter, $currentActiveJobs)) {
                     $plan = $this->recruiterPlanService->getRecruiterPlanContext($recruiter);
@@ -213,7 +278,16 @@ class JobService
             }
         }
 
-        $updated = $job->update($data);
+        $updated = DB::transaction(function () use ($job, $data): bool {
+            $updated = $job->update($data);
+
+            if ($updated) {
+                $job->refresh();
+                $this->syncRecruiterJobRecord($job, false);
+            }
+
+            return $updated;
+        });
 
         $this->serviceActivityLogService->log(
             $this,
@@ -249,9 +323,18 @@ class JobService
             return false;
         }
 
-        $updated = $job->update([
-            'recruiter_id' => $recruiterId,
-        ]);
+        $updated = DB::transaction(function () use ($job, $recruiterId): bool {
+            $updated = $job->update([
+                'recruiter_id' => $recruiterId,
+            ]);
+
+            if ($updated) {
+                $job->refresh();
+                $this->syncRecruiterJobRecord($job, false);
+            }
+
+            return $updated;
+        });
 
         $this->serviceActivityLogService->log(
             $this,
@@ -310,9 +393,13 @@ class JobService
      */
     public function getRecruiterJobs(int $recruiterId, int $perPage = 15): LengthAwarePaginator
     {
-        $jobs = Job::where('recruiter_id', $recruiterId)
-            ->latest()
-            ->paginate($perPage);
+        $query = Job::where('recruiter_id', $recruiterId);
+
+        if (Schema::hasTable('recruiter_jobs')) {
+            $query->whereHas('recruiterJob');
+        }
+
+        $jobs = $query->latest()->paginate($perPage);
 
         $this->serviceActivityLogService->debug($this, 'job_service.recruiter_jobs_loaded', [
             'action' => 'get_recruiter_jobs',

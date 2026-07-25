@@ -119,6 +119,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Return job records submitted directly from this recruiter account.
+     */
+    public function recruiterJobs()
+    {
+        return $this->hasMany(RecruiterJob::class, 'recruiter_id');
+    }
+
+    /**
      * Return applications submitted by this candidate account.
      */
     public function applications()
