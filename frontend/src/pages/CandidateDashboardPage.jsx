@@ -71,6 +71,7 @@ const DEFAULT_VISIBLE_SKILL_ENTRIES = 1;
 const MAX_ADDITIONAL_SKILL_ENTRIES = 5;
 const MAX_VISIBLE_SKILL_ENTRIES =
   DEFAULT_VISIBLE_SKILL_ENTRIES + MAX_ADDITIONAL_SKILL_ENTRIES;
+const CANDIDATE_DASHBOARD_JOBS_PER_PAGE = 500;
 const PROFILE_PHOTO_MAX_FILE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 const PROFILE_PHOTO_MAX_DIMENSION_IN_PIXELS = 480;
 const PROFILE_PHOTO_OUTPUT_QUALITY = 0.82;
@@ -749,7 +750,13 @@ const CandidateDashboardPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, updateProfile, getCurrentUser } = useAuth();
-  const { jobs, isLoading: isLoadingJobs, error: jobsError, fetchJobs } = useJobs();
+  const {
+    jobs,
+    pagination: jobsPagination,
+    isLoading: isLoadingJobs,
+    error: jobsError,
+    fetchJobs,
+  } = useJobs();
   const {
     applications,
     isLoading: isLoadingApplications,
@@ -828,7 +835,7 @@ const CandidateDashboardPage = () => {
       return;
     }
 
-    fetchJobs({}, 1, 24);
+    fetchJobs({}, 1, CANDIDATE_DASHBOARD_JOBS_PER_PAGE);
     getMyApplications(1, 30);
   }, [fetchJobs, getMyApplications, user?.id, user?.role]);
 
@@ -915,6 +922,10 @@ const CandidateDashboardPage = () => {
         (job) => !job.alreadyApplied
       ),
     [applications, jobs, persistedProfile]
+  );
+  const candidateJobsTotalCount = Math.max(
+    Number(jobsPagination?.total) || 0,
+    recommendedJobs.length
   );
   const spotlightJobs = recommendedJobs.slice(0, 6);
   const primaryPreferredRole = firstFilledItem(persistedProfile.preferredRoles, 'Belum diisi');
@@ -2781,7 +2792,7 @@ const CandidateDashboardPage = () => {
                 <article className="candidate-jobs-context-card">
                   <div className="candidate-jobs-context-head">
                     <strong>Arah pencarian Anda</strong>
-                    <span>{recommendedJobs.length} peluang cocok</span>
+                    <span>{candidateJobsTotalCount} peluang cocok</span>
                   </div>
                   <p>{jobsFocusCaption}</p>
                   <div className="candidate-jobs-priority-row">
