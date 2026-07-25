@@ -119,6 +119,14 @@ class Job extends Model
     }
 
     /**
+     * Return the recruiter-owned mirror row when this job was submitted by a recruiter account.
+     */
+    public function recruiterJob()
+    {
+        return $this->hasOne(RecruiterJob::class);
+    }
+
+    /**
      * Return all applications submitted against this job posting.
      */
     public function applications()
