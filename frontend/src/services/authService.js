@@ -13,6 +13,8 @@ import {
 const MOCK_USERS_STORAGE_KEY = 'mock_auth_users';
 const MOCK_PASSWORD_RESET_STORAGE_KEY = 'mock_password_reset_tokens';
 const DEFAULT_DEMO_PASSWORD = 'password123';
+const REGISTRATION_NETWORK_ERROR_MESSAGE =
+  'Koneksi ke server terputus saat memproses pendaftaran. Jika tombol daftar sempat lama, akun mungkin sudah dibuat. Coba login dengan email dan password yang sama, atau gunakan Lupa Password jika belum bisa masuk.';
 
 const defaultMockUsers = [
   {
@@ -364,6 +366,16 @@ const normalizeMockProfileUpdatePayload = (data) => {
   return normalizedPayload;
 };
 
+/**
+ * Detect API failures where the browser never received one structured backend response.
+ */
+const isNetworkFailure = (error) =>
+  !error?.response &&
+  (error?.message === 'Network Error' ||
+    error?.code === 'ECONNABORTED' ||
+    error?.code === 'ERR_NETWORK' ||
+    Boolean(error?.request));
+
 class AuthService {
   /**
    * Register new user
@@ -423,6 +435,10 @@ class AuthService {
       }
       return response.data;
     } catch (error) {
+      if (isNetworkFailure(error)) {
+        throw { message: REGISTRATION_NETWORK_ERROR_MESSAGE };
+      }
+
       throw error.response?.data || error.message;
     }
   }

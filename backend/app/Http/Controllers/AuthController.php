@@ -17,6 +17,7 @@ use App\Services\SecurityEventService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Str;
@@ -46,11 +47,16 @@ class AuthController extends Controller
     {
         $validated = $request->validated();
 
-        $user = $this->authService->register($validated);
-        $token = $this->authService->createToken($user);
+        [$user, $token] = DB::transaction(function () use ($validated): array {
+            $user = $this->authService->register($validated);
+            $token = $this->authService->createToken($user);
+
+            return [$user, $token];
+        });
+
         $this->auditLogService->record('auth.register_succeeded', [
             'action' => 'register',
-            'step' => 'create_user',
+            'step' => 'create_user_and_token',
             'result' => 'success',
         ], $user, AuthService::class);
 

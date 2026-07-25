@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
+use Throwable;
 
 class ServiceLogManager
 {
@@ -26,19 +27,36 @@ class ServiceLogManager
             return $this->loggers[$loggerKey];
         }
 
-        $servicesLogPath = storage_path('logs/services');
-
-        if (!is_dir($servicesLogPath)) {
-            mkdir($servicesLogPath, 0777, true);
+        $configuredChannel = env('LOG_SERVICE_CHANNEL');
+        if (is_string($configuredChannel) && trim($configuredChannel) !== '') {
+            return $this->loggers[$loggerKey] = Log::channel(trim($configuredChannel));
         }
 
-        $this->loggers[$loggerKey] = Log::build([
-            'driver' => 'daily',
-            'path' => $servicesLogPath . '/' . $loggerKey . '.log',
-            'level' => env('LOG_SERVICE_LEVEL', env('LOG_LEVEL', 'debug')),
-            'days' => env('LOG_SERVICE_DAYS', 14),
-            'replace_placeholders' => true,
-        ]);
+        if (app()->environment('production')) {
+            return $this->loggers[$loggerKey] = Log::channel('stderr');
+        }
+
+        $servicesLogPath = storage_path('logs/services');
+
+        try {
+            if (!is_dir($servicesLogPath)) {
+                mkdir($servicesLogPath, 0777, true);
+            }
+
+            if (!is_writable($servicesLogPath)) {
+                return $this->loggers[$loggerKey] = Log::channel('stderr');
+            }
+
+            $this->loggers[$loggerKey] = Log::build([
+                'driver' => 'daily',
+                'path' => $servicesLogPath . '/' . $loggerKey . '.log',
+                'level' => env('LOG_SERVICE_LEVEL', env('LOG_LEVEL', 'debug')),
+                'days' => env('LOG_SERVICE_DAYS', 14),
+                'replace_placeholders' => true,
+            ]);
+        } catch (Throwable) {
+            $this->loggers[$loggerKey] = Log::channel('stderr');
+        }
 
         return $this->loggers[$loggerKey];
     }
