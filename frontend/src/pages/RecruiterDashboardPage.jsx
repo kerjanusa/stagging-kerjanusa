@@ -636,6 +636,20 @@ const RecruiterDashboardPage = () => {
   const [chatSearchQuery, setChatSearchQuery] = useState('');
 
   useEffect(() => {
+    if (!feedback) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedback(null);
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [feedback]);
+
+  useEffect(() => {
     setActiveSection(resolveRecruiterSectionFromHash(location.hash));
   }, [location.hash]);
 
