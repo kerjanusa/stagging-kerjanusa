@@ -1941,7 +1941,9 @@ const RecruiterDashboardPage = () => {
       <main className="workspace-shell workspace-main recruiter-flow-shell">
         {feedback && (
           <div
-            className={`${feedback.type === 'error' ? 'error' : 'success'} workspace-feedback`}
+            className={`${feedback.type === 'error' ? 'error' : 'success'} workspace-feedback recruiter-flow-feedback`}
+            role="alert"
+            aria-live="assertive"
           >
             {feedback.message}
           </div>
