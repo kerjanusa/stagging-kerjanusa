@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Support\RequestLogContext;
+use Throwable;
 
 class ServiceActivityLogService
 {
@@ -80,11 +81,21 @@ class ServiceActivityLogService
         ?User $actor = null
     ): void
     {
-        $payload = $this->requestLogContext->build(
-            ['event_name' => $eventName, ...$context],
-            $actor
-        );
+        try {
+            $payload = $this->requestLogContext->build(
+                ['event_name' => $eventName, ...$context],
+                $actor
+            );
 
-        $this->serviceLogManager->for($service)->log($level, $eventName, $payload);
+            $this->serviceLogManager->for($service)->log($level, $eventName, $payload);
+        } catch (Throwable $exception) {
+            error_log(sprintf(
+                'service_activity_log_failed event=%s level=%s exception=%s message=%s',
+                $eventName,
+                $level,
+                $exception::class,
+                $exception->getMessage()
+            ));
+        }
     }
 }

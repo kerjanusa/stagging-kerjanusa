@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Support\RequestLogContext;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class AuditLogService
 {
@@ -28,18 +29,27 @@ class AuditLogService
         object|string|null $sourceService = null
     ): void
     {
-        $payload = $this->requestLogContext->build(
-            ['event_name' => $eventName, ...$context],
-            $actor
-        );
+        try {
+            $payload = $this->requestLogContext->build(
+                ['event_name' => $eventName, ...$context],
+                $actor
+            );
 
-        Log::channel('audit')->info(
-            $eventName,
-            $payload
-        );
+            Log::channel('audit')->info(
+                $eventName,
+                $payload
+            );
 
-        $this->serviceLogManager
-            ->for($sourceService ?? self::class)
-            ->info($eventName, $payload);
+            $this->serviceLogManager
+                ->for($sourceService ?? self::class)
+                ->info($eventName, $payload);
+        } catch (Throwable $exception) {
+            error_log(sprintf(
+                'audit_log_failed event=%s exception=%s message=%s',
+                $eventName,
+                $exception::class,
+                $exception->getMessage()
+            ));
+        }
     }
 }

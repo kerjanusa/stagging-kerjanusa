@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Support\RequestLogContext;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class SecurityEventService
 {
@@ -29,19 +30,29 @@ class SecurityEventService
         object|string|null $sourceService = null
     ): void
     {
-        $payload = $this->requestLogContext->build(
-            ['event_name' => $eventName, ...$context],
-            $actor
-        );
+        try {
+            $payload = $this->requestLogContext->build(
+                ['event_name' => $eventName, ...$context],
+                $actor
+            );
 
-        Log::channel('security')->log(
-            $level,
-            $eventName,
-            $payload
-        );
+            Log::channel('security')->log(
+                $level,
+                $eventName,
+                $payload
+            );
 
-        $this->serviceLogManager
-            ->for($sourceService ?? self::class)
-            ->log($level, $eventName, $payload);
+            $this->serviceLogManager
+                ->for($sourceService ?? self::class)
+                ->log($level, $eventName, $payload);
+        } catch (Throwable $exception) {
+            error_log(sprintf(
+                'security_event_log_failed event=%s level=%s exception=%s message=%s',
+                $eventName,
+                $level,
+                $exception::class,
+                $exception->getMessage()
+            ));
+        }
     }
 }
