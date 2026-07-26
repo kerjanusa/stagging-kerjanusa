@@ -97,6 +97,8 @@ Route::get('/health/database', $databaseHealthResponder);
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+Route::get('/oauth/{provider}/redirect', [AuthController::class, 'redirectToOAuthProvider'])->middleware('throttle:10,1');
+Route::get('/oauth/{provider}/callback', [AuthController::class, 'handleOAuthProviderCallback'])->middleware('throttle:20,1');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:6,1');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1');
 

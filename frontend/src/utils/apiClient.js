@@ -7,7 +7,7 @@ import {
 import { getLoginRouteForRole } from './routeHelpers.js';
 import { resolvedApiUrl } from './mockMode.js';
 
-const API_BASE_URL = resolvedApiUrl || '/api';
+export const API_BASE_URL = resolvedApiUrl || '/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

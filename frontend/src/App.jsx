@@ -12,6 +12,7 @@ const PlatformPage = lazy(() => import('./pages/PlatformPage.jsx'));
 const JobListPage = lazy(() => import('./pages/JobListPage.jsx'));
 const JobApplyPage = lazy(() => import('./pages/JobApplyPage.jsx'));
 const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
+const OAuthCallbackPage = lazy(() => import('./pages/OAuthCallbackPage.jsx'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage.jsx'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage.jsx'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage.jsx'));
@@ -127,6 +128,7 @@ function AppLayout() {
     location.pathname === APP_ROUTES.adminDashboard;
   const loginShellClassName =
     location.pathname === APP_ROUTES.login ||
+    location.pathname === APP_ROUTES.oauthCallback ||
     location.pathname === APP_ROUTES.forgotPassword ||
     location.pathname === APP_ROUTES.resetPassword
       ? 'auth-shell auth-shell-with-navbar'
@@ -179,6 +181,14 @@ function AppLayout() {
                   <LoginPage />
                 </main>
               </GuestRoute>
+            }
+          />
+          <Route
+            path={APP_ROUTES.oauthCallback}
+            element={
+              <main className={loginShellClassName}>
+                <OAuthCallbackPage />
+              </main>
             }
           />
           <Route

@@ -5,6 +5,7 @@ export const APP_ROUTES = {
   platform: '/platform',
   jobs: '/jobs',
   login: '/login',
+  oauthCallback: '/oauth/callback',
   forgotPassword: '/forgot-password',
   resetPassword: '/reset-password',
   register: '/register',

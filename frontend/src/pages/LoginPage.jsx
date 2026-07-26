@@ -78,6 +78,7 @@ const LoginPage = () => {
         ? 'superadmin'
         : 'default';
   const loginCopy = LOGIN_ENTRY_COPY[loginEntryKey];
+  const oauthRole = loginEntryKey === 'candidate' ? 'candidate' : 'recruiter';
   const forgotPasswordTo =
     loginEntryKey === 'default'
       ? APP_ROUTES.forgotPassword
@@ -174,6 +175,8 @@ const LoginPage = () => {
               <LoginForm
                 emailPlaceholder={loginCopy.emailPlaceholder}
                 forgotPasswordTo={forgotPasswordTo}
+                oauthRole={oauthRole}
+                showOAuthLogin={loginEntryKey !== 'superadmin'}
               />
               {loginCopy.registerTo ? (
                 <p className="auth-link">

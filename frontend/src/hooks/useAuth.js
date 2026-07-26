@@ -46,6 +46,31 @@ const useAuthStore = create((set) => ({
     }
   },
 
+  // OAuth callback action
+  completeOAuthLogin: async (token) => {
+    set({ isLoading: true, error: null, validationErrors: {} });
+    try {
+      const data = await AuthService.completeOAuthLogin(token);
+      set({
+        user: data.user,
+        token: data.token,
+        isLoading: false,
+        error: null,
+        validationErrors: {},
+      });
+      return data;
+    } catch (error) {
+      set({
+        user: null,
+        token: null,
+        error: getErrorMessage(error, 'Login Google/Facebook gagal'),
+        validationErrors: getValidationErrors(error),
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
   // Register action
   register: async (formData) => {
     set({ isLoading: true, error: null, validationErrors: {} });

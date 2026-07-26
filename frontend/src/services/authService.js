@@ -1,4 +1,4 @@
-import apiClient from '../utils/apiClient';
+import apiClient, { API_BASE_URL } from '../utils/apiClient';
 import { shouldUseMockData } from '../utils/mockMode';
 import { clearCandidateApplyIntent } from '../utils/candidateApplyIntent.js';
 import { normalizeUserRole } from '../utils/routeHelpers.js';
@@ -15,6 +15,9 @@ const MOCK_PASSWORD_RESET_STORAGE_KEY = 'mock_password_reset_tokens';
 const DEFAULT_DEMO_PASSWORD = 'password123';
 const REGISTRATION_NETWORK_ERROR_MESSAGE =
   'Koneksi ke server terputus saat memproses pendaftaran. Jika tombol daftar sempat lama, akun mungkin sudah dibuat. Coba login dengan email dan password yang sama, atau gunakan Lupa Password jika belum bisa masuk.';
+
+const PUBLIC_OAUTH_ROLES = new Set(['candidate', 'recruiter']);
+const SUPPORTED_OAUTH_PROVIDERS = new Set(['google', 'facebook']);
 
 const defaultMockUsers = [
   {
@@ -376,7 +379,52 @@ const isNetworkFailure = (error) =>
     error?.code === 'ERR_NETWORK' ||
     Boolean(error?.request));
 
+/**
+ * Resolve the configured API base URL into an absolute browser URL for provider redirects.
+ */
+const getAbsoluteApiBaseUrl = () => {
+  const trimmedApiBaseUrl = String(API_BASE_URL || '/api').replace(/\/+$/, '');
+
+  if (/^https?:\/\//i.test(trimmedApiBaseUrl)) {
+    return trimmedApiBaseUrl;
+  }
+
+  const browserOrigin =
+    typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
+  const normalizedPath = trimmedApiBaseUrl.startsWith('/')
+    ? trimmedApiBaseUrl
+    : `/${trimmedApiBaseUrl}`;
+
+  return `${browserOrigin}${normalizedPath}`.replace(/\/+$/, '');
+};
+
 class AuthService {
+  /**
+   * Determine whether real OAuth redirects can be attempted in the current frontend mode.
+   */
+  static canUseOAuthLogin() {
+    return !shouldUseMockData;
+  }
+
+  /**
+   * Build a backend OAuth redirect URL for a supported public login role.
+   */
+  static getOAuthRedirectUrl(provider, role = 'candidate') {
+    const normalizedProvider = String(provider || '').trim().toLowerCase();
+
+    if (!SUPPORTED_OAUTH_PROVIDERS.has(normalizedProvider)) {
+      throw { message: 'Provider login tidak didukung.' };
+    }
+
+    const normalizedRoleValue = String(role || '').trim().toLowerCase();
+    const normalizedRole = PUBLIC_OAUTH_ROLES.has(normalizedRoleValue)
+      ? normalizedRoleValue
+      : 'candidate';
+    const params = new URLSearchParams({ role: normalizedRole });
+
+    return `${getAbsoluteApiBaseUrl()}/oauth/${normalizedProvider}/redirect?${params.toString()}`;
+  }
+
   /**
    * Register new user
    */
@@ -499,6 +547,37 @@ class AuthService {
       }
       return response.data;
     } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  }
+
+  /**
+   * Persist an OAuth token received from the backend callback, then hydrate the current user.
+   */
+  static async completeOAuthLogin(token) {
+    const normalizedToken = String(token || '').trim();
+
+    if (!normalizedToken) {
+      throw { message: 'Token login tidak diterima. Silakan coba lagi.' };
+    }
+
+    if (shouldUseMockData) {
+      throw { message: 'Login Google/Facebook tidak tersedia di mode demo.' };
+    }
+
+    try {
+      writeStoredAuthToken(normalizedToken, { persistent: true });
+      const response = await apiClient.get('/me');
+      const normalizedUser = persistApiSession(response.data.user, normalizedToken, {
+        persistent: true,
+      });
+
+      return {
+        user: normalizedUser,
+        token: normalizedToken,
+      };
+    } catch (error) {
+      clearStoredAuthSession();
       throw error.response?.data || error.message;
     }
   }

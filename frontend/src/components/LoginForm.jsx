@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
+import AuthService from '../services/authService.js';
 import PasswordField from './PasswordField';
 import '../styles/authForm.css';
 
@@ -11,13 +12,19 @@ const LoginForm = ({
   onSuccess,
   emailPlaceholder = 'Email recruiter / company',
   forgotPasswordTo = '/forgot-password',
+  oauthRole = 'candidate',
+  showOAuthLogin = true,
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberDevice, setRememberDevice] = useState(true);
+  const [oauthError, setOauthError] = useState('');
   const { login, isLoading, error, validationErrors, clearError } = useAuth();
 
   const hasFieldErrors = Object.keys(validationErrors || {}).length > 0;
+  const formError = oauthError || error;
+  const canUseOAuthLogin = showOAuthLogin && AuthService.canUseOAuthLogin();
+
   /**
    * Mengambil error pertama untuk field tertentu agar input cukup membaca satu sumber pesan.
    */
@@ -32,6 +39,10 @@ const LoginForm = ({
     if (error || hasFieldErrors) {
       clearError();
     }
+
+    if (oauthError) {
+      setOauthError('');
+    }
   };
 
   /**
@@ -42,6 +53,10 @@ const LoginForm = ({
 
     if (error || hasFieldErrors) {
       clearError();
+    }
+
+    if (oauthError) {
+      setOauthError('');
     }
   };
 
@@ -58,9 +73,20 @@ const LoginForm = ({
     }
   };
 
+  /**
+   * Mulai OAuth login lewat backend agar callback tetap memakai token Sanctum aplikasi.
+   */
+  const handleOAuthLogin = (provider) => {
+    try {
+      window.location.assign(AuthService.getOAuthRedirectUrl(provider, oauthRole));
+    } catch (error) {
+      setOauthError(error?.message || 'Login Google/Facebook belum bisa diproses.');
+    }
+  };
+
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
-      {error && !hasFieldErrors && <div className="error-message">{error}</div>}
+      {formError && !hasFieldErrors && <div className="error-message">{formError}</div>}
 
       <div className={`form-group${getFieldError('email') ? ' has-error' : ''}`}>
         <label htmlFor="email">Email</label>
@@ -118,6 +144,38 @@ const LoginForm = ({
       <button type="submit" className="btn btn-primary" disabled={isLoading}>
         {isLoading ? 'Memproses...' : 'Login'}
       </button>
+
+      {canUseOAuthLogin ? (
+        <>
+          <div className="auth-social-divider">
+            <span>atau</span>
+          </div>
+          <div className="auth-social-actions" aria-label="Pilihan login sosial">
+            <button
+              type="button"
+              className="auth-social-button"
+              onClick={() => handleOAuthLogin('google')}
+              disabled={isLoading}
+            >
+              <span className="auth-social-icon auth-social-icon-google" aria-hidden="true">
+                G
+              </span>
+              <span>Google</span>
+            </button>
+            <button
+              type="button"
+              className="auth-social-button"
+              onClick={() => handleOAuthLogin('facebook')}
+              disabled={isLoading}
+            >
+              <span className="auth-social-icon auth-social-icon-facebook" aria-hidden="true">
+                f
+              </span>
+              <span>Facebook</span>
+            </button>
+          </div>
+        </>
+      ) : null}
     </form>
   );
 };
