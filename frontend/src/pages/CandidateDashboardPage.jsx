@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import InboxWorkspace from '../components/InboxWorkspace.jsx';
+import indonesiaLocationOptions from '../data/indonesiaLocationOptions.js';
 import locationCoordinates, {
   getLocationCoordinates,
+  normalizeLocationKey,
 } from '../data/locationCoordinates.js';
 import useApplications from '../hooks/useApplications.js';
 import useAuth from '../hooks/useAuth.js';
@@ -108,10 +110,24 @@ const EXPERIENCE_YEAR_OPTIONS = Array.from(
 const createCandidateJobFilters = () => ({
   search: '',
   location: '',
+  locationLabel: '',
   workMode: '',
   experienceLevel: '',
 });
 const NEAREST_LOCATION_FILTER_VALUE = '__nearest_location__';
+
+const ALL_INDONESIA_LOCATION_OPTIONS = indonesiaLocationOptions.flatMap((group) =>
+  group.options.map((option) => ({
+    key: `${group.province}-${option.rawName || option.value}-${option.label}`,
+    label: option.label,
+    value: option.value,
+    rawName: option.rawName,
+    province: group.province,
+    searchText: normalizeLocationKey(
+      `${group.province} ${option.label} ${option.value} ${option.rawName || ''}`
+    ),
+  }))
+);
 
 /**
  * Menyediakan template kosong untuk satu entri pengalaman kerja kandidat.
@@ -702,6 +718,40 @@ const formatCandidateJobScorePercent = (job) => {
 const getCandidateJobMatchScoreValue = (job) => Number(job?.candidate_match?.score || 0);
 const hasCandidateJobMatch = (job) => getCandidateJobMatchScoreValue(job) > 0;
 
+const areLocationCoordinatesEqual = (firstCoordinates, secondCoordinates) =>
+  Boolean(firstCoordinates && secondCoordinates) &&
+  Math.abs(firstCoordinates.latitude - secondCoordinates.latitude) < 0.01 &&
+  Math.abs(firstCoordinates.longitude - secondCoordinates.longitude) < 0.01;
+
+/**
+ * Mencocokkan lokasi lowongan dengan pilihan kota/kabupaten nasional yang formatnya bisa berbeda.
+ */
+const doesCandidateJobLocationMatch = (jobLocation = '', selectedLocation = '') => {
+  const normalizedJobLocation = normalizeLocationKey(jobLocation);
+  const normalizedSelectedLocation = normalizeLocationKey(selectedLocation);
+
+  if (!normalizedSelectedLocation) {
+    return true;
+  }
+
+  if (!normalizedJobLocation) {
+    return false;
+  }
+
+  if (
+    normalizedJobLocation === normalizedSelectedLocation ||
+    normalizedJobLocation.includes(normalizedSelectedLocation) ||
+    normalizedSelectedLocation.includes(normalizedJobLocation)
+  ) {
+    return true;
+  }
+
+  return areLocationCoordinatesEqual(
+    getLocationCoordinates(jobLocation),
+    getLocationCoordinates(selectedLocation)
+  );
+};
+
 /**
  * Menyederhanakan label level pengalaman agar lebih ringkas pada kartu rekomendasi.
  */
@@ -868,11 +918,14 @@ const CandidateDashboardPage = () => {
   const [chatDraftMessage, setChatDraftMessage] = useState('');
   const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [candidateJobFilters, setCandidateJobFilters] = useState(createCandidateJobFilters);
+  const [isCandidateLocationDropdownOpen, setIsCandidateLocationDropdownOpen] = useState(false);
+  const [candidateLocationSearchQuery, setCandidateLocationSearchQuery] = useState('');
   const [resumePreview, setResumePreview] = useState(null);
   const [profilePhotoFile, setProfilePhotoFile] = useState(null);
   const [shouldClearProfilePhoto, setShouldClearProfilePhoto] = useState(false);
   const [resumeUploadFiles, setResumeUploadFiles] = useState([]);
   const isSavingProfileRef = useRef(false);
+  const candidateLocationDropdownRef = useRef(null);
 
   useEffect(() => {
     setActiveSection(resolveCandidateSectionFromHash(location.hash));
@@ -1060,6 +1113,24 @@ const CandidateDashboardPage = () => {
     });
   }, [activeSection, chatError]);
 
+  useEffect(() => {
+    if (!isCandidateLocationDropdownOpen) {
+      return undefined;
+    }
+
+    const handleOutsidePointer = (event) => {
+      if (!candidateLocationDropdownRef.current?.contains(event.target)) {
+        setIsCandidateLocationDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsidePointer);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsidePointer);
+    };
+  }, [isCandidateLocationDropdownOpen]);
+
   const completion = useMemo(
     () => getCandidateProfileCompletion(profile),
     [profile]
@@ -1084,13 +1155,24 @@ const CandidateDashboardPage = () => {
     () => recommendedJobs.filter(hasCandidateJobMatch),
     [recommendedJobs]
   );
-  const candidateJobLocationOptions = useMemo(
+  const candidateActiveJobLocationOptions = useMemo(
     () =>
       [...new Set(recommendedJobs.map((job) => String(job.location || '').trim()).filter(Boolean))].sort(
         (leftValue, rightValue) => leftValue.localeCompare(rightValue, 'id')
       ),
     [recommendedJobs]
   );
+  const filteredCandidateLocationOptions = useMemo(() => {
+    const normalizedSearchQuery = normalizeLocationKey(candidateLocationSearchQuery);
+
+    if (!normalizedSearchQuery) {
+      return ALL_INDONESIA_LOCATION_OPTIONS;
+    }
+
+    return ALL_INDONESIA_LOCATION_OPTIONS.filter((option) =>
+      option.searchText.includes(normalizedSearchQuery)
+    );
+  }, [candidateLocationSearchQuery]);
   const candidateJobWorkModeOptions = useMemo(
     () =>
       [...new Set(recommendedJobs.map((job) => String(job.work_mode || '').trim()).filter(Boolean))],
@@ -1119,9 +1201,10 @@ const CandidateDashboardPage = () => {
 
       const matchesSearch =
         !normalizedSearchQuery || searchableText.includes(normalizedSearchQuery);
-      const matchesLocation =
-        !candidateJobFilters.location ||
-        String(job.location || '').trim() === candidateJobFilters.location;
+      const matchesLocation = doesCandidateJobLocationMatch(
+        job.location,
+        candidateJobFilters.location
+      );
       const matchesWorkMode =
         !candidateJobFilters.workMode ||
         String(job.work_mode || '').trim() === candidateJobFilters.workMode;
@@ -1150,6 +1233,13 @@ const CandidateDashboardPage = () => {
     profile.preferredLocations,
     'Belum diisi'
   );
+  const selectedCandidateJobLocationLabel = candidateJobFilters.location
+    ? candidateJobFilters.locationLabel ||
+      ALL_INDONESIA_LOCATION_OPTIONS.find(
+        (option) => option.value === candidateJobFilters.location
+      )?.label ||
+      candidateJobFilters.location
+    : 'Semua lokasi';
   const resumePreviewName = resumePreview?.name || profile.resumeFiles[0] || 'CV belum diunggah';
   const hasProfilePhoto = Boolean(profile.photoDataUrl);
   const profilePhotoAlt = profile.fullName?.trim()
@@ -1248,6 +1338,14 @@ const CandidateDashboardPage = () => {
     }));
   };
 
+  const handleCandidateJobLocationFilterUpdate = (locationValue, locationLabel = '') => {
+    setCandidateJobFilters((currentFilters) => ({
+      ...currentFilters,
+      location: locationValue,
+      locationLabel,
+    }));
+  };
+
   const handleUseNearestCandidateJobLocation = async () => {
     if (isFindingNearestJobLocation) {
       return;
@@ -1261,7 +1359,7 @@ const CandidateDashboardPage = () => {
       return;
     }
 
-    const candidateLocationsWithCoordinates = candidateJobLocationOptions
+    const candidateLocationsWithCoordinates = candidateActiveJobLocationOptions
       .map((locationName) => ({
         name: locationName,
         coordinates: getLocationCoordinates(locationName),
@@ -1305,7 +1403,7 @@ const CandidateDashboardPage = () => {
         throw new Error('Lokasi perangkat terbaca, tetapi belum ada lowongan terdekat yang cocok.');
       }
 
-      handleCandidateJobFilterChange('location', nearestLocation.name);
+      handleCandidateJobLocationFilterUpdate(nearestLocation.name, nearestLocation.name);
       setFeedback({
         type: 'success',
         message: `Filter terdekat aktif: ${nearestLocation.name} (${formatDistanceLabel(
@@ -1327,15 +1425,27 @@ const CandidateDashboardPage = () => {
 
   const handleCandidateJobLocationFilterChange = (value) => {
     if (value === NEAREST_LOCATION_FILTER_VALUE) {
+      setIsCandidateLocationDropdownOpen(false);
+      setCandidateLocationSearchQuery('');
       handleUseNearestCandidateJobLocation();
       return;
     }
 
-    handleCandidateJobFilterChange('location', value);
+    handleCandidateJobLocationFilterUpdate(value);
+    setIsCandidateLocationDropdownOpen(false);
+    setCandidateLocationSearchQuery('');
+  };
+
+  const handleCandidateLocationOptionSelect = (option) => {
+    handleCandidateJobLocationFilterUpdate(option.value, option.label);
+    setIsCandidateLocationDropdownOpen(false);
+    setCandidateLocationSearchQuery('');
   };
 
   const handleResetCandidateJobFilters = () => {
     setCandidateJobFilters(createCandidateJobFilters());
+    setIsCandidateLocationDropdownOpen(false);
+    setCandidateLocationSearchQuery('');
   };
 
   const handleLogout = async () => {
@@ -3239,28 +3349,103 @@ const CandidateDashboardPage = () => {
                     />
                   </label>
 
-                  <label className="candidate-jobs-filter-field">
+                  <div className="candidate-jobs-filter-field">
                     <span>Lokasi</span>
-                    <select
-                      value={candidateJobFilters.location}
-                      onChange={(event) =>
-                        handleCandidateJobLocationFilterChange(event.target.value)
-                      }
-                      disabled={isFindingNearestJobLocation}
+                    <div
+                      className="candidate-jobs-location-picker"
+                      ref={candidateLocationDropdownRef}
                     >
-                      <option value="">Semua lokasi</option>
-                      <option value={NEAREST_LOCATION_FILTER_VALUE}>
-                        {isFindingNearestJobLocation
-                          ? 'Mencari lokasi terdekat...'
-                          : 'Terdekat dari lokasi saya'}
-                      </option>
-                      {candidateJobLocationOptions.map((locationOption) => (
-                        <option key={locationOption} value={locationOption}>
-                          {locationOption}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      <button
+                        type="button"
+                        className={`candidate-jobs-location-trigger${
+                          isCandidateLocationDropdownOpen ? ' is-open' : ''
+                        }${candidateJobFilters.location ? ' has-selection' : ''}`}
+                        aria-expanded={isCandidateLocationDropdownOpen}
+                        aria-haspopup="listbox"
+                        onClick={() =>
+                          setIsCandidateLocationDropdownOpen((currentValue) => !currentValue)
+                        }
+                        disabled={isFindingNearestJobLocation}
+                      >
+                        <span>{selectedCandidateJobLocationLabel}</span>
+                        <span aria-hidden="true">⌄</span>
+                      </button>
+
+                      {isCandidateLocationDropdownOpen && (
+                        <div className="candidate-jobs-location-menu">
+                          <div className="candidate-jobs-location-search">
+                            <input
+                              type="search"
+                              value={candidateLocationSearchQuery}
+                              onChange={(event) =>
+                                setCandidateLocationSearchQuery(event.target.value)
+                              }
+                              placeholder="Cari kota / kabupaten..."
+                              autoFocus
+                            />
+                          </div>
+
+                          <div className="candidate-jobs-location-options" role="listbox">
+                            <button
+                              type="button"
+                              className={`candidate-jobs-location-option${
+                                !candidateJobFilters.location ? ' is-active' : ''
+                              }`}
+                              onClick={() => handleCandidateJobLocationFilterChange('')}
+                            >
+                              <strong>Semua lokasi</strong>
+                              <span>Seluruh lowongan kandidat</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className="candidate-jobs-location-option"
+                              onClick={() =>
+                                handleCandidateJobLocationFilterChange(
+                                  NEAREST_LOCATION_FILTER_VALUE
+                                )
+                              }
+                            >
+                              <strong>
+                                {isFindingNearestJobLocation
+                                  ? 'Mencari lokasi terdekat...'
+                                  : 'Terdekat dari lokasi saya'}
+                              </strong>
+                              <span>Berdasarkan lokasi lowongan yang aktif</span>
+                            </button>
+
+                            {filteredCandidateLocationOptions.map((option) => (
+                              <button
+                                key={option.key}
+                                type="button"
+                                className={`candidate-jobs-location-option${
+                                  candidateJobFilters.location === option.value &&
+                                  candidateJobFilters.locationLabel === option.label
+                                    ? ' is-active'
+                                    : ''
+                                }`}
+                                role="option"
+                                aria-selected={
+                                  candidateJobFilters.location === option.value &&
+                                  candidateJobFilters.locationLabel === option.label
+                                }
+                                onClick={() => handleCandidateLocationOptionSelect(option)}
+                              >
+                                <strong>{option.label}</strong>
+                                <span>{option.province}</span>
+                              </button>
+                            ))}
+
+                            {filteredCandidateLocationOptions.length === 0 && (
+                              <p className="candidate-jobs-location-empty">
+                                Lokasi tidak ditemukan.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <label className="candidate-jobs-filter-field">
                     <span>Mode kerja</span>
