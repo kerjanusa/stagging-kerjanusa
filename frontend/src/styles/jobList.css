@@ -2767,7 +2767,45 @@
   white-space: nowrap;
 }
 
-@media (min-width: 900px) {
+.job-apply-page-shell,
+.job-apply-modal-standalone.is-story-step,
+.job-apply-story-shell {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+@supports not (overflow: clip) {
+  .job-apply-page-shell,
+  .job-apply-modal-standalone.is-story-step,
+  .job-apply-story-shell {
+    overflow-x: hidden;
+  }
+}
+
+.job-apply-story-shell,
+.job-apply-story-hero,
+.job-apply-story-hero-copy,
+.job-apply-story-content,
+.job-apply-story-section,
+.job-apply-story-question-panel,
+.job-apply-profile-summary,
+.job-apply-question-card,
+.job-apply-benefit-card {
+  min-width: 0;
+}
+
+.job-apply-story-shell p,
+.job-apply-story-shell strong,
+.job-apply-story-shell span,
+.job-apply-story-shell li,
+.job-apply-hero-title,
+.job-apply-hero-company,
+.job-apply-company-copy {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
   .job-apply-page-shell {
     width: min(100%, 60rem);
     padding: 1.6rem 1.25rem 3rem;
@@ -2932,7 +2970,7 @@
   }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 1180px) and (hover: hover) and (pointer: fine) {
   .job-apply-page-shell {
     width: min(100%, 72rem);
     padding-inline: 1.5rem;
@@ -2953,6 +2991,60 @@
 
   .job-apply-modal-standalone.is-story-step .job-apply-story-cover {
     min-height: 16rem;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .job-apply-page-shell {
+    width: min(100%, 28rem);
+    padding-inline: 0.92rem;
+  }
+
+  .job-apply-page-topbar {
+    display: none;
+  }
+
+  .job-apply-modal-standalone.job-apply-modal.is-story-step {
+    width: 100%;
+    max-height: none;
+    height: auto;
+    border-radius: 1.35rem;
+    overflow: hidden;
+  }
+
+  .job-apply-modal-standalone.is-story-step .job-apply-story-hero,
+  .job-apply-modal-standalone.is-story-step .job-apply-story-content,
+  .job-apply-modal-standalone.is-story-step .job-apply-story-question-panel .job-apply-question-list,
+  .job-apply-modal-standalone.is-story-step .job-apply-benefit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .job-apply-modal-standalone.is-story-step .job-apply-story-content > * {
+    position: static;
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .job-apply-modal-standalone .job-apply-story-intro-strip {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.28rem;
+  }
+
+  .job-apply-actions.is-story-step,
+  .job-apply-modal-standalone .job-apply-actions.is-story-step {
+    position: static;
+    grid-template-columns: 1fr;
+    margin-top: 0.85rem;
+    padding: 0 0.95rem 0.15rem;
+    border-top: none;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .job-apply-story-button-label {
+    white-space: normal;
   }
 }
 

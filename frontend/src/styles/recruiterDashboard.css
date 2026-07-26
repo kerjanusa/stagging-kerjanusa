@@ -243,12 +243,15 @@
   position: fixed;
   top: calc(4.8rem + env(safe-area-inset-top, 0px));
   left: 50%;
-  z-index: 1080;
+  z-index: 1090;
   width: min(calc(100vw - 2rem), 46rem);
   margin: 0;
   transform: translateX(-50%);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  align-items: flex-start;
+  max-height: min(42vh, 18rem);
+  overflow-y: auto;
 }
 
 .recruiter-profile-chip {

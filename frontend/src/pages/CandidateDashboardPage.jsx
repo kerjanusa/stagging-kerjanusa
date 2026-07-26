@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import InboxWorkspace from '../components/InboxWorkspace.jsx';
-import locationCoordinates from '../data/locationCoordinates.js';
+import locationCoordinates, {
+  getLocationCoordinates,
+} from '../data/locationCoordinates.js';
 import useApplications from '../hooks/useApplications.js';
 import useAuth from '../hooks/useAuth.js';
 import useChat from '../hooks/useChat.js';
@@ -109,6 +111,7 @@ const createCandidateJobFilters = () => ({
   workMode: '',
   experienceLevel: '',
 });
+const NEAREST_LOCATION_FILTER_VALUE = '__nearest_location__';
 
 /**
  * Menyediakan template kosong untuk satu entri pengalaman kerja kandidat.
@@ -159,6 +162,17 @@ const calculateDistanceInKilometers = (origin, destination) => {
       Math.sin(longitudeDelta / 2) ** 2;
 
   return 2 * EARTH_RADIUS_IN_KILOMETERS * Math.asin(Math.sqrt(haversineResult));
+};
+
+/**
+ * Memformat jarak kandidat ke lokasi lowongan untuk notifikasi filter terdekat.
+ */
+const formatDistanceLabel = (distanceInKilometers) => {
+  if (distanceInKilometers < 1) {
+    return `${Math.round(distanceInKilometers * 1000)} m`;
+  }
+
+  return `${distanceInKilometers.toFixed(1).replace('.', ',')} km`;
 };
 
 /**
@@ -685,6 +699,9 @@ const formatCandidateJobScorePercent = (job) => {
   return Math.min(100, Math.round((rawScore / 10) * 100));
 };
 
+const getCandidateJobMatchScoreValue = (job) => Number(job?.candidate_match?.score || 0);
+const hasCandidateJobMatch = (job) => getCandidateJobMatchScoreValue(job) > 0;
+
 /**
  * Menyederhanakan label level pengalaman agar lebih ringkas pada kartu rekomendasi.
  */
@@ -844,6 +861,7 @@ const CandidateDashboardPage = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isDetectingCurrentLocation, setIsDetectingCurrentLocation] = useState(false);
+  const [isFindingNearestJobLocation, setIsFindingNearestJobLocation] = useState(false);
   const [applicationBucket, setApplicationBucket] = useState('active');
   const [applicationActionInFlightId, setApplicationActionInFlightId] = useState(null);
   const [selectedChatContact, setSelectedChatContact] = useState(null);
@@ -1042,13 +1060,9 @@ const CandidateDashboardPage = () => {
     });
   }, [activeSection, chatError]);
 
-  const persistedProfile = useMemo(
-    () => readCandidateProfile(user, { preferStoredDraft: false }),
-    [user]
-  );
   const completion = useMemo(
-    () => getCandidateProfileCompletion(persistedProfile),
-    [persistedProfile]
+    () => getCandidateProfileCompletion(profile),
+    [profile]
   );
   const activeApplications = useMemo(
     () => applications.filter((application) => isCandidateApplicationActive(application.status, application)),
@@ -1061,10 +1075,14 @@ const CandidateDashboardPage = () => {
   );
   const recommendedJobs = useMemo(
     () =>
-      sortCandidateRecommendedJobs(jobs, persistedProfile, applications).filter(
+      sortCandidateRecommendedJobs(jobs, profile, applications).filter(
         (job) => !job.alreadyApplied
       ),
-    [applications, jobs, persistedProfile]
+    [applications, jobs, profile]
+  );
+  const matchedRecommendedJobs = useMemo(
+    () => recommendedJobs.filter(hasCandidateJobMatch),
+    [recommendedJobs]
   );
   const candidateJobLocationOptions = useMemo(
     () =>
@@ -1125,11 +1143,11 @@ const CandidateDashboardPage = () => {
     recommendedJobs.length
   );
   const candidateJobsMatchCount = hasActiveCandidateJobFilters
-    ? filteredRecommendedJobs.length
-    : candidateJobsTotalCount;
-  const primaryPreferredRole = firstFilledItem(persistedProfile.preferredRoles, 'Belum diisi');
+    ? filteredRecommendedJobs.filter(hasCandidateJobMatch).length
+    : matchedRecommendedJobs.length;
+  const primaryPreferredRole = firstFilledItem(profile.preferredRoles, 'Belum diisi');
   const primaryPreferredLocation = firstFilledItem(
-    persistedProfile.preferredLocations,
+    profile.preferredLocations,
     'Belum diisi'
   );
   const resumePreviewName = resumePreview?.name || profile.resumeFiles[0] || 'CV belum diunggah';
@@ -1228,6 +1246,92 @@ const CandidateDashboardPage = () => {
       ...currentFilters,
       [field]: value,
     }));
+  };
+
+  const handleUseNearestCandidateJobLocation = async () => {
+    if (isFindingNearestJobLocation) {
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setFeedback({
+        type: 'error',
+        message: 'Browser Anda belum mendukung akses lokasi perangkat.',
+      });
+      return;
+    }
+
+    const candidateLocationsWithCoordinates = candidateJobLocationOptions
+      .map((locationName) => ({
+        name: locationName,
+        coordinates: getLocationCoordinates(locationName),
+      }))
+      .filter((location) => location.coordinates);
+
+    if (candidateLocationsWithCoordinates.length === 0) {
+      setFeedback({
+        type: 'error',
+        message: 'Belum ada lokasi lowongan aktif yang punya titik koordinat untuk dicari dari posisi Anda.',
+      });
+      return;
+    }
+
+    setIsFindingNearestJobLocation(true);
+    setFeedback({
+      type: 'success',
+      message: 'Mencari lowongan terdekat dari lokasi perangkat Anda...',
+    });
+
+    try {
+      const position = await requestCurrentCoordinates();
+      const currentCoordinates = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+      const nearestLocation = candidateLocationsWithCoordinates
+        .map((location) => ({
+          ...location,
+          distanceInKilometers: calculateDistanceInKilometers(
+            currentCoordinates,
+            location.coordinates
+          ),
+        }))
+        .sort(
+          (firstLocation, secondLocation) =>
+            firstLocation.distanceInKilometers - secondLocation.distanceInKilometers
+        )[0];
+
+      if (!nearestLocation) {
+        throw new Error('Lokasi perangkat terbaca, tetapi belum ada lowongan terdekat yang cocok.');
+      }
+
+      handleCandidateJobFilterChange('location', nearestLocation.name);
+      setFeedback({
+        type: 'success',
+        message: `Filter terdekat aktif: ${nearestLocation.name} (${formatDistanceLabel(
+          nearestLocation.distanceInKilometers
+        )} dari posisi Anda).`,
+      });
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message:
+          typeof error?.code === 'number'
+            ? getLocationPermissionErrorMessage(error.code)
+            : error?.message || 'Gagal mencari lowongan terdekat dari lokasi perangkat Anda.',
+      });
+    } finally {
+      setIsFindingNearestJobLocation(false);
+    }
+  };
+
+  const handleCandidateJobLocationFilterChange = (value) => {
+    if (value === NEAREST_LOCATION_FILTER_VALUE) {
+      handleUseNearestCandidateJobLocation();
+      return;
+    }
+
+    handleCandidateJobFilterChange('location', value);
   };
 
   const handleResetCandidateJobFilters = () => {
@@ -3140,10 +3244,16 @@ const CandidateDashboardPage = () => {
                     <select
                       value={candidateJobFilters.location}
                       onChange={(event) =>
-                        handleCandidateJobFilterChange('location', event.target.value)
+                        handleCandidateJobLocationFilterChange(event.target.value)
                       }
+                      disabled={isFindingNearestJobLocation}
                     >
                       <option value="">Semua lokasi</option>
+                      <option value={NEAREST_LOCATION_FILTER_VALUE}>
+                        {isFindingNearestJobLocation
+                          ? 'Mencari lokasi terdekat...'
+                          : 'Terdekat dari lokasi saya'}
+                      </option>
                       {candidateJobLocationOptions.map((locationOption) => (
                         <option key={locationOption} value={locationOption}>
                           {locationOption}

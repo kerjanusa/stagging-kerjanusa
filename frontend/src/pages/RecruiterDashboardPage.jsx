@@ -672,7 +672,7 @@ const RecruiterDashboardPage = () => {
   const [chatSearchQuery, setChatSearchQuery] = useState('');
 
   useEffect(() => {
-    if (!feedback) {
+    if (!feedback || feedback.type === 'error') {
       return undefined;
     }
 
@@ -2079,7 +2079,15 @@ const RecruiterDashboardPage = () => {
             role="alert"
             aria-live="assertive"
           >
-            {feedback.message}
+            <span className="workspace-feedback-message">{feedback.message}</span>
+            <button
+              type="button"
+              className="workspace-feedback-close"
+              onClick={() => setFeedback(null)}
+              aria-label="Tutup notifikasi"
+            >
+              x
+            </button>
           </div>
         )}
 
