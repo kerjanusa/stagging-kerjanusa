@@ -2099,13 +2099,15 @@ const CandidateDashboardPage = () => {
         autofillPayload.profile || {}
       );
       const nextProfile = mergeResult.profile;
-      const missingRequiredFields = getCandidateProfileCompletion(nextProfile).missingRequiredItems;
+      const storedAutofillProfile = saveCandidateProfile(user, nextProfile);
+      const missingRequiredFields =
+        getCandidateProfileCompletion(storedAutofillProfile).missingRequiredItems;
 
-      profileRef.current = nextProfile;
-      setProfile(nextProfile);
-      setVisibleExperienceCount(getVisibleExperienceCount(nextProfile));
-      setVisibleOrganizationCount(getVisibleOrganizationCount(nextProfile));
-      setVisibleSkillCount(getVisibleSkillCount(nextProfile));
+      profileRef.current = storedAutofillProfile;
+      setProfile(storedAutofillProfile);
+      setVisibleExperienceCount(getVisibleExperienceCount(storedAutofillProfile));
+      setVisibleOrganizationCount(getVisibleOrganizationCount(storedAutofillProfile));
+      setVisibleSkillCount(getVisibleSkillCount(storedAutofillProfile));
       setResumeAutofillSummary({
         fileName: autofillPayload.source?.fileName || resumeFile.name || 'CV kandidat',
         filledFields: mergeResult.changedFields,
@@ -2286,7 +2288,8 @@ const CandidateDashboardPage = () => {
       return;
     }
 
-    const invalidResumeFileName = profile.resumeFiles.find(
+    const sourceProfile = profileRef.current || profile;
+    const invalidResumeFileName = sourceProfile.resumeFiles.find(
       (fileName) => !isPdfResumeFileName(fileName)
     );
 
@@ -2301,27 +2304,31 @@ const CandidateDashboardPage = () => {
     isSavingProfileRef.current = true;
     setIsSavingProfile(true);
     const normalizedProfile = {
-      ...profile,
-      preferredLocations: profile.preferredLocations.map((item, index) =>
+      ...sourceProfile,
+      preferredLocations: sourceProfile.preferredLocations.map((item, index) =>
         index === 0 && !String(item || '').trim()
-          ? String(profile.currentAddress || '').trim()
+          ? String(sourceProfile.currentAddress || '').trim()
           : item
       ),
-      strengths: profile.strengths.map((item, index) =>
+      strengths: sourceProfile.strengths.map((item, index) =>
         index === 0
-          ? limitTextToWordCount(buildCombinedProfileText(profile.strengths), ABOUT_ME_WORD_LIMIT)
+          ? limitTextToWordCount(
+              buildCombinedProfileText(sourceProfile.strengths),
+              ABOUT_ME_WORD_LIMIT
+            )
           : ''
       ),
-      achievements: profile.achievements.map((item, index) =>
-        index === 0 ? getFirstFilledListValue(profile.achievements) : ''
+      achievements: sourceProfile.achievements.map((item, index) =>
+        index === 0 ? getFirstFilledListValue(sourceProfile.achievements) : ''
       ),
-      skills: profile.skills.map((item, index) =>
+      skills: sourceProfile.skills.map((item, index) =>
         index === 0 && !String(item || '').trim()
-          ? String(profile.targetIndustry || '').trim()
+          ? String(sourceProfile.targetIndustry || '').trim()
           : item
       ),
     };
     const savedProfile = saveCandidateProfile(user, normalizedProfile);
+    profileRef.current = savedProfile;
     setProfile(savedProfile);
 
     try {
@@ -2352,6 +2359,7 @@ const CandidateDashboardPage = () => {
       });
       const storedSyncedProfile = saveCandidateProfile(response?.user || user, syncedProfile);
       const syncedCompletion = getCandidateProfileCompletion(storedSyncedProfile);
+      profileRef.current = storedSyncedProfile;
       setProfile(storedSyncedProfile);
       setVisibleExperienceCount(getVisibleExperienceCount(storedSyncedProfile));
       setVisibleOrganizationCount(getVisibleOrganizationCount(storedSyncedProfile));
