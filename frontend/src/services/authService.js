@@ -380,6 +380,12 @@ const isNetworkFailure = (error) =>
     error?.code === 'ERR_NETWORK' ||
     Boolean(error?.request));
 
+const shouldUseBrowserResumeAutofillFallback = (error) => {
+  const status = Number(error?.response?.status || 0);
+
+  return isNetworkFailure(error) || status === 404 || status === 405 || status >= 500;
+};
+
 /**
  * Resolve the configured API base URL into an absolute browser URL for provider redirects.
  */
@@ -823,12 +829,8 @@ class AuthService {
 
       return response.data;
     } catch (error) {
-      if (!error?.response || error.response?.status >= 500) {
-        const browserAutofill = await buildCandidateResumeAutofillFromBrowserFile(file);
-
-        if ((browserAutofill.autofill?.filledFields || []).length > 0) {
-          return browserAutofill;
-        }
+      if (shouldUseBrowserResumeAutofillFallback(error)) {
+        return buildCandidateResumeAutofillFromBrowserFile(file);
       }
 
       throw error.response?.data || error.message;
