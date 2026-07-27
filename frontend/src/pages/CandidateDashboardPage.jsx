@@ -91,6 +91,7 @@ const PROFILE_PHOTO_MAX_DIMENSION_IN_PIXELS = 480;
 const PROFILE_PHOTO_OUTPUT_QUALITY = 0.82;
 const PROFILE_PHOTO_ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const CANDIDATE_RESUME_MAX_FILE_SIZE_IN_BYTES = 2 * 1024 * 1024;
+const RESUME_AUTOFILL_MINIMUM_LOADING_MS = 900;
 const CANDIDATE_GENDER_OPTIONS = [
   { value: 'male', label: 'Laki-laki' },
   { value: 'female', label: 'Perempuan' },
@@ -1199,6 +1200,7 @@ const CandidateDashboardPage = () => {
   const [isAutofillingResume, setIsAutofillingResume] = useState(false);
   const [resumeAutofillSummary, setResumeAutofillSummary] = useState(null);
   const isSavingProfileRef = useRef(false);
+  const isAutofillingResumeRef = useRef(false);
   const resumeAutofillRequestIdRef = useRef(0);
   const profileRef = useRef(profile);
   const candidateLocationDropdownRef = useRef(null);
@@ -1222,6 +1224,7 @@ const CandidateDashboardPage = () => {
     setShouldClearProfilePhoto(false);
     setResumeUploadFiles([]);
     setIsAutofillingResume(false);
+    isAutofillingResumeRef.current = false;
     setResumeAutofillSummary(null);
     resumeAutofillRequestIdRef.current += 1;
   }, [user]);
@@ -1605,6 +1608,14 @@ const CandidateDashboardPage = () => {
   );
 
   const handleSectionChange = (section) => {
+    if (isAutofillingResumeRef.current || isAutofillingResume) {
+      setFeedback({
+        type: 'success',
+        message: 'Tunggu sampai CV selesai dibaca. Form akan terisi otomatis setelah proses selesai.',
+      });
+      return;
+    }
+
     setActiveSection(section);
     setIsMobileNavOpen(false);
     navigate(getCandidateSectionRoute(section));
@@ -2079,6 +2090,7 @@ const CandidateDashboardPage = () => {
 
     const requestId = resumeAutofillRequestIdRef.current + 1;
     resumeAutofillRequestIdRef.current = requestId;
+    isAutofillingResumeRef.current = true;
     setIsAutofillingResume(true);
     setResumeAutofillSummary(null);
     setFeedback({
@@ -2087,7 +2099,16 @@ const CandidateDashboardPage = () => {
     });
 
     try {
-      const response = await autofillCandidateProfileFromResume(resumeFile);
+      const minimumLoadingDelay =
+        typeof window !== 'undefined'
+          ? new Promise((resolve) => {
+              window.setTimeout(resolve, RESUME_AUTOFILL_MINIMUM_LOADING_MS);
+            })
+          : Promise.resolve();
+      const [response] = await Promise.all([
+        autofillCandidateProfileFromResume(resumeFile),
+        minimumLoadingDelay,
+      ]);
 
       if (resumeAutofillRequestIdRef.current !== requestId) {
         return;
@@ -2142,6 +2163,7 @@ const CandidateDashboardPage = () => {
       });
     } finally {
       if (resumeAutofillRequestIdRef.current === requestId) {
+        isAutofillingResumeRef.current = false;
         setIsAutofillingResume(false);
       }
     }
@@ -2154,6 +2176,7 @@ const CandidateDashboardPage = () => {
 
     if (field === 'resumeFiles') {
       resumeAutofillRequestIdRef.current += 1;
+      isAutofillingResumeRef.current = false;
       setIsAutofillingResume(false);
       setResumeAutofillSummary(null);
     }
@@ -2213,7 +2236,13 @@ const CandidateDashboardPage = () => {
       );
 
       if (primaryFile && isPdfResumeFile(primaryFile)) {
-        await handleResumeAutofill(primaryFile);
+        try {
+          await handleResumeAutofill(primaryFile);
+        } finally {
+          if (inputElement) {
+            inputElement.value = '';
+          }
+        }
       }
 
       return;
@@ -2284,7 +2313,7 @@ const CandidateDashboardPage = () => {
   };
 
   const handleSaveProfile = async () => {
-    if (!user || isSavingProfileRef.current || isAutofillingResume) {
+    if (!user || isSavingProfileRef.current || isAutofillingResume || isAutofillingResumeRef.current) {
       return;
     }
 
@@ -2554,8 +2583,29 @@ const CandidateDashboardPage = () => {
         )}
 
         {activeSection === 'profile' && (
-          <section className="workspace-section-stack candidate-profile-layout">
+          <section
+            className={`workspace-section-stack candidate-profile-layout${
+              isAutofillingResume ? ' is-autofilling-resume' : ''
+            }`}
+            aria-busy={isAutofillingResume}
+          >
             <div className="candidate-profile-shell">
+              {isAutofillingResume && (
+                <div
+                  className="candidate-profile-autofill-blocker"
+                  role="status"
+                  aria-live="assertive"
+                >
+                  <div className="candidate-profile-autofill-dialog">
+                    <span className="candidate-profile-autofill-spinner" aria-hidden="true" />
+                    <strong>Membaca CV</strong>
+                    <p>
+                      Sistem sedang mengambil data dari CV. Tunggu sampai proses selesai, lalu form
+                      akan terisi otomatis.
+                    </p>
+                  </div>
+                </div>
+              )}
               <header className="candidate-profile-hero" data-reveal>
                 <span className="candidate-profile-kicker">Profil Siap Lamar</span>
                 <h1>Rapikan profil yang recruiter akan baca lebih dulu</h1>
@@ -3665,6 +3715,7 @@ const CandidateDashboardPage = () => {
                   type="button"
                   className="candidate-profile-secondary-button"
                   onClick={() => handleSectionChange('jobs')}
+                  disabled={isSavingProfile || isAutofillingResume}
                 >
                   Lanjut ke Lowongan Kerja
                 </button>
