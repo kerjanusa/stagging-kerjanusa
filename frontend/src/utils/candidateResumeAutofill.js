@@ -104,26 +104,80 @@ const KNOWN_SKILLS = [
   'Adobe Photoshop',
   'Adobe Illustrator',
   'AutoCAD',
+  'AI / LLM',
+  'ChatGPT',
+  'Codex',
+  'Claude Code',
+  'Claude AI',
+  'OpenAI API',
+  'Gemini',
+  'LangChain',
+  'LangGraph',
+  'RAG',
+  'Embeddings',
+  'Prompt Engineering',
+  'Automation',
+  'n8n',
+  'REST API',
+  'API Integration',
+  'Vite',
+  'Tailwind CSS',
+  'Bootstrap',
+  'GitHub',
+  'CI/CD',
+  'Docker',
+  'Vercel',
+  'Supabase',
+  'Redis',
+  'cPanel',
+  'Hostinger',
+  'Debugging',
+  'Monitoring',
+  'Deployment',
+  'Problem Solving',
+  'Teamwork',
+  'Time Management',
+  'Analytical Thinking',
 ];
 
 const SECTION_HEADINGS = [
   'about',
   'achievement',
+  'certification',
+  'certifications',
+  'company profile',
+  'contact',
+  'core stack',
+  'core skills',
   'education',
+  'employment history',
   'experience',
+  'experiences',
   'keahlian',
   'kemampuan',
   'kontak',
+  'links',
   'organisasi',
   'pendidikan',
   'pengalaman',
+  'portfolio',
+  'professional experience',
+  'project',
+  'projects',
   'profile',
   'profil',
+  'riwayat pekerjaan',
   'skill',
   'skills',
   'summary',
+  'tech stack',
+  'technical skills',
   'tentang',
+  'tools',
+  'tools & technologies',
+  'technology stack',
   'work',
+  'work experience',
 ];
 
 const cleanText = (value = '', maxLength = 255) =>
@@ -432,6 +486,94 @@ const extractSectionLines = (lines = [], headings = [], maxLines = 18) => {
 
 const lineHasYearRange = (line = '') => /\b(19|20)\d{2}\b/.test(line) || /\b(current|present|sekarang|saat ini|masih)\b/i.test(line);
 
+const MONTH_NAME_PATTERN =
+  /\b(jan(?:uari|uary)?|feb(?:ruari|ruary)?|mar(?:et|ch)?|apr(?:il)?|mei|may|jun(?:i|e)?|jul(?:i|y)?|agu(?:stus)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|des(?:ember)?|dec(?:ember)?)\b/i;
+
+const addUniqueSkill = (skills, skill) => {
+  const normalizedSkill = cleanText(skill, 48);
+
+  if (
+    normalizedSkill &&
+    !skills.some((item) => item.toLowerCase() === normalizedSkill.toLowerCase())
+  ) {
+    skills.push(normalizedSkill);
+  }
+};
+
+const collectKnownSkillsFromText = (sourceText = '', skills = []) => {
+  KNOWN_SKILLS.forEach((skill) => {
+    if (skills.length < 6 && textContainsWholeTerm(sourceText, skill)) {
+      addUniqueSkill(skills, skill);
+    }
+  });
+
+  return skills;
+};
+
+const cleanSkillCandidate = (value = '') =>
+  cleanText(
+    String(value || '').replace(
+      /\b(skills?|keahlian|kemampuan|kompetensi|technical|core stack|tech stack|tools?)\b\s*[:\-]?/gi,
+      ''
+    ),
+    48
+  );
+
+const isKnownSkillValue = (value = '') =>
+  KNOWN_SKILLS.some((skill) => skill.toLowerCase() === cleanText(value, 48).toLowerCase());
+
+const looksLikeCompanyNameToken = (value = '') => {
+  const words = cleanText(value, 80).split(/\s+/).filter(Boolean);
+  const titleCaseWords = words.filter((word) => /^[A-Z][a-z]{2,}$/u.test(word));
+
+  return (
+    words.length >= 3 &&
+    words.length <= 5 &&
+    titleCaseWords.length === words.length
+  );
+};
+
+const isLikelySkillCandidate = (value = '') => {
+  const skill = cleanSkillCandidate(value);
+
+  if (!skill) {
+    return false;
+  }
+
+  const wordCount = skill.split(/\s+/).filter(Boolean).length;
+  const lowerSkill = skill.toLowerCase();
+
+  if (isKnownSkillValue(skill)) {
+    return true;
+  }
+
+  if (
+    wordCount > 4 ||
+    /@|https?:\/\//i.test(skill) ||
+    lineHasYearRange(skill) ||
+    MONTH_NAME_PATTERN.test(skill) ||
+    /^(present|current|now|sekarang|saat ini|masih aktif|masih bekerja)$/i.test(skill) ||
+    /\b(company profile|profil perusahaan|alamat|address|kontak|contact|email|phone|pengalaman|experience|pendidikan|education)\b/i.test(skill) ||
+    /\b(pt\.?|cv\.?|corp|company|inc|ltd|group|universitas|sekolah)\b/i.test(skill) ||
+    looksLikeRole(skill) ||
+    looksLikeCompany(skill) ||
+    looksLikeCompanyNameToken(skill)
+  ) {
+    return false;
+  }
+
+  if (/^(digital|profile|portfolio|project|company)$/i.test(skill)) {
+    return false;
+  }
+
+  return (
+    /\b[A-Z]{2,}(?:\/[A-Z]{2,})?\b/.test(skill) ||
+    /\b[a-z]+\.js\b/i.test(skill) ||
+    /\b[a-z]+\d[a-z]*\b/i.test(skill) ||
+    /\b(automation|debugging|monitoring|deployment|devops|backend|frontend|fullstack|database|cloud|server|prompt|integrasi|integration|analytics|reporting)\b/i.test(lowerSkill)
+  );
+};
+
 const splitExperienceChunks = (lines = []) => {
   const chunks = [];
   let currentChunk = [];
@@ -587,25 +729,36 @@ const extractAddress = (lines = []) => {
 };
 
 const extractSkills = (text = '', lines = []) => {
-  const skillLines = extractSectionLines(lines, ['keahlian', 'kemampuan', 'skills', 'technical skills', 'kompetensi'], 20);
+  const skillLines = extractSectionLines(lines, [
+    'keahlian',
+    'kemampuan',
+    'skills',
+    'technical skills',
+    'core skills',
+    'core stack',
+    'tech stack',
+    'technology stack',
+    'tools',
+    'tools & technologies',
+    'kompetensi',
+  ], 20);
+  const skillSectionText = skillLines.join('\n');
   const skills = [];
 
-  skillLines
-    .join('\n')
-    .split(/[,;|/]|\s+-\s+|\n/u)
-    .map((part) => cleanText(part.replace(/\b(skills?|keahlian|kemampuan|kompetensi|technical)\b\s*[:\-]?/gi, ''), 48))
-    .filter((part) => part && part.split(/\s+/).length <= 5)
-    .forEach((skill) => {
-      if (!skills.some((item) => item.toLowerCase() === skill.toLowerCase())) {
-        skills.push(skill);
-      }
-    });
+  collectKnownSkillsFromText(skillSectionText, skills);
+  collectKnownSkillsFromText(text, skills);
 
-  KNOWN_SKILLS.forEach((skill) => {
-    if (skills.length < 6 && textContainsWholeTerm(text, skill) && !skills.includes(skill)) {
-      skills.push(skill);
-    }
-  });
+  if (skills.length < 6) {
+    skillSectionText
+      .split(/[,;|]|\s+-\s+|\n/u)
+      .map(cleanSkillCandidate)
+      .filter(isLikelySkillCandidate)
+      .forEach((skill) => {
+        if (skills.length < 6) {
+          addUniqueSkill(skills, skill);
+        }
+      });
+  }
 
   return [...skills.slice(0, 6), '', '', '', '', '', ''].slice(0, 6);
 };

@@ -77,26 +77,40 @@ class CandidateResumeAutofillService
         'aktivitas',
         'award',
         'certification',
+        'certifications',
+        'company profile',
         'contact',
+        'core stack',
+        'core skills',
         'education',
+        'employment history',
         'experience',
         'experiences',
         'keahlian',
         'kemampuan',
         'kontak',
+        'links',
         'organisasi',
         'pendidikan',
         'pengalaman',
+        'portfolio',
         'profile',
         'profil',
         'project',
         'projects',
+        'riwayat pekerjaan',
         'sertifikasi',
         'skill',
         'skills',
         'summary',
+        'tech stack',
+        'technical skills',
         'tentang',
+        'tools',
+        'tools & technologies',
+        'technology stack',
         'work',
+        'work experience',
     ];
 
     private const KNOWN_SKILLS = [
@@ -145,6 +159,40 @@ class CandidateResumeAutofillService
         'Adobe Photoshop',
         'Adobe Illustrator',
         'AutoCAD',
+        'AI / LLM',
+        'ChatGPT',
+        'Codex',
+        'Claude Code',
+        'Claude AI',
+        'OpenAI API',
+        'Gemini',
+        'LangChain',
+        'LangGraph',
+        'RAG',
+        'Embeddings',
+        'Prompt Engineering',
+        'Automation',
+        'n8n',
+        'REST API',
+        'API Integration',
+        'Vite',
+        'Tailwind CSS',
+        'Bootstrap',
+        'GitHub',
+        'CI/CD',
+        'Docker',
+        'Vercel',
+        'Supabase',
+        'Redis',
+        'cPanel',
+        'Hostinger',
+        'Debugging',
+        'Monitoring',
+        'Deployment',
+        'Problem Solving',
+        'Teamwork',
+        'Time Management',
+        'Analytical Thinking',
     ];
 
     /**
@@ -1364,34 +1412,27 @@ class CandidateResumeAutofillService
             'skills',
             'technical skills',
             'core skills',
+            'core stack',
+            'tech stack',
+            'technology stack',
+            'tools',
+            'tools & technologies',
             'kompetensi',
         ], 20);
+        $skillSectionText = implode("\n", $skillLines);
 
-        if (!empty($skillLines)) {
-            $parts = preg_split('/[,;|\/]|(?:\s+-\s+)|(?:\n+)/u', implode("\n", $skillLines)) ?: [];
+        $this->collectKnownSkillsFromText($skillSectionText, $skills);
+        $this->collectKnownSkillsFromText($text, $skills);
+
+        if (count($skills) < self::MAX_SKILL_ITEMS && $skillSectionText !== '') {
+            $parts = preg_split('/[,;|]|(?:\s+-\s+)|(?:\n+)/u', $skillSectionText) ?: [];
 
             foreach ($parts as $part) {
                 $skill = $this->cleanSkill($part);
 
-                if ($skill !== '' && !in_array(mb_strtolower($skill), array_map('mb_strtolower', $skills), true)) {
-                    $skills[] = $skill;
+                if ($skill !== '' && $this->isLikelySkillCandidate($skill)) {
+                    $this->addUniqueSkill($skills, $skill);
                 }
-
-                if (count($skills) >= self::MAX_SKILL_ITEMS) {
-                    break;
-                }
-            }
-        }
-
-        if (count($skills) < self::MAX_SKILL_ITEMS) {
-            $normalizedText = mb_strtolower($text);
-
-            foreach (self::KNOWN_SKILLS as $knownSkill) {
-                if ($this->textContainsKnownSkill($normalizedText, $knownSkill)) {
-                    $skills[] = $knownSkill;
-                }
-
-                $skills = array_values(array_unique($skills));
 
                 if (count($skills) >= self::MAX_SKILL_ITEMS) {
                     break;
@@ -1400,6 +1441,44 @@ class CandidateResumeAutofillService
         }
 
         return array_slice($skills, 0, self::MAX_SKILL_ITEMS);
+    }
+
+    /**
+     * Append a skill once, ignoring case differences.
+     */
+    private function addUniqueSkill(array &$skills, string $skill): void
+    {
+        $normalizedSkill = $this->cleanHumanText($skill, 48);
+
+        if ($normalizedSkill === '') {
+            return;
+        }
+
+        foreach ($skills as $existingSkill) {
+            if (mb_strtolower($existingSkill) === mb_strtolower($normalizedSkill)) {
+                return;
+            }
+        }
+
+        $skills[] = $normalizedSkill;
+    }
+
+    /**
+     * Collect known skill labels from text without accepting arbitrary CV lines.
+     */
+    private function collectKnownSkillsFromText(string $sourceText, array &$skills): void
+    {
+        $normalizedText = mb_strtolower($sourceText);
+
+        foreach (self::KNOWN_SKILLS as $knownSkill) {
+            if (count($skills) >= self::MAX_SKILL_ITEMS) {
+                return;
+            }
+
+            if ($this->textContainsKnownSkill($normalizedText, $knownSkill)) {
+                $this->addUniqueSkill($skills, $knownSkill);
+            }
+        }
     }
 
     /**
@@ -1419,18 +1498,94 @@ class CandidateResumeAutofillService
     private function cleanSkill(string $value): string
     {
         $value = preg_replace('/^[\s\-*•]+/u', '', $value) ?? $value;
-        $value = preg_replace('/\b(skills?|keahlian|kemampuan|kompetensi|technical)\b\s*[:\-]?/i', '', $value) ?? $value;
+        $value = preg_replace('/\b(skills?|keahlian|kemampuan|kompetensi|technical|core stack|tech stack|tools?)\b\s*[:\-]?/i', '', $value) ?? $value;
         $value = $this->cleanHumanText($value, 48);
 
-        if (
-            $value === '' ||
-            preg_match('/[@]|\b(education|experience|pengalaman|pendidikan|contact|kontak)\b/i', $value) ||
-            count(preg_split('/\s+/', $value) ?: []) > 5
-        ) {
-            return '';
+        return $value;
+    }
+
+    /**
+     * Check whether one free-form token is plausible as a skill, not company/date text.
+     */
+    private function isLikelySkillCandidate(string $value): bool
+    {
+        $value = $this->cleanSkill($value);
+
+        if ($value === '') {
+            return false;
         }
 
-        return $value;
+        if ($this->isKnownSkillValue($value)) {
+            return true;
+        }
+
+        $wordCount = count(preg_split('/\s+/', $value) ?: []);
+        $lowerValue = mb_strtolower($value);
+
+        if (
+            $wordCount > 4 ||
+            preg_match('/@|https?:\/\//i', $value) ||
+            $this->lineHasYearRange($value) ||
+            $this->containsMonthName($value) ||
+            preg_match('/^(present|current|now|sekarang|saat ini|masih aktif|masih bekerja)$/i', $value) ||
+            preg_match('/\b(company profile|profil perusahaan|alamat|address|kontak|contact|email|phone|pengalaman|experience|pendidikan|education)\b/i', $value) ||
+            preg_match('/\b(pt\.?|cv\.?|corp|company|inc|ltd|group|universitas|sekolah)\b/i', $value) ||
+            $this->looksLikeRole($value) ||
+            $this->looksLikeCompany($value) ||
+            $this->looksLikeCompanyNameToken($value) ||
+            preg_match('/^(digital|profile|portfolio|project|company)$/i', $value)
+        ) {
+            return false;
+        }
+
+        return preg_match('/\b[A-Z]{2,}(?:\/[A-Z]{2,})?\b/', $value) === 1 ||
+            preg_match('/\b[a-z]+\.js\b/i', $value) === 1 ||
+            preg_match('/\b[a-z]+\d[a-z]*\b/i', $value) === 1 ||
+            preg_match('/\b(automation|debugging|monitoring|deployment|devops|backend|frontend|fullstack|database|cloud|server|prompt|integrasi|integration|analytics|reporting)\b/i', $lowerValue) === 1;
+    }
+
+    /**
+     * Known skill labels are allowed even when they look like title-case phrases.
+     */
+    private function isKnownSkillValue(string $value): bool
+    {
+        foreach (self::KNOWN_SKILLS as $knownSkill) {
+            if (mb_strtolower($knownSkill) === mb_strtolower($this->cleanHumanText($value, 48))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Reject common month/date tokens that were previously placed into skills.
+     */
+    private function containsMonthName(string $value): bool
+    {
+        return preg_match(
+            '/\b(jan(?:uari|uary)?|feb(?:ruari|ruary)?|mar(?:et|ch)?|apr(?:il)?|mei|may|jun(?:i|e)?|jul(?:i|y)?|agu(?:stus)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|des(?:ember)?|dec(?:ember)?)\b/i',
+            $value
+        ) === 1;
+    }
+
+    /**
+     * Title-cased 3-5 word phrases are usually company names, not skills.
+     */
+    private function looksLikeCompanyNameToken(string $value): bool
+    {
+        $words = array_values(array_filter(preg_split('/\s+/', $this->cleanHumanText($value, 80)) ?: []));
+
+        if (count($words) < 3 || count($words) > 5) {
+            return false;
+        }
+
+        $titleCaseWords = array_filter(
+            $words,
+            fn (string $word): bool => preg_match('/^[A-Z][a-z]{2,}$/u', $word) === 1
+        );
+
+        return count($titleCaseWords) === count($words);
     }
 
     /**

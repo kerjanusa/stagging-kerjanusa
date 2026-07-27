@@ -527,6 +527,81 @@ const mergeAutofillStringListField = (
   return nextItems;
 };
 
+const RESUME_AUTOFILL_INVALID_SKILL_PATTERN =
+  /@|https?:\/\/|\b(jan(?:uari|uary)?|feb(?:ruari|ruary)?|mar(?:et|ch)?|apr(?:il)?|mei|may|jun(?:i|e)?|jul(?:i|y)?|agu(?:stus)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|des(?:ember)?|dec(?:ember)?|present|current|now|sekarang|saat ini|masih aktif|masih bekerja|pt\.?|cv\.?|corp|company|inc|ltd|group|universitas|sekolah|pengalaman|experience|pendidikan|education|alamat|address|kontak|contact)\b/i;
+
+const looksLikeAutofillCompanySkill = (value = '') => {
+  const words = String(value || '').trim().split(/\s+/).filter(Boolean);
+  const titleCaseWords = words.filter((word) => /^[A-Z][a-z]{2,}$/u.test(word));
+
+  return words.length >= 3 && words.length <= 5 && titleCaseWords.length === words.length;
+};
+
+const looksLikeInvalidAutofillSkillValue = (value = '') => {
+  const skill = String(value || '').trim();
+
+  if (!skill) {
+    return false;
+  }
+
+  if (RESUME_AUTOFILL_INVALID_SKILL_PATTERN.test(skill) || /\b(19|20)\d{2}\b/.test(skill)) {
+    return true;
+  }
+
+  if (/^(digital|profile|portfolio|project|company)$/i.test(skill)) {
+    return true;
+  }
+
+  return looksLikeAutofillCompanySkill(skill);
+};
+
+const mergeAutofillSkillListField = (profile, autofillProfile, length, changedFields) => {
+  const currentItems = Array.isArray(profile.skills) ? profile.skills : [];
+  const autofillItems = Array.isArray(autofillProfile?.skills) ? autofillProfile.skills : [];
+  const nextItems = [];
+
+  currentItems.forEach((item) => {
+    const currentValue = String(item || '').trim();
+
+    if (
+      currentValue &&
+      !looksLikeInvalidAutofillSkillValue(currentValue) &&
+      !nextItems.some((nextItem) => nextItem.toLowerCase() === currentValue.toLowerCase())
+    ) {
+      nextItems.push(currentValue);
+    }
+  });
+
+  autofillItems.forEach((item) => {
+    const autofillValue = String(item || '').trim();
+
+    if (
+      autofillValue &&
+      !looksLikeInvalidAutofillSkillValue(autofillValue) &&
+      !nextItems.some((nextItem) => nextItem.toLowerCase() === autofillValue.toLowerCase()) &&
+      nextItems.length < length
+    ) {
+      nextItems.push(autofillValue);
+    }
+  });
+
+  while (nextItems.length < length) {
+    nextItems.push('');
+  }
+
+  const trimmedNextItems = nextItems.slice(0, length);
+  const normalizedCurrentItems = Array.from(
+    { length },
+    (_, index) => String(currentItems[index] || '').trim()
+  );
+
+  if (JSON.stringify(trimmedNextItems) !== JSON.stringify(normalizedCurrentItems)) {
+    changedFields.push('skills');
+  }
+
+  return trimmedNextItems;
+};
+
 const mergeAutofillObjectField = (currentValue = {}, autofillValue = {}, changedFields, field) => {
   const nextValue = {
     ...currentValue,
@@ -652,10 +727,9 @@ const mergeCandidateResumeAutofillProfile = (profile, autofillProfile = {}) => {
   );
   nextProfile.organizationActivity =
     nextProfile.organizationActivities[0] || createEmptyOrganizationActivityEntry();
-  nextProfile.skills = mergeAutofillStringListField(
+  nextProfile.skills = mergeAutofillSkillListField(
     nextProfile,
     autofillProfile,
-    'skills',
     MAX_VISIBLE_SKILL_ENTRIES,
     changedFields
   );
