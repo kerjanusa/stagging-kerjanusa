@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Throwable;
 
 class CandidateResumeAutofillService
 {
@@ -176,6 +177,15 @@ class CandidateResumeAutofillService
     private function extractTextFromPdf(UploadedFile $file): string
     {
         $path = $file->getRealPath();
+
+        if (is_string($path)) {
+            $parserText = $this->extractTextWithPdfParser($path);
+
+            if ($parserText !== '') {
+                return mb_substr($parserText, 0, self::MAX_EXTRACTED_TEXT_LENGTH);
+            }
+        }
+
         $content = is_string($path) ? @file_get_contents($path) : false;
 
         if (!is_string($content) || $content === '') {
@@ -207,6 +217,25 @@ class CandidateResumeAutofillService
             0,
             self::MAX_EXTRACTED_TEXT_LENGTH
         );
+    }
+
+    /**
+     * Use the Composer PDF parser first because most real CV PDFs compress text streams.
+     */
+    private function extractTextWithPdfParser(string $path): string
+    {
+        if (!class_exists(\Smalot\PdfParser\Parser::class)) {
+            return '';
+        }
+
+        try {
+            $parser = new \Smalot\PdfParser\Parser();
+            $pdf = $parser->parseFile($path);
+
+            return $this->normalizeDocumentText($pdf->getText());
+        } catch (Throwable) {
+            return '';
+        }
     }
 
     /**

@@ -1,6 +1,7 @@
 import apiClient, { API_BASE_URL } from '../utils/apiClient';
 import { shouldUseMockData } from '../utils/mockMode';
 import { clearCandidateApplyIntent } from '../utils/candidateApplyIntent.js';
+import { buildCandidateResumeAutofillFromBrowserFile } from '../utils/candidateResumeAutofill.js';
 import { normalizeUserRole } from '../utils/routeHelpers.js';
 import {
   clearStoredAuthSession,
@@ -796,22 +797,7 @@ class AuthService {
     }
 
     if (shouldUseMockData) {
-      return {
-        message:
-          'Mode demo lokal belum membaca isi CV. Jalankan backend API untuk mencoba autofill dari teks PDF.',
-        autofill: {
-          profile: {},
-          filledFields: [],
-          missingRequiredFields: [],
-          confidence: {},
-          source: {
-            fileName: file.name || 'cv-kandidat.pdf',
-            textLength: 0,
-            parser: 'mock_mode_unavailable',
-          },
-          needsReview: true,
-        },
-      };
+      return buildCandidateResumeAutofillFromBrowserFile(file);
     }
 
     try {
@@ -823,8 +809,28 @@ class AuthService {
         },
       });
 
+      if (
+        Number(response.data?.autofill?.source?.textLength || 0) <= 0 ||
+        !Array.isArray(response.data?.autofill?.filledFields) ||
+        response.data.autofill.filledFields.length === 0
+      ) {
+        const browserAutofill = await buildCandidateResumeAutofillFromBrowserFile(file);
+
+        if ((browserAutofill.autofill?.filledFields || []).length > 0) {
+          return browserAutofill;
+        }
+      }
+
       return response.data;
     } catch (error) {
+      if (!error?.response || error.response?.status >= 500) {
+        const browserAutofill = await buildCandidateResumeAutofillFromBrowserFile(file);
+
+        if ((browserAutofill.autofill?.filledFields || []).length > 0) {
+          return browserAutofill;
+        }
+      }
+
       throw error.response?.data || error.message;
     }
   }
