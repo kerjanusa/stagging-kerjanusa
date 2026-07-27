@@ -2493,6 +2493,28 @@
   line-height: 1.55;
 }
 
+.candidate-profile-autofill-progress {
+  width: min(100%, 18rem);
+  height: 0.58rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(91, 35, 79, 0.12);
+}
+
+.candidate-profile-autofill-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #e9a924 0%, #5b234f 100%);
+  transition: width 0.18s ease;
+}
+
+.candidate-profile-autofill-percent {
+  color: #8c7380;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
 .candidate-profile-autofill-spinner {
   width: 2.2rem;
   height: 2.2rem;

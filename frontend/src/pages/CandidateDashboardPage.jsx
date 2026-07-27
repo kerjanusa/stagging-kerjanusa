@@ -92,6 +92,10 @@ const PROFILE_PHOTO_OUTPUT_QUALITY = 0.82;
 const PROFILE_PHOTO_ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const CANDIDATE_RESUME_MAX_FILE_SIZE_IN_BYTES = 2 * 1024 * 1024;
 const RESUME_AUTOFILL_MINIMUM_LOADING_MS = 900;
+const RESUME_AUTOFILL_FINISH_DELAY_MS = 350;
+const RESUME_AUTOFILL_PROGRESS_INTERVAL_MS = 180;
+const RESUME_AUTOFILL_PROGRESS_START = 8;
+const RESUME_AUTOFILL_PROGRESS_MAX_WHILE_READING = 92;
 const CANDIDATE_GENDER_OPTIONS = [
   { value: 'male', label: 'Laki-laki' },
   { value: 'female', label: 'Perempuan' },
@@ -1198,12 +1202,55 @@ const CandidateDashboardPage = () => {
   const [shouldClearProfilePhoto, setShouldClearProfilePhoto] = useState(false);
   const [resumeUploadFiles, setResumeUploadFiles] = useState([]);
   const [isAutofillingResume, setIsAutofillingResume] = useState(false);
+  const [resumeAutofillProgress, setResumeAutofillProgress] = useState(0);
   const [resumeAutofillSummary, setResumeAutofillSummary] = useState(null);
   const isSavingProfileRef = useRef(false);
   const isAutofillingResumeRef = useRef(false);
+  const resumeAutofillProgressTimerRef = useRef(null);
   const resumeAutofillRequestIdRef = useRef(0);
   const profileRef = useRef(profile);
   const candidateLocationDropdownRef = useRef(null);
+
+  const clearResumeAutofillProgressTimer = () => {
+    if (resumeAutofillProgressTimerRef.current && typeof window !== 'undefined') {
+      window.clearInterval(resumeAutofillProgressTimerRef.current);
+    }
+
+    resumeAutofillProgressTimerRef.current = null;
+  };
+
+  const waitResumeAutofillDelay = (duration) =>
+    typeof window !== 'undefined'
+      ? new Promise((resolve) => {
+          window.setTimeout(resolve, duration);
+        })
+      : Promise.resolve();
+
+  const startResumeAutofillProgress = () => {
+    clearResumeAutofillProgressTimer();
+    setResumeAutofillProgress(RESUME_AUTOFILL_PROGRESS_START);
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    resumeAutofillProgressTimerRef.current = window.setInterval(() => {
+      setResumeAutofillProgress((currentProgress) => {
+        if (currentProgress >= RESUME_AUTOFILL_PROGRESS_MAX_WHILE_READING) {
+          return currentProgress;
+        }
+
+        const remainingProgress =
+          RESUME_AUTOFILL_PROGRESS_MAX_WHILE_READING - currentProgress;
+        const nextStep = Math.max(1, Math.round(remainingProgress * 0.14));
+
+        return Math.min(
+          RESUME_AUTOFILL_PROGRESS_MAX_WHILE_READING,
+          currentProgress + nextStep
+        );
+      });
+    }, RESUME_AUTOFILL_PROGRESS_INTERVAL_MS);
+  };
 
   useEffect(() => {
     profileRef.current = profile;
@@ -1213,6 +1260,15 @@ const CandidateDashboardPage = () => {
     setActiveSection(resolveCandidateSectionFromHash(location.hash));
     setIsMobileNavOpen(false);
   }, [location.hash]);
+
+  useEffect(
+    () => () => {
+      resumeAutofillRequestIdRef.current += 1;
+      isAutofillingResumeRef.current = false;
+      clearResumeAutofillProgressTimer();
+    },
+    []
+  );
 
   useEffect(() => {
     const nextProfile = readCandidateProfile(user, { preferStoredDraft: false });
@@ -1225,6 +1281,8 @@ const CandidateDashboardPage = () => {
     setResumeUploadFiles([]);
     setIsAutofillingResume(false);
     isAutofillingResumeRef.current = false;
+    clearResumeAutofillProgressTimer();
+    setResumeAutofillProgress(0);
     setResumeAutofillSummary(null);
     resumeAutofillRequestIdRef.current += 1;
   }, [user]);
@@ -2092,6 +2150,7 @@ const CandidateDashboardPage = () => {
     resumeAutofillRequestIdRef.current = requestId;
     isAutofillingResumeRef.current = true;
     setIsAutofillingResume(true);
+    startResumeAutofillProgress();
     setResumeAutofillSummary(null);
     setFeedback({
       type: 'success',
@@ -2099,15 +2158,9 @@ const CandidateDashboardPage = () => {
     });
 
     try {
-      const minimumLoadingDelay =
-        typeof window !== 'undefined'
-          ? new Promise((resolve) => {
-              window.setTimeout(resolve, RESUME_AUTOFILL_MINIMUM_LOADING_MS);
-            })
-          : Promise.resolve();
       const [response] = await Promise.all([
         autofillCandidateProfileFromResume(resumeFile),
-        minimumLoadingDelay,
+        waitResumeAutofillDelay(RESUME_AUTOFILL_MINIMUM_LOADING_MS),
       ]);
 
       if (resumeAutofillRequestIdRef.current !== requestId) {
@@ -2163,8 +2216,14 @@ const CandidateDashboardPage = () => {
       });
     } finally {
       if (resumeAutofillRequestIdRef.current === requestId) {
-        isAutofillingResumeRef.current = false;
-        setIsAutofillingResume(false);
+        clearResumeAutofillProgressTimer();
+        setResumeAutofillProgress(100);
+        await waitResumeAutofillDelay(RESUME_AUTOFILL_FINISH_DELAY_MS);
+
+        if (resumeAutofillRequestIdRef.current === requestId) {
+          isAutofillingResumeRef.current = false;
+          setIsAutofillingResume(false);
+        }
       }
     }
   };
@@ -2177,7 +2236,9 @@ const CandidateDashboardPage = () => {
     if (field === 'resumeFiles') {
       resumeAutofillRequestIdRef.current += 1;
       isAutofillingResumeRef.current = false;
+      clearResumeAutofillProgressTimer();
       setIsAutofillingResume(false);
+      setResumeAutofillProgress(0);
       setResumeAutofillSummary(null);
     }
 
@@ -2603,6 +2664,21 @@ const CandidateDashboardPage = () => {
                       Sistem sedang mengambil data dari CV. Tunggu sampai proses selesai, lalu form
                       akan terisi otomatis.
                     </p>
+                    <div
+                      className="candidate-profile-autofill-progress"
+                      role="progressbar"
+                      aria-label="Progress membaca CV"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={resumeAutofillProgress}
+                    >
+                      <span style={{ width: `${resumeAutofillProgress}%` }} />
+                    </div>
+                    <small className="candidate-profile-autofill-percent">
+                      {resumeAutofillProgress >= 100
+                        ? '100% selesai membaca CV'
+                        : `${resumeAutofillProgress}% membaca data CV`}
+                    </small>
                   </div>
                 </div>
               )}
