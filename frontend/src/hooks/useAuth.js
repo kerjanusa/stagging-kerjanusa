@@ -137,6 +137,19 @@ const useAuthStore = create((set) => ({
     }
   },
 
+  // Candidate resume autofill action
+  autofillCandidateProfileFromResume: async (file) => {
+    try {
+      return await AuthService.autofillCandidateProfileFromResume(file);
+    } catch (error) {
+      set({
+        error: getErrorMessage(error, 'Autofill CV gagal'),
+        validationErrors: getValidationErrors(error),
+      });
+      throw error;
+    }
+  },
+
   // Get current user
   getCurrentUser: async () => {
     set({ isLoading: true, validationErrors: {} });

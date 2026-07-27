@@ -788,6 +788,48 @@ class AuthService {
   }
 
   /**
+   * Parse one uploaded candidate resume and return profile autofill suggestions.
+   */
+  static async autofillCandidateProfileFromResume(file) {
+    if (!isFileLike(file)) {
+      throw { message: 'Pilih file CV terlebih dahulu.' };
+    }
+
+    if (shouldUseMockData) {
+      return {
+        message:
+          'Mode demo lokal belum membaca isi CV. Jalankan backend API untuk mencoba autofill dari teks PDF.',
+        autofill: {
+          profile: {},
+          filledFields: [],
+          missingRequiredFields: [],
+          confidence: {},
+          source: {
+            fileName: file.name || 'cv-kandidat.pdf',
+            textLength: 0,
+            parser: 'mock_mode_unavailable',
+          },
+          needsReview: true,
+        },
+      };
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('candidate_resume_file', file);
+      const response = await apiClient.post('/candidate/profile/autofill-from-resume', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  }
+
+  /**
    * Change password
    */
   static async changePassword(oldPassword, newPassword, newPasswordConfirmation) {

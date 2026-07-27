@@ -2982,6 +2982,17 @@
   transform: translateY(-1px);
 }
 
+.candidate-profile-upload-zone.is-loading {
+  border-color: rgba(91, 35, 79, 0.45);
+  background: rgba(250, 244, 255, 0.86);
+  cursor: wait;
+}
+
+.candidate-profile-upload-zone.is-loading:hover {
+  box-shadow: none;
+  transform: none;
+}
+
 .candidate-profile-upload-icon {
   display: inline-flex;
   align-items: center;
@@ -3096,6 +3107,33 @@
   font-size: 0.76rem;
   line-height: 1.55;
   text-align: center;
+}
+
+.candidate-profile-autofill-panel {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(230, 211, 216, 0.82);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.candidate-profile-autofill-panel.is-loading {
+  border-color: rgba(91, 35, 79, 0.32);
+  background: rgba(250, 244, 255, 0.8);
+}
+
+.candidate-profile-autofill-panel strong {
+  color: #4a233f;
+  font-size: 0.9rem;
+}
+
+.candidate-profile-autofill-panel p,
+.candidate-profile-autofill-panel small {
+  margin: 0;
+  color: #836c78;
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
 .candidate-profile-actions {
