@@ -14,6 +14,17 @@ use Illuminate\Validation\ValidationException;
 
 class JobService
 {
+    private const LEGACY_SCREENING_TEMPLATE_IDS = [
+        'ready-to-work',
+        'driver-license',
+        'police-record',
+        'reference-letter',
+        'motorcycle',
+        'phone',
+        'height',
+        'english',
+    ];
+
     /**
      * Wire plan enforcement and logging for job lifecycle operations.
      */
@@ -541,7 +552,10 @@ class JobService
         $seenIds = [];
 
         return collect($questions)
-            ->filter(fn ($question) => is_array($question) && filled($question['question'] ?? null))
+            ->filter(fn ($question) => is_array($question)
+                && filled($question['question'] ?? null)
+                && !in_array((string) ($question['id'] ?? ''), self::LEGACY_SCREENING_TEMPLATE_IDS, true)
+            )
             ->map(function (array $question, int $index) use (&$seenIds) {
                 $rawId = filled($question['id'] ?? null) ? (string) $question['id'] : '';
                 $questionId = $rawId && !in_array($rawId, $seenIds, true)

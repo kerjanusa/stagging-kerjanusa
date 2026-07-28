@@ -696,11 +696,10 @@
 }
 
 .recruiter-job-create-quiz-grid {
-  grid-template-columns: minmax(260px, 310px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
-.recruiter-job-create-quiz-preview-panel,
 .recruiter-job-create-quiz-panel,
 .recruiter-job-create-quiz-custom-fields {
   display: grid;
@@ -720,233 +719,9 @@
   line-height: 1.55;
 }
 
-.recruiter-job-create-phone-preview {
-  display: flex;
-  justify-content: center;
-}
-
-.recruiter-job-create-phone-shell {
-  width: min(100%, 250px);
-  padding: 0.72rem;
-  border-radius: 2.25rem;
-  background: linear-gradient(180deg, #24151f 0%, #140b12 100%);
-  box-shadow: 0 20px 40px rgba(35, 17, 31, 0.22);
-}
-
-.recruiter-job-create-phone-notch {
-  width: 6rem;
-  height: 0.48rem;
-  margin: 0 auto 0.7rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.recruiter-job-create-phone-screen {
-  min-height: 26rem;
-  padding: 1rem 0.95rem;
-  border-radius: 1.7rem;
-  background:
-    radial-gradient(circle at top right, rgba(212, 170, 68, 0.12), transparent 18%),
-    linear-gradient(180deg, #fffdf9 0%, #fff8f0 100%);
-  display: grid;
-  gap: 0.9rem;
-}
-
-.recruiter-job-create-phone-header {
-  display: grid;
-  gap: 0.12rem;
-}
-
-.recruiter-job-create-phone-header strong {
-  color: var(--primary-dark);
-  font-size: 0.86rem;
-  font-weight: 800;
-}
-
-.recruiter-job-create-phone-header span {
-  color: var(--gray-500);
-  font-size: 0.68rem;
-  line-height: 1.45;
-}
-
-.recruiter-job-create-phone-step {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.recruiter-job-create-phone-step span {
-  color: var(--gray-500);
-  font-size: 0.66rem;
-  font-weight: 700;
-}
-
-.recruiter-job-create-phone-step-bar {
-  height: 0.3rem;
-  border-radius: 999px;
-  background: rgba(91, 35, 79, 0.08);
-  overflow: hidden;
-}
-
-.recruiter-job-create-phone-step-bar span {
-  display: block;
-  width: 32%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #5b234f 0%, #7d3f6d 100%);
-}
-
-.recruiter-job-create-phone-question {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.recruiter-job-create-phone-question p {
-  margin: 0;
-  color: var(--gray-900);
-  font-size: 0.77rem;
-  font-weight: 700;
-  line-height: 1.5;
-}
-
-.recruiter-job-create-phone-question span {
-  color: var(--gray-500);
-  font-size: 0.67rem;
-}
-
-.recruiter-job-create-phone-options {
-  display: grid;
-  gap: 0.55rem;
-}
-
-.recruiter-job-create-phone-option {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 2.45rem;
-  padding: 0.68rem 0.78rem;
-  border: 1px solid var(--job-create-border);
-  border-radius: 0.8rem;
-  background: #ffffff;
-  color: var(--gray-700);
-  font-size: 0.73rem;
-  font-weight: 600;
-}
-
-.recruiter-job-create-phone-option.is-highlighted {
-  border-color: rgba(107, 126, 224, 0.32);
-  background: linear-gradient(180deg, #f5f7ff 0%, #edf1ff 100%);
-  color: #3046af;
-}
-
-.recruiter-job-create-phone-option-dot {
-  width: 0.86rem;
-  height: 0.86rem;
-  border: 1.5px solid rgba(91, 35, 79, 0.2);
-  border-radius: 999px;
-  background: #ffffff;
-  flex-shrink: 0;
-}
-
-.recruiter-job-create-phone-option.is-highlighted .recruiter-job-create-phone-option-dot {
-  border-color: rgba(107, 126, 224, 0.5);
-  box-shadow: inset 0 0 0 3px #ffffff;
-  background: #6b7ee0;
-}
-
-.recruiter-job-create-phone-option-text {
-  justify-content: center;
-  text-align: center;
-  color: var(--gray-500);
-}
-
-.recruiter-job-create-quiz-chip-group {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 0.6rem;
-}
-
-.recruiter-job-create-quiz-chip {
-  width: 100%;
-  justify-content: flex-start;
-}
-
-.recruiter-job-create-quiz-chip-custom {
-  border-style: dashed;
-  background: linear-gradient(180deg, #fff7f1 0%, #fff1e1 100%);
-  color: #b54708;
-  cursor: pointer;
-}
-
-.recruiter-job-create-quiz-selected-list {
-  display: grid;
-  gap: 0.58rem;
-  margin-top: 0.8rem;
-}
-
-.recruiter-job-create-quiz-selected-item {
-  display: grid;
-  gap: 0.7rem;
-  width: 100%;
-  padding: 0.78rem 0.86rem;
-  border: 1px solid rgba(91, 35, 79, 0.12);
-  border-radius: 0.82rem;
-  background: rgba(255, 255, 255, 0.92);
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
-}
-
-.recruiter-job-create-quiz-selected-trigger {
-  display: grid;
-  gap: 0.18rem;
-  width: 100%;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.recruiter-job-create-quiz-selected-item strong {
-  color: var(--primary-dark);
-  font-size: 0.76rem;
-  font-weight: 800;
-}
-
-.recruiter-job-create-quiz-selected-item span {
-  color: var(--gray-500);
-  font-size: 0.72rem;
-  line-height: 1.5;
-}
-
-.recruiter-job-create-quiz-selected-item:hover,
-.recruiter-job-create-quiz-selected-item:focus-visible {
-  border-color: rgba(91, 35, 79, 0.28);
-  box-shadow: 0 10px 20px rgba(46, 22, 44, 0.08);
-  transform: translateY(-1px);
-}
-
-.recruiter-job-create-quiz-selected-item.is-active {
-  border-color: rgba(107, 126, 224, 0.34);
-  background: linear-gradient(180deg, #f5f7ff 0%, #edf1ff 100%);
-}
-
-.recruiter-job-create-quiz-selected-item:focus-visible {
-  outline: none;
-}
-
-.recruiter-job-create-quiz-selected-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-}
-
 .recruiter-job-create-quiz-required-toggle,
 .recruiter-job-create-quiz-remove,
-.recruiter-job-create-quiz-custom-add,
-.recruiter-job-create-quiz-preview-trigger {
+.recruiter-job-create-quiz-custom-add {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -966,6 +741,12 @@
     transform 0.18s ease;
 }
 
+.recruiter-job-create-quiz-required-toggle {
+  border-color: rgba(91, 35, 79, 0.1);
+  background: #f3eee9;
+  color: #8a7d86;
+}
+
 .recruiter-job-create-quiz-required-toggle.is-active {
   border-color: rgba(212, 170, 68, 0.34);
   background: linear-gradient(180deg, #fff6df 0%, #ffefc8 100%);
@@ -975,11 +756,9 @@
 .recruiter-job-create-quiz-required-toggle:hover,
 .recruiter-job-create-quiz-remove:hover,
 .recruiter-job-create-quiz-custom-add:hover,
-.recruiter-job-create-quiz-preview-trigger:hover,
 .recruiter-job-create-quiz-required-toggle:focus-visible,
 .recruiter-job-create-quiz-remove:focus-visible,
-.recruiter-job-create-quiz-custom-add:focus-visible,
-.recruiter-job-create-quiz-preview-trigger:focus-visible {
+.recruiter-job-create-quiz-custom-add:focus-visible {
   border-color: rgba(91, 35, 79, 0.24);
   box-shadow: 0 12px 24px rgba(46, 22, 44, 0.08);
   transform: translateY(-1px);
@@ -987,8 +766,7 @@
 
 .recruiter-job-create-quiz-required-toggle:focus-visible,
 .recruiter-job-create-quiz-remove:focus-visible,
-.recruiter-job-create-quiz-custom-add:focus-visible,
-.recruiter-job-create-quiz-preview-trigger:focus-visible {
+.recruiter-job-create-quiz-custom-add:focus-visible {
   outline: none;
 }
 
@@ -1004,83 +782,6 @@
   color: var(--gray-500);
   font-size: 0.74rem;
   line-height: 1.6;
-}
-
-.recruiter-job-create-quiz-detail-card {
-  display: grid;
-  gap: 0.85rem;
-  padding: 1rem;
-  border: 1px solid var(--job-create-border);
-  border-radius: 0.9rem;
-  background: linear-gradient(180deg, #fffdfb 0%, #fffaf4 100%);
-}
-
-.recruiter-job-create-quiz-detail-card h3 {
-  margin: 0;
-  color: var(--primary-dark);
-  font-size: 0.92rem;
-  font-weight: 800;
-}
-
-.recruiter-job-create-quiz-detail-card p {
-  margin: 0;
-  color: var(--gray-500);
-  font-size: 0.74rem;
-  line-height: 1.55;
-}
-
-.recruiter-job-create-quiz-detail-block {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.recruiter-job-create-quiz-detail-block span {
-  color: var(--gray-500);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.recruiter-job-create-quiz-detail-block strong {
-  color: var(--gray-900);
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1.5;
-}
-
-.recruiter-job-create-quiz-answer-list {
-  display: grid;
-  gap: 0.55rem;
-}
-
-.recruiter-job-create-quiz-answer {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-height: 2.6rem;
-  padding: 0.72rem 0.82rem;
-  border: 1px solid var(--job-create-border);
-  border-radius: 0.75rem;
-  background: #ffffff;
-  color: var(--gray-700);
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
-.recruiter-job-create-quiz-answer input {
-  width: 1rem;
-  height: 1rem;
-  margin: 0;
-  accent-color: #6b7ee0;
-}
-
-.recruiter-job-create-quiz-answer.is-recommended {
-  border-color: rgba(107, 126, 224, 0.32);
-  background: linear-gradient(180deg, #f5f7ff 0%, #edf1ff 100%);
-  color: #3046af;
-}
-
-.recruiter-job-create-quiz-answer-text {
-  justify-content: flex-start;
 }
 
 .recruiter-job-create-quiz-custom-head {
@@ -1422,8 +1123,7 @@
 
   .recruiter-job-create-quiz-custom-head,
   .recruiter-job-create-quiz-custom-card-head,
-  .recruiter-job-create-quiz-custom-actions,
-  .recruiter-job-create-quiz-selected-actions {
+  .recruiter-job-create-quiz-custom-actions {
     flex-direction: column;
     align-items: stretch;
   }
