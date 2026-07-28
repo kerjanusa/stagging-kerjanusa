@@ -2816,17 +2816,19 @@ const RecruiterDashboardPage = () => {
                         {['draft', 'review', 'rejected'].includes(job.workflowStatus) && (
                           <button
                             type="button"
-                            className="btn btn-outline"
+                            className="btn btn-primary recruiter-flow-job-edit-action"
                             onClick={() => handleEditJob(job)}
                             disabled={jobActionInFlightId === job.id}
                           >
-                            Sunting
+                            Edit
                           </button>
                         )}
 
                         <button
                           type="button"
-                          className="btn btn-outline"
+                          className={`btn btn-outline${
+                            job.workflowStatus === 'active' ? ' recruiter-flow-job-recreate-action' : ''
+                          }`}
                           onClick={
                             job.workflowStatus === 'active'
                               ? handleRecreateApprovedJob

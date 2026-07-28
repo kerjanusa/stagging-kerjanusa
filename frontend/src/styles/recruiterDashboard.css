@@ -3937,6 +3937,11 @@
   align-items: center;
 }
 
+.recruiter-flow-job-edit-action,
+.recruiter-flow-job-recreate-action {
+  white-space: nowrap;
+}
+
 .recruiter-flow-candidate-card .workspace-tag-list,
 .recruiter-flow-candidate-card .workspace-action-row {
   margin-top: 0;
@@ -4194,12 +4199,19 @@
     display: grid;
     grid-template-columns: 1fr;
     align-items: stretch;
+    gap: 0.55rem;
+    margin-top: 0.95rem;
   }
 
   .recruiter-flow-job-actions-wide .btn,
   .recruiter-flow-job-actions-wide .recruiter-flow-select {
     width: 100%;
     min-width: 0;
+  }
+
+  .recruiter-flow-job-edit-action,
+  .recruiter-flow-job-recreate-action {
+    order: -1;
   }
 }
 
