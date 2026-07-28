@@ -404,7 +404,7 @@ class ApplicationService
         ?string $videoIntroUrl
     ): void
     {
-        $questions = collect($job->quiz_screening_questions ?? []);
+        $questions = $this->normalizeScreeningQuestionsForSubmission($job);
         $requiredQuestions = $questions->filter(
             fn ($question) => (bool) ($question['required'] ?? true)
         );
@@ -414,8 +414,15 @@ class ApplicationService
 
         $missingQuestions = $requiredQuestions
             ->filter(function ($question) use ($answersByQuestionId) {
-                $questionId = (string) ($question['id'] ?? '');
-                $submittedAnswer = $answersByQuestionId->get($questionId);
+                $submittedAnswer = null;
+
+                foreach (($question['_accepted_ids'] ?? []) as $questionId) {
+                    $submittedAnswer = $answersByQuestionId->get((string) $questionId);
+
+                    if (filled($submittedAnswer['answer'] ?? null)) {
+                        break;
+                    }
+                }
 
                 return !filled($submittedAnswer['answer'] ?? null);
             })
@@ -459,6 +466,45 @@ class ApplicationService
             ->filter(fn ($answer) => filled($answer['question']) && filled($answer['answer']))
             ->values()
             ->all();
+    }
+
+    /**
+     * Normalize legacy screening questions so required-answer validation can match stable UI IDs.
+     */
+    private function normalizeScreeningQuestionsForSubmission(Job $job): \Illuminate\Support\Collection
+    {
+        $seenIds = [];
+
+        return collect($job->quiz_screening_questions ?? [])
+            ->filter(fn ($question) => is_array($question) && filled($question['question'] ?? null))
+            ->values()
+            ->map(function (array $question, int $index) use (&$seenIds) {
+                $rawId = filled($question['id'] ?? null) ? (string) $question['id'] : '';
+                $canUseRawId = $rawId !== '' && !in_array($rawId, $seenIds, true);
+                $fallbackIds = [
+                    sprintf('screening-question-%d', $index + 1),
+                    sprintf('question-%d', $index + 1),
+                ];
+                $primaryId = $canUseRawId ? $rawId : $fallbackIds[0];
+                $suffix = 2;
+
+                while (in_array($primaryId, $seenIds, true)) {
+                    $primaryId = sprintf('%s-%d', $fallbackIds[0], $suffix);
+                    $suffix++;
+                }
+
+                $seenIds[] = $primaryId;
+
+                return [
+                    ...$question,
+                    'id' => $primaryId,
+                    '_accepted_ids' => collect([$canUseRawId ? $rawId : null, ...$fallbackIds])
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all(),
+                ];
+            });
     }
 
     /**

@@ -38,7 +38,7 @@ import {
 } from '../utils/recruiterFlow.js';
 import { formatRecruiterPlanDocuments } from '../utils/recruiterPlans.js';
 import { formatExperienceLevel, formatWorkMode } from '../utils/jobFormatters.js';
-import { APP_ROUTES, getJobApplyRoute } from '../utils/routeHelpers.js';
+import { APP_ROUTES, getJobApplyRoute, getRecruiterJobEditRoute } from '../utils/routeHelpers.js';
 import '../styles/workspace.css';
 import '../styles/recruiterDashboard.css';
 const RECRUITER_SUPPORT_WHATSAPP_LINK = CONTACT_WHATSAPP_LINK;
@@ -1594,6 +1594,14 @@ const RecruiterDashboardPage = () => {
     });
   };
 
+  const handleEditJob = (job) => {
+    navigate(getRecruiterJobEditRoute(job.id));
+  };
+
+  const handleRecreateApprovedJob = () => {
+    navigate(APP_ROUTES.recruiterCreateJob);
+  };
+
   const handleDuplicateJob = async (job) => {
     setJobActionInFlightId(job.id);
 
@@ -2805,13 +2813,28 @@ const RecruiterDashboardPage = () => {
                           Preview
                         </button>
 
+                        {['draft', 'review', 'rejected'].includes(job.workflowStatus) && (
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => handleEditJob(job)}
+                            disabled={jobActionInFlightId === job.id}
+                          >
+                            Sunting
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           className="btn btn-outline"
-                          onClick={() => handleDuplicateJob(job)}
+                          onClick={
+                            job.workflowStatus === 'active'
+                              ? handleRecreateApprovedJob
+                              : () => handleDuplicateJob(job)
+                          }
                           disabled={jobActionInFlightId === job.id}
                         >
-                          Duplikasi
+                          {job.workflowStatus === 'active' ? 'Buat Ulang' : 'Duplikasi'}
                         </button>
 
                         <button

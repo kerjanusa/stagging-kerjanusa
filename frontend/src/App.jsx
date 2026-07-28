@@ -244,6 +244,14 @@ function AppLayout() {
             }
           />
           <Route
+            path={APP_ROUTES.recruiterEditJob}
+            element={
+              <ProtectedRoute allowedRoles={['recruiter']} loginRole="recruiter">
+                <RecruiterJobCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path={APP_ROUTES.recruiterDashboard}
             element={
               <ProtectedRoute allowedRoles={['recruiter']} loginRole="recruiter">

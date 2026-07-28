@@ -11,6 +11,7 @@ export const APP_ROUTES = {
   register: '/register',
   recruiterDashboard: '/recruiter',
   recruiterCreateJob: '/recruiter/jobs/create',
+  recruiterEditJob: '/recruiter/jobs/:jobId/edit',
   candidateDashboard: '/candidate',
   adminDashboard: '/admin',
 };
@@ -19,6 +20,12 @@ export const APP_ROUTES = {
  * Build the dedicated candidate-facing job apply route for one job id.
  */
 export const getJobApplyRoute = (jobId) => `${APP_ROUTES.jobs}/${Number(jobId)}/apply`;
+
+/**
+ * Build the recruiter-facing edit route for one job id.
+ */
+export const getRecruiterJobEditRoute = (jobId) =>
+  `/recruiter/jobs/${Number(jobId)}/edit`;
 
 /**
  * Normalize legacy role aliases so route decisions use one canonical role set.

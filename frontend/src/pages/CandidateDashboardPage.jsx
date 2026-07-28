@@ -894,17 +894,15 @@ const CandidateDashboardPage = () => {
     error: chatError,
   } = useChat();
   const [activeSection, setActiveSection] = useState(resolveCandidateSectionFromHash(location.hash));
-  const [profile, setProfile] = useState(() =>
-    readCandidateProfile(user, { preferStoredDraft: false })
-  );
+  const [profile, setProfile] = useState(() => readCandidateProfile(user));
   const [visibleExperienceCount, setVisibleExperienceCount] = useState(() =>
-    getVisibleExperienceCount(readCandidateProfile(user, { preferStoredDraft: false }))
+    getVisibleExperienceCount(readCandidateProfile(user))
   );
   const [visibleOrganizationCount, setVisibleOrganizationCount] = useState(() =>
-    getVisibleOrganizationCount(readCandidateProfile(user, { preferStoredDraft: false }))
+    getVisibleOrganizationCount(readCandidateProfile(user))
   );
   const [visibleSkillCount, setVisibleSkillCount] = useState(() =>
-    getVisibleSkillCount(readCandidateProfile(user, { preferStoredDraft: false }))
+    getVisibleSkillCount(readCandidateProfile(user))
   );
   const [isSkillsSectionExpanded, setIsSkillsSectionExpanded] = useState(true);
   const [feedback, setFeedback] = useState(null);
@@ -938,7 +936,7 @@ const CandidateDashboardPage = () => {
   }, [location.hash]);
 
   useEffect(() => {
-    const nextProfile = readCandidateProfile(user, { preferStoredDraft: false });
+    const nextProfile = readCandidateProfile(user);
     setProfile(nextProfile);
     setVisibleExperienceCount(getVisibleExperienceCount(nextProfile));
     setVisibleOrganizationCount(getVisibleOrganizationCount(nextProfile));
@@ -1071,7 +1069,7 @@ const CandidateDashboardPage = () => {
           return;
         }
 
-        const nextProfile = readCandidateProfile(freshUser, { preferStoredDraft: false });
+        const nextProfile = readCandidateProfile(freshUser);
         setProfile(nextProfile);
         setVisibleExperienceCount(getVisibleExperienceCount(nextProfile));
         setVisibleOrganizationCount(getVisibleOrganizationCount(nextProfile));

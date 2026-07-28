@@ -63,6 +63,19 @@ class JobService
             'openings_count' => $job->openings_count,
             'interview_type' => $job->interview_type,
             'interview_note' => $job->interview_note,
+            'shift_night' => $job->shift_night,
+            'expiry_date' => $job->expiry_date,
+            'candidate_gender' => $job->candidate_gender,
+            'candidate_experience' => $job->candidate_experience,
+            'candidate_education' => $job->candidate_education,
+            'candidate_age_min' => $job->candidate_age_min,
+            'candidate_age_max' => $job->candidate_age_max,
+            'candidate_no_age_limit' => $job->candidate_no_age_limit,
+            'candidate_photo_requirement' => $job->candidate_photo_requirement,
+            'candidate_domicile' => $job->candidate_domicile,
+            'candidate_skills' => $job->candidate_skills,
+            'candidate_custom_skill' => $job->candidate_custom_skill,
+            'internal_recruiter_link' => $job->internal_recruiter_link,
             'video_screening_requirement' => $job->video_screening_requirement,
             'status' => $job->status,
             'workflow_status' => $job->workflow_status,
@@ -166,6 +179,7 @@ class JobService
         $data['quiz_screening_questions'] = $this->sanitizeScreeningQuestions(
             $data['quiz_screening_questions'] ?? []
         );
+        $data = $this->normalizeCandidateCriteria($data);
 
         if (($data['workflow_status'] ?? Job::WORKFLOW_ACTIVE) === Job::WORKFLOW_ACTIVE) {
             $currentActiveJobs = $this->countRecruiterActiveJobsForPlan($recruiterId);
@@ -242,6 +256,7 @@ class JobService
                 $data['quiz_screening_questions'] ?? []
             );
         }
+        $data = $this->normalizeCandidateCriteria($data);
 
         $nextWorkflowStatus = $data['workflow_status'] ?? $job->workflow_status;
 
@@ -523,13 +538,26 @@ class JobService
      */
     private function sanitizeScreeningQuestions(array $questions): array
     {
+        $seenIds = [];
+
         return collect($questions)
             ->filter(fn ($question) => is_array($question) && filled($question['question'] ?? null))
-            ->map(function (array $question, int $index) {
+            ->map(function (array $question, int $index) use (&$seenIds) {
+                $rawId = filled($question['id'] ?? null) ? (string) $question['id'] : '';
+                $questionId = $rawId && !in_array($rawId, $seenIds, true)
+                    ? $rawId
+                    : sprintf('question-%d', $index + 1);
+                $suffix = 2;
+
+                while (in_array($questionId, $seenIds, true)) {
+                    $questionId = sprintf('question-%d-%d', $index + 1, $suffix);
+                    $suffix++;
+                }
+
+                $seenIds[] = $questionId;
+
                 return [
-                    'id' => filled($question['id'] ?? null)
-                        ? (string) $question['id']
-                        : sprintf('question-%d', $index + 1),
+                    'id' => $questionId,
                     'type' => $question['type'] ?? 'text',
                     'title' => trim((string) ($question['title'] ?? $question['question'] ?? 'Pertanyaan screening')),
                     'question' => trim((string) ($question['question'] ?? '')),
@@ -543,5 +571,28 @@ class JobService
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * Keep optional candidate criteria clean before create/update.
+     */
+    private function normalizeCandidateCriteria(array $data): array
+    {
+        if (array_key_exists('candidate_skills', $data)) {
+            $data['candidate_skills'] = collect($data['candidate_skills'] ?? [])
+                ->map(fn ($skill) => trim((string) $skill))
+                ->filter()
+                ->unique()
+                ->take(6)
+                ->values()
+                ->all();
+        }
+
+        if ((bool) ($data['candidate_no_age_limit'] ?? false)) {
+            $data['candidate_age_min'] = null;
+            $data['candidate_age_max'] = null;
+        }
+
+        return $data;
     }
 }

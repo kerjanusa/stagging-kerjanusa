@@ -196,16 +196,49 @@ const formatJobStoryDate = (value) => {
 };
 
 /**
+ * Normalize legacy screening questions so every rendered input has one stable unique id.
+ */
+const normalizeScreeningQuestions = (questions = []) => {
+  const seenIds = new Set();
+
+  return (Array.isArray(questions) ? questions : [])
+    .filter((question) => question && typeof question === 'object' && String(question.question || '').trim())
+    .map((question, index) => {
+      const rawId = String(question.id || '').trim();
+      const fallbackId = `screening-question-${index + 1}`;
+      let id = rawId && !seenIds.has(rawId) ? rawId : fallbackId;
+      let suffix = 2;
+
+      while (seenIds.has(id)) {
+        id = `${fallbackId}-${suffix}`;
+        suffix += 1;
+      }
+
+      seenIds.add(id);
+
+      return {
+        ...question,
+        id,
+        originalId: rawId,
+        title: question.title || `Pertanyaan ${index + 1}`,
+        question: String(question.question || '').trim(),
+        answers: Array.isArray(question.answers)
+          ? question.answers.map((answer) => String(answer || '').trim()).filter(Boolean)
+          : [],
+        required: question.required ?? true,
+      };
+    });
+};
+
+/**
  * Siapkan jawaban awal screening kosong dari data lowongan.
  */
 const buildInitialScreeningAnswers = (job) =>
-  Array.isArray(job?.quiz_screening_questions)
-    ? job.quiz_screening_questions.map((question) => ({
-        question_id: question.id,
-        question: question.question,
-        answer: '',
-      }))
-    : [];
+  normalizeScreeningQuestions(job?.quiz_screening_questions).map((question) => ({
+    question_id: question.id,
+    question: question.question,
+    answer: '',
+  }));
 
 /**
  * Ambil kunci localStorage bookmark per user.
@@ -496,9 +529,10 @@ const JobApplyPage = () => {
 
   const companyName = job?.recruiter?.company_name || job?.recruiter?.name || 'Perusahaan';
   const recruiterProfile = job?.recruiter?.recruiter_profile || {};
-  const screeningQuestions = Array.isArray(job?.quiz_screening_questions)
-    ? job.quiz_screening_questions
-    : [];
+  const screeningQuestions = React.useMemo(
+    () => normalizeScreeningQuestions(job?.quiz_screening_questions),
+    [job?.quiz_screening_questions]
+  );
   const activeVideoScreeningLabel = formatVideoScreeningRequirement(
     job?.video_screening_requirement
   );

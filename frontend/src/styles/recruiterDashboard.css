@@ -4165,6 +4165,42 @@
   .recruiter-flow-inline-applicant-actions .btn {
     width: 100%;
   }
+
+  .recruiter-flow-job-grid {
+    gap: 0.82rem;
+  }
+
+  .recruiter-flow-job-card-detailed {
+    padding: 0.9rem;
+    border-radius: 0.92rem;
+  }
+
+  .recruiter-flow-job-card-head {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .recruiter-flow-job-card-head strong,
+  .recruiter-flow-job-card p {
+    overflow-wrap: anywhere;
+  }
+
+  .recruiter-flow-job-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recruiter-flow-job-actions-wide {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .recruiter-flow-job-actions-wide .btn,
+  .recruiter-flow-job-actions-wide .recruiter-flow-select {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .recruiter-flow-job-stat-grid,

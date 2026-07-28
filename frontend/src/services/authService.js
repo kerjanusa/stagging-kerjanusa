@@ -18,6 +18,7 @@ const REGISTRATION_NETWORK_ERROR_MESSAGE =
 
 const PUBLIC_OAUTH_ROLES = new Set(['candidate', 'recruiter']);
 const SUPPORTED_OAUTH_PROVIDERS = new Set(['google', 'facebook']);
+const isOAuthLoginEnabled = String(import.meta.env.VITE_ENABLE_OAUTH_LOGIN || '').toLowerCase() === 'true';
 
 const defaultMockUsers = [
   {
@@ -403,7 +404,7 @@ class AuthService {
    * Determine whether real OAuth redirects can be attempted in the current frontend mode.
    */
   static canUseOAuthLogin() {
-    return !shouldUseMockData;
+    return isOAuthLoginEnabled && !shouldUseMockData;
   }
 
   /**

@@ -690,15 +690,20 @@ export const getCandidateJobMatchScore = (job, profile) => {
   let score = 0;
   const reasons = [];
   const preferredRoles = profile.preferredRoles.filter((item) => item.trim());
+  const currentAddress = normalizeText(profile.currentAddress) ? profile.currentAddress : '';
   const preferredLocations = profile.preferredLocations.filter((item) => item.trim());
   const skills = profile.skills.filter((item) => item.trim());
+  const jobLocationText = `${job.location} ${job.candidate_domicile || ''}`;
 
   if (includesAnyText(`${job.title} ${job.category}`, preferredRoles)) {
     score += 4;
     reasons.push('Posisi sesuai minat Anda');
   }
 
-  if (includesAnyText(job.location, preferredLocations)) {
+  if (includesAnyText(jobLocationText, [currentAddress])) {
+    score += 4;
+    reasons.push('Lokasi cocok dengan domisili Anda');
+  } else if (includesAnyText(jobLocationText, preferredLocations)) {
     score += 3;
     reasons.push('Lokasi cocok dengan preferensi');
   }

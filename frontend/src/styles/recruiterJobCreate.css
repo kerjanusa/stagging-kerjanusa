@@ -553,6 +553,22 @@
   gap: 0.65rem;
 }
 
+.recruiter-job-create-age-input {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.recruiter-job-create-age-input small {
+  color: var(--gray-500);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.recruiter-job-create-field .recruiter-job-create-age-input small {
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
 .recruiter-job-create-checkbox {
   display: inline-flex;
   align-items: center;
@@ -1100,6 +1116,17 @@
   gap: 0.55rem;
 }
 
+.recruiter-job-create-quiz-answer-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.recruiter-job-create-quiz-answer-field span {
+  color: var(--gray-700);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
 .recruiter-job-create-summary-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1123,6 +1150,7 @@
   color: var(--gray-600);
   font-size: 0.75rem;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .recruiter-job-create-summary-card-full {
@@ -1442,6 +1470,10 @@
 
   .recruiter-job-create-section {
     padding: 1rem 0.9rem;
+  }
+
+  .recruiter-job-create-card {
+    overflow: visible;
   }
 
   .recruiter-job-create-section-copy h2 {
