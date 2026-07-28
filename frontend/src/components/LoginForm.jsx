@@ -23,7 +23,8 @@ const LoginForm = ({
 
   const hasFieldErrors = Object.keys(validationErrors || {}).length > 0;
   const formError = oauthError || error;
-  const canUseOAuthLogin = showOAuthLogin && AuthService.canUseOAuthLogin();
+  const oauthProviders = showOAuthLogin ? AuthService.getEnabledOAuthProviders() : [];
+  const canUseOAuthLogin = oauthProviders.length > 0;
 
   /**
    * Mengambil error pertama untuk field tertentu agar input cukup membaca satu sumber pesan.
@@ -151,28 +152,23 @@ const LoginForm = ({
             <span>atau</span>
           </div>
           <div className="auth-social-actions" aria-label="Pilihan login sosial">
-            <button
-              type="button"
-              className="auth-social-button"
-              onClick={() => handleOAuthLogin('google')}
-              disabled={isLoading}
-            >
-              <span className="auth-social-icon auth-social-icon-google" aria-hidden="true">
-                G
-              </span>
-              <span>Google</span>
-            </button>
-            <button
-              type="button"
-              className="auth-social-button"
-              onClick={() => handleOAuthLogin('facebook')}
-              disabled={isLoading}
-            >
-              <span className="auth-social-icon auth-social-icon-facebook" aria-hidden="true">
-                f
-              </span>
-              <span>Facebook</span>
-            </button>
+            {oauthProviders.map((provider) => (
+              <button
+                key={provider.value}
+                type="button"
+                className="auth-social-button"
+                onClick={() => handleOAuthLogin(provider.value)}
+                disabled={isLoading}
+              >
+                <span
+                  className={`auth-social-icon auth-social-icon-${provider.value}`}
+                  aria-hidden="true"
+                >
+                  {provider.value === 'facebook' ? 'f' : 'G'}
+                </span>
+                <span>{provider.label}</span>
+              </button>
+            ))}
           </div>
         </>
       ) : null}

@@ -19,6 +19,14 @@ const REGISTRATION_NETWORK_ERROR_MESSAGE =
 const PUBLIC_OAUTH_ROLES = new Set(['candidate', 'recruiter']);
 const SUPPORTED_OAUTH_PROVIDERS = new Set(['google', 'facebook']);
 const isOAuthLoginEnabled = String(import.meta.env.VITE_ENABLE_OAUTH_LOGIN || '').toLowerCase() === 'true';
+const OAUTH_PROVIDER_LABELS = {
+  google: 'Google',
+  facebook: 'Facebook',
+};
+const enabledOAuthProviders = String(import.meta.env.VITE_OAUTH_PROVIDERS || '')
+  .split(',')
+  .map((provider) => provider.trim().toLowerCase())
+  .filter((provider) => SUPPORTED_OAUTH_PROVIDERS.has(provider));
 
 const defaultMockUsers = [
   {
@@ -403,8 +411,32 @@ class AuthService {
   /**
    * Determine whether real OAuth redirects can be attempted in the current frontend mode.
    */
-  static canUseOAuthLogin() {
-    return isOAuthLoginEnabled && !shouldUseMockData;
+  static canUseOAuthLogin(provider = '') {
+    if (!isOAuthLoginEnabled || shouldUseMockData) {
+      return false;
+    }
+
+    const normalizedProvider = String(provider || '').trim().toLowerCase();
+
+    if (normalizedProvider) {
+      return enabledOAuthProviders.includes(normalizedProvider);
+    }
+
+    return enabledOAuthProviders.length > 0;
+  }
+
+  /**
+   * Return OAuth providers explicitly enabled for this frontend build.
+   */
+  static getEnabledOAuthProviders() {
+    if (!this.canUseOAuthLogin()) {
+      return [];
+    }
+
+    return enabledOAuthProviders.map((provider) => ({
+      value: provider,
+      label: OAUTH_PROVIDER_LABELS[provider] || provider,
+    }));
   }
 
   /**
@@ -415,6 +447,12 @@ class AuthService {
 
     if (!SUPPORTED_OAUTH_PROVIDERS.has(normalizedProvider)) {
       throw { message: 'Provider login tidak didukung.' };
+    }
+
+    if (!this.canUseOAuthLogin(normalizedProvider)) {
+      throw {
+        message: `Login ${OAUTH_PROVIDER_LABELS[normalizedProvider] || normalizedProvider} belum diaktifkan.`,
+      };
     }
 
     const normalizedRoleValue = String(role || '').trim().toLowerCase();
