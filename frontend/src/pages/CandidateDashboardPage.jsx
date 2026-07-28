@@ -459,12 +459,30 @@ const limitTextToWordCount = (value = '', maxWords = ABOUT_ME_WORD_LIMIT) => {
 /**
  * Menggabungkan beberapa poin lama menjadi satu narasi ringkas untuk field baru.
  */
-const buildCombinedProfileText = (items = []) =>
-  (Array.isArray(items) ? items : [])
+const buildCombinedProfileText = (items = []) => {
+  const listItems = Array.isArray(items) ? items : [];
+  const filledItemIndexes = listItems.reduce((indexes, item, index) => {
+    if (String(item || '').trim()) {
+      indexes.push(index);
+    }
+
+    return indexes;
+  }, []);
+
+  if (filledItemIndexes.length === 0) {
+    return '';
+  }
+
+  if (filledItemIndexes.length === 1 && filledItemIndexes[0] === 0) {
+    return String(listItems[0] || '');
+  }
+
+  return listItems
     .map((item) => String(item || '').trim())
     .filter(Boolean)
     .join(' ')
     .trim();
+};
 
 /**
  * Mengambil isian non-kosong pertama dari satu array field profil.
