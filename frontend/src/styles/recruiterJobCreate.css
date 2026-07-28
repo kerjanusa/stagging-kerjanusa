@@ -555,7 +555,14 @@
 
 .recruiter-job-create-age-input {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.32rem;
+}
+
+.recruiter-job-create-field .recruiter-job-create-age-input .recruiter-job-create-age-label {
+  color: var(--primary-dark);
+  font-size: 0.73rem;
+  font-weight: 800;
+  line-height: 1.3;
 }
 
 .recruiter-job-create-age-input small {

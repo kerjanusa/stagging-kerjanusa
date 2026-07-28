@@ -2325,7 +2325,7 @@ const RecruiterJobCreatePage = () => {
                       <span>Usia (tahun)*</span>
                       <div className="recruiter-job-create-age-grid">
                         <label className="recruiter-job-create-age-input">
-                          <span className="recruiter-sr-only">Usia minimum kandidat</span>
+                          <span className="recruiter-job-create-age-label">Usia minimum</span>
                           <input
                             type="text"
                             inputMode="numeric"
@@ -2341,7 +2341,7 @@ const RecruiterJobCreatePage = () => {
                           <small>Minimal 17 tahun</small>
                         </label>
                         <label className="recruiter-job-create-age-input">
-                          <span className="recruiter-sr-only">Usia maksimum kandidat</span>
+                          <span className="recruiter-job-create-age-label">Usia maksimum</span>
                           <input
                             type="text"
                             inputMode="numeric"
