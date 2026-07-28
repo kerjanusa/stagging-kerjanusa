@@ -2694,7 +2694,43 @@ const RecruiterJobCreatePage = () => {
                     <p>Periksa kembali detail lowongan sebelum dikirim ke review recruiter.</p>
                   </div>
 
-                  <div className="recruiter-job-create-fields recruiter-job-create-summary-grid">
+                  <div className="recruiter-job-create-summary-mobile">
+                    <article>
+                      <strong>Lowongan</strong>
+                      <span>{formData.title || '-'} • {formData.category || '-'}</span>
+                    </article>
+                    <article>
+                      <strong>Penempatan</strong>
+                      <span>{formData.location || '-'} • {selectedWorkModeLabel}</span>
+                    </article>
+                    <article>
+                      <strong>Gaji</strong>
+                      <span>{`${formatCurrency(formData.salary_min)} - ${formatCurrency(formData.salary_max)}`}</span>
+                    </article>
+                    <article>
+                      <strong>Kandidat</strong>
+                      <span>
+                        {[
+                          selectedExperienceLevelLabel,
+                          formData.candidate_education || '-',
+                          formData.candidate_no_age_limit
+                            ? 'Tanpa batas usia'
+                            : `${formData.candidate_age_min || '-'}-${formData.candidate_age_max || '-'} tahun`,
+                        ].join(' • ')}
+                      </span>
+                    </article>
+                    <article>
+                      <strong>Skrining</strong>
+                      <span>
+                        {`${configuredScreeningQuestionCount} pertanyaan • ${
+                          formatVideoScreeningRequirement(formData.video_screening_requirement) ||
+                          'Video tidak wajib'
+                        }`}
+                      </span>
+                    </article>
+                  </div>
+
+                  <div className="recruiter-job-create-fields recruiter-job-create-summary-grid recruiter-job-create-summary-grid-detailed">
                     <div className="recruiter-job-create-summary-card">
                       <strong>Judul Lowongan</strong>
                       <span>{formData.title || '-'}</span>

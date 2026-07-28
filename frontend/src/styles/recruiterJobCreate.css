@@ -839,6 +839,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.recruiter-job-create-summary-mobile {
+  display: none;
+}
+
 .recruiter-job-create-summary-card {
   display: grid;
   gap: 0.35rem;
@@ -1115,6 +1119,38 @@
 
   .recruiter-job-create-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .recruiter-job-create-summary-grid-detailed {
+    display: none;
+  }
+
+  .recruiter-job-create-summary-mobile {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .recruiter-job-create-summary-mobile article {
+    display: grid;
+    gap: 0.18rem;
+    padding: 0.68rem 0.74rem;
+    border: 1px solid var(--job-create-border);
+    border-radius: 0.72rem;
+    background: linear-gradient(180deg, #fffdfb 0%, #fff8f0 100%);
+  }
+
+  .recruiter-job-create-summary-mobile strong {
+    color: var(--primary-dark);
+    font-size: 0.7rem;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+
+  .recruiter-job-create-summary-mobile span {
+    color: var(--gray-600);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
 
   .recruiter-job-create-quiz-grid {
