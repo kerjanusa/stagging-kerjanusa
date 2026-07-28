@@ -86,6 +86,7 @@ const MAX_ADDITIONAL_SKILL_ENTRIES = 5;
 const MAX_VISIBLE_SKILL_ENTRIES =
   DEFAULT_VISIBLE_SKILL_ENTRIES + MAX_ADDITIONAL_SKILL_ENTRIES;
 const CANDIDATE_DASHBOARD_JOBS_PER_PAGE = 500;
+const CANDIDATE_PREFERRED_LOCATION_COUNT = 5;
 const PROFILE_PHOTO_MAX_FILE_SIZE_IN_BYTES = 5 * 1024 * 1024;
 const PROFILE_PHOTO_MAX_DIMENSION_IN_PIXELS = 480;
 const PROFILE_PHOTO_OUTPUT_QUALITY = 0.82;
@@ -115,6 +116,15 @@ const createCandidateJobFilters = () => ({
   experienceLevel: '',
 });
 const NEAREST_LOCATION_FILTER_VALUE = '__nearest_location__';
+
+const syncPrimaryPreferredLocation = (locations = [], currentAddress = '') => {
+  const currentLocations = Array.isArray(locations) ? locations : [];
+
+  return Array.from(
+    { length: Math.max(CANDIDATE_PREFERRED_LOCATION_COUNT, currentLocations.length) },
+    (_, index) => (index === 0 ? currentAddress : currentLocations[index] || '')
+  );
+};
 
 const ALL_INDONESIA_LOCATION_OPTIONS = indonesiaLocationOptions.flatMap((group) =>
   group.options.map((option) => ({
@@ -1250,10 +1260,9 @@ const CandidateDashboardPage = () => {
     ? filteredRecommendedJobs.filter(hasCandidateJobMatch).length
     : matchedRecommendedJobs.length;
   const primaryPreferredRole = firstFilledItem(profile.preferredRoles, 'Belum diisi');
-  const primaryPreferredLocation = firstFilledItem(
-    profile.preferredLocations,
-    'Belum diisi'
-  );
+  const primaryPreferredLocation =
+    String(profile.currentAddress || '').trim() ||
+    firstFilledItem(profile.preferredLocations, 'Belum diisi');
   const selectedCandidateJobLocationLabel = candidateJobFilters.location
     ? candidateJobFilters.locationLabel ||
       ALL_INDONESIA_LOCATION_OPTIONS.find(
@@ -1476,10 +1485,21 @@ const CandidateDashboardPage = () => {
   };
 
   const handleProfileFieldChange = (field, value) => {
-    setProfile((currentProfile) => ({
-      ...currentProfile,
-      [field]: value,
-    }));
+    setProfile((currentProfile) => {
+      const nextProfile = {
+        ...currentProfile,
+        [field]: value,
+      };
+
+      if (field === 'currentAddress') {
+        nextProfile.preferredLocations = syncPrimaryPreferredLocation(
+          currentProfile.preferredLocations,
+          value
+        );
+      }
+
+      return nextProfile;
+    });
     setFeedback(null);
   };
 
@@ -1915,8 +1935,9 @@ const CandidateDashboardPage = () => {
       setProfile((currentProfile) => ({
         ...currentProfile,
         currentAddress: resolvedLocation,
-        preferredLocations: currentProfile.preferredLocations.map((item, index) =>
-          index === 0 && !String(item || '').trim() ? resolvedLocation : item
+        preferredLocations: syncPrimaryPreferredLocation(
+          currentProfile.preferredLocations,
+          resolvedLocation
         ),
       }));
       setFeedback({
@@ -1958,10 +1979,9 @@ const CandidateDashboardPage = () => {
     setIsSavingProfile(true);
     const normalizedProfile = {
       ...sourceProfile,
-      preferredLocations: sourceProfile.preferredLocations.map((item, index) =>
-        index === 0 && !String(item || '').trim()
-          ? String(sourceProfile.currentAddress || '').trim()
-          : item
+      preferredLocations: syncPrimaryPreferredLocation(
+        sourceProfile.preferredLocations,
+        String(sourceProfile.currentAddress || '').trim()
       ),
       strengths: sourceProfile.strengths.map((item, index) =>
         index === 0

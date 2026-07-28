@@ -351,6 +351,7 @@ export const mergeCandidateProfile = (user, savedProfile) => {
   }
 
   const normalizedPreferredLocations = normalizeStringList(savedProfile.preferredLocations, 5);
+  const normalizedCurrentAddress = trimText(savedProfile.currentAddress);
   const normalizedSkills = normalizeStringList(savedProfile.skills, MAX_CANDIDATE_SKILLS);
   const normalizedStrengths = normalizeStringList(
     savedProfile.strengths,
@@ -372,8 +373,8 @@ export const mergeCandidateProfile = (user, savedProfile) => {
       )
   );
 
-  if (!firstFilledText(normalizedPreferredLocations) && trimText(savedProfile.currentAddress)) {
-    normalizedPreferredLocations[0] = trimText(savedProfile.currentAddress);
+  if (normalizedCurrentAddress) {
+    normalizedPreferredLocations[0] = normalizedCurrentAddress;
   }
 
   if (!firstFilledText(normalizedSkills)) {
