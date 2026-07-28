@@ -204,7 +204,7 @@ const normalizeScreeningQuestions = (questions = []) => {
   return (Array.isArray(questions) ? questions : [])
     .filter((question) => question && typeof question === 'object' && String(question.question || '').trim())
     .map((question, index) => {
-      const rawId = String(question.id || '').trim();
+      const rawId = String(question.id ?? '').trim();
       const fallbackId = `screening-question-${index + 1}`;
       let id = rawId && !seenIds.has(rawId) ? rawId : fallbackId;
       let suffix = 2;
@@ -219,6 +219,7 @@ const normalizeScreeningQuestions = (questions = []) => {
       return {
         ...question,
         id,
+        answerKey: `${id}::${index + 1}`,
         originalId: rawId,
         title: question.title || `Pertanyaan ${index + 1}`,
         question: String(question.question || '').trim(),
@@ -230,11 +231,33 @@ const normalizeScreeningQuestions = (questions = []) => {
     });
 };
 
+const findScreeningAnswerForQuestion = (answers = [], question = {}) => {
+  const questionAnswerKey = String(question.answerKey || '').trim();
+  const answerItems = Array.isArray(answers) ? answers : [];
+
+  if (questionAnswerKey) {
+    const matchedByAnswerKey = answerItems.find(
+      (answer) => String(answer.answer_key || '').trim() === questionAnswerKey
+    );
+
+    if (matchedByAnswerKey) {
+      return matchedByAnswerKey;
+    }
+  }
+
+  return answerItems.find(
+    (answer) =>
+      !String(answer.answer_key || '').trim() &&
+      String(answer.question_id) === String(question.id)
+  );
+};
+
 /**
  * Siapkan jawaban awal screening kosong dari data lowongan.
  */
 const buildInitialScreeningAnswers = (job) =>
   normalizeScreeningQuestions(job?.quiz_screening_questions).map((question) => ({
+    answer_key: question.answerKey,
     question_id: question.id,
     question: question.question,
     answer: '',
@@ -684,9 +707,7 @@ const JobApplyPage = () => {
     }
 
     const currentAnswer =
-      applicationScreeningAnswers.find(
-        (answer) => String(answer.question_id) === String(question.id)
-      )?.answer || '';
+      findScreeningAnswerForQuestion(applicationScreeningAnswers, question)?.answer || '';
 
     return !String(currentAnswer).trim();
   }).length;
@@ -741,13 +762,20 @@ const JobApplyPage = () => {
                 'Pahami kebutuhan lowongan, cara kerja tim, dan pertanyaan recruiter sebelum mulai melamar.',
             };
 
-  const handleScreeningAnswerChange = React.useCallback((questionIdValue, questionText, answerValue) => {
+  const handleScreeningAnswerChange = React.useCallback((question, answerValue) => {
     setApplicationScreeningAnswers((currentAnswers) => {
       const nextAnswers = [...currentAnswers];
+      const questionAnswerKey = String(question?.answerKey || '').trim();
+      const questionIdValue = question?.id || '';
+      const questionText = question?.question || '';
       const existingIndex = nextAnswers.findIndex(
-        (answer) => String(answer.question_id) === String(questionIdValue)
+        (answer) =>
+          (questionAnswerKey && String(answer.answer_key || '').trim() === questionAnswerKey) ||
+          (!String(answer.answer_key || '').trim() &&
+            String(answer.question_id) === String(questionIdValue))
       );
       const nextAnswer = {
+        answer_key: questionAnswerKey,
         question_id: questionIdValue,
         question: questionText,
         answer: answerValue,
@@ -1331,12 +1359,11 @@ const JobApplyPage = () => {
                   <strong>Pertanyaan screening</strong>
                   {screeningQuestions.map((question) => {
                     const currentAnswer =
-                      applicationScreeningAnswers.find(
-                        (answer) => String(answer.question_id) === String(question.id)
-                      )?.answer || '';
+                      findScreeningAnswerForQuestion(applicationScreeningAnswers, question)
+                        ?.answer || '';
 
                     return (
-                      <div key={question.id} className="job-apply-screening-card">
+                      <div key={question.answerKey} className="job-apply-screening-card">
                         <span>
                           {question.question}
                           {question.required ?? true ? ' *' : ''}
@@ -1347,12 +1374,11 @@ const JobApplyPage = () => {
                               <label key={`${question.id}-${answerOption}`}>
                                 <input
                                   type="radio"
-                                  name={`screening-${question.id}`}
+                                  name={`screening-${question.answerKey}`}
                                   checked={currentAnswer === answerOption}
                                   onChange={() =>
                                     handleScreeningAnswerChange(
-                                      question.id,
-                                      question.question,
+                                      question,
                                       answerOption
                                     )
                                   }
@@ -1368,8 +1394,7 @@ const JobApplyPage = () => {
                             value={currentAnswer}
                             onChange={(event) =>
                               handleScreeningAnswerChange(
-                                question.id,
-                                question.question,
+                                question,
                                 event.target.value
                               )
                             }
