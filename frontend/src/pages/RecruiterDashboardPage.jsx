@@ -2629,8 +2629,8 @@ const RecruiterDashboardPage = () => {
         )}
 
         {activeSection === 'jobs' && (
-          <section className="workspace-section-stack">
-            <article className="workspace-panel" data-reveal>
+          <section className="workspace-section-stack recruiter-flow-jobs-section">
+            <article className="workspace-panel recruiter-flow-jobs-panel" data-reveal>
               <div className="workspace-panel-heading">
                 <div>
                   <span className="workspace-section-label">Posting Lowongan</span>
