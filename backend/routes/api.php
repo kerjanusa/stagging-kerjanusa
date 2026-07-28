@@ -4,7 +4,6 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CandidateDocumentController;
-use App\Http\Controllers\CandidateProfileAutofillController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\RecruiterWorkspaceController;
@@ -123,8 +122,6 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/chat/messages', [MessageController::class, 'send']);
 
     Route::middleware('role:candidate')->group(function () {
-        Route::post('/candidate/profile/autofill-from-resume', CandidateProfileAutofillController::class)
-            ->middleware('throttle:12,1');
         Route::post('/apply', [ApplicationController::class, 'store']);
         Route::get('/my-applications', [ApplicationController::class, 'myCandidateApplications']);
         Route::put('/applications/{applicationId}/withdraw', [ApplicationController::class, 'withdraw']);

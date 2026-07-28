@@ -1,7 +1,6 @@
 import apiClient, { API_BASE_URL } from '../utils/apiClient';
 import { shouldUseMockData } from '../utils/mockMode';
 import { clearCandidateApplyIntent } from '../utils/candidateApplyIntent.js';
-import { buildCandidateResumeAutofillFromBrowserFile } from '../utils/candidateResumeAutofill.js';
 import { normalizeUserRole } from '../utils/routeHelpers.js';
 import {
   clearStoredAuthSession,
@@ -379,12 +378,6 @@ const isNetworkFailure = (error) =>
     error?.code === 'ECONNABORTED' ||
     error?.code === 'ERR_NETWORK' ||
     Boolean(error?.request));
-
-const shouldUseBrowserResumeAutofillFallback = (error) => {
-  const status = Number(error?.response?.status || 0);
-
-  return isNetworkFailure(error) || status === 404 || status === 405 || status >= 500;
-};
 
 /**
  * Resolve the configured API base URL into an absolute browser URL for provider redirects.
@@ -790,49 +783,6 @@ class AuthService {
         user: normalizedUser,
       };
     } catch (error) {
-      throw error.response?.data || error.message;
-    }
-  }
-
-  /**
-   * Parse one uploaded candidate resume and return profile autofill suggestions.
-   */
-  static async autofillCandidateProfileFromResume(file) {
-    if (!isFileLike(file)) {
-      throw { message: 'Pilih file CV terlebih dahulu.' };
-    }
-
-    if (shouldUseMockData) {
-      return buildCandidateResumeAutofillFromBrowserFile(file);
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('candidate_resume_file', file);
-      const response = await apiClient.post('/candidate/profile/autofill-from-resume', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      if (
-        Number(response.data?.autofill?.source?.textLength || 0) <= 0 ||
-        !Array.isArray(response.data?.autofill?.filledFields) ||
-        response.data.autofill.filledFields.length === 0
-      ) {
-        const browserAutofill = await buildCandidateResumeAutofillFromBrowserFile(file);
-
-        if ((browserAutofill.autofill?.filledFields || []).length > 0) {
-          return browserAutofill;
-        }
-      }
-
-      return response.data;
-    } catch (error) {
-      if (shouldUseBrowserResumeAutofillFallback(error)) {
-        return buildCandidateResumeAutofillFromBrowserFile(file);
-      }
-
       throw error.response?.data || error.message;
     }
   }

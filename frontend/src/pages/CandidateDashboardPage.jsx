@@ -91,11 +91,6 @@ const PROFILE_PHOTO_MAX_DIMENSION_IN_PIXELS = 480;
 const PROFILE_PHOTO_OUTPUT_QUALITY = 0.82;
 const PROFILE_PHOTO_ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const CANDIDATE_RESUME_MAX_FILE_SIZE_IN_BYTES = 2 * 1024 * 1024;
-const RESUME_AUTOFILL_MINIMUM_LOADING_MS = 900;
-const RESUME_AUTOFILL_FINISH_DELAY_MS = 350;
-const RESUME_AUTOFILL_PROGRESS_INTERVAL_MS = 180;
-const RESUME_AUTOFILL_PROGRESS_START = 8;
-const RESUME_AUTOFILL_PROGRESS_MAX_WHILE_READING = 92;
 const CANDIDATE_GENDER_OPTIONS = [
   { value: 'male', label: 'Laki-laki' },
   { value: 'female', label: 'Perempuan' },
@@ -438,351 +433,6 @@ const getVisibleSkillCount = (profile) =>
     MAX_VISIBLE_SKILL_ENTRIES,
     Math.max(DEFAULT_VISIBLE_SKILL_ENTRIES, countFilledSkillEntries(profile?.skills || []))
   );
-
-const CANDIDATE_RESUME_AUTOFILL_FIELD_LABELS = {
-  fullName: 'nama',
-  email: 'email',
-  phone: 'nomor telepon',
-  placeOfBirth: 'tempat lahir',
-  dateOfBirth: 'tanggal lahir',
-  currentAddress: 'lokasi saat ini',
-  gender: 'jenis kelamin',
-  age: 'usia',
-  profileSummary: 'ringkasan profil',
-  employmentType: 'tipe pekerjaan',
-  targetIndustry: 'industri target',
-  linkedin: 'LinkedIn',
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  otherSocial: 'link portfolio',
-  education: 'pendidikan',
-  organizationActivities: 'organisasi',
-  experiences: 'pengalaman',
-  strengths: 'tentang saya',
-  achievements: 'pencapaian',
-  skills: 'kemampuan',
-  preferredLocations: 'lokasi pilihan',
-  preferredRoles: 'posisi diminati',
-  salaryMin: 'ekspektasi gaji',
-  salaryMax: 'ekspektasi gaji',
-};
-
-const isAutofillValueFilled = (value) => {
-  if (Array.isArray(value)) {
-    return value.some((item) => isAutofillValueFilled(item));
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.values(value).some((item) => isAutofillValueFilled(item));
-  }
-
-  return String(value ?? '').trim() !== '';
-};
-
-const getAutofillFieldLabel = (field) =>
-  CANDIDATE_RESUME_AUTOFILL_FIELD_LABELS[field] || field;
-
-const createUniqueLabelList = (items = []) =>
-  [...new Set(items.map(getAutofillFieldLabel).filter(Boolean))];
-
-const mergeAutofillScalarField = (profile, autofillProfile, field, changedFields) => {
-  const currentValue = profile[field];
-  const nextValue = autofillProfile?.[field];
-
-  if (!isAutofillValueFilled(currentValue) && isAutofillValueFilled(nextValue)) {
-    changedFields.push(field);
-
-    return String(nextValue || '').trim();
-  }
-
-  return currentValue;
-};
-
-const mergeAutofillStringListField = (
-  profile,
-  autofillProfile,
-  field,
-  length,
-  changedFields
-) => {
-  const currentItems = Array.isArray(profile[field]) ? profile[field] : [];
-  const autofillItems = Array.isArray(autofillProfile?.[field]) ? autofillProfile[field] : [];
-  let didChange = false;
-  const nextItems = Array.from({ length }, (_, index) => {
-    const currentValue = String(currentItems[index] || '').trim();
-    const autofillValue = String(autofillItems[index] || '').trim();
-
-    if (!currentValue && autofillValue) {
-      didChange = true;
-      return autofillValue;
-    }
-
-    return currentItems[index] || '';
-  });
-
-  if (didChange) {
-    changedFields.push(field);
-  }
-
-  return nextItems;
-};
-
-const RESUME_AUTOFILL_INVALID_SKILL_PATTERN =
-  /@|https?:\/\/|\b(jan(?:uari|uary)?|feb(?:ruari|ruary)?|mar(?:et|ch)?|apr(?:il)?|mei|may|jun(?:i|e)?|jul(?:i|y)?|agu(?:stus)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|des(?:ember)?|dec(?:ember)?|present|current|now|sekarang|saat ini|masih aktif|masih bekerja|pt\.?|cv\.?|corp|company|inc|ltd|group|universitas|sekolah|pengalaman|experience|pendidikan|education|alamat|address|kontak|contact)\b/i;
-
-const looksLikeAutofillCompanySkill = (value = '') => {
-  const words = String(value || '').trim().split(/\s+/).filter(Boolean);
-  const titleCaseWords = words.filter((word) => /^[A-Z][a-z]{2,}$/u.test(word));
-
-  return words.length >= 3 && words.length <= 5 && titleCaseWords.length === words.length;
-};
-
-const looksLikeInvalidAutofillSkillValue = (value = '') => {
-  const skill = String(value || '').trim();
-
-  if (!skill) {
-    return false;
-  }
-
-  if (RESUME_AUTOFILL_INVALID_SKILL_PATTERN.test(skill) || /\b(19|20)\d{2}\b/.test(skill)) {
-    return true;
-  }
-
-  if (/^(digital|profile|portfolio|project|company)$/i.test(skill)) {
-    return true;
-  }
-
-  return looksLikeAutofillCompanySkill(skill);
-};
-
-const mergeAutofillSkillListField = (profile, autofillProfile, length, changedFields) => {
-  const currentItems = Array.isArray(profile.skills) ? profile.skills : [];
-  const autofillItems = Array.isArray(autofillProfile?.skills) ? autofillProfile.skills : [];
-  const nextItems = [];
-
-  currentItems.forEach((item) => {
-    const currentValue = String(item || '').trim();
-
-    if (
-      currentValue &&
-      !looksLikeInvalidAutofillSkillValue(currentValue) &&
-      !nextItems.some((nextItem) => nextItem.toLowerCase() === currentValue.toLowerCase())
-    ) {
-      nextItems.push(currentValue);
-    }
-  });
-
-  autofillItems.forEach((item) => {
-    const autofillValue = String(item || '').trim();
-
-    if (
-      autofillValue &&
-      !looksLikeInvalidAutofillSkillValue(autofillValue) &&
-      !nextItems.some((nextItem) => nextItem.toLowerCase() === autofillValue.toLowerCase()) &&
-      nextItems.length < length
-    ) {
-      nextItems.push(autofillValue);
-    }
-  });
-
-  while (nextItems.length < length) {
-    nextItems.push('');
-  }
-
-  const trimmedNextItems = nextItems.slice(0, length);
-  const normalizedCurrentItems = Array.from(
-    { length },
-    (_, index) => String(currentItems[index] || '').trim()
-  );
-
-  if (JSON.stringify(trimmedNextItems) !== JSON.stringify(normalizedCurrentItems)) {
-    changedFields.push('skills');
-  }
-
-  return trimmedNextItems;
-};
-
-const mergeAutofillObjectField = (currentValue = {}, autofillValue = {}, changedFields, field) => {
-  const nextValue = {
-    ...currentValue,
-  };
-  let didChange = false;
-
-  Object.entries(autofillValue || {}).forEach(([key, value]) => {
-    if (!isAutofillValueFilled(nextValue[key]) && isAutofillValueFilled(value)) {
-      nextValue[key] = value;
-      didChange = true;
-    }
-  });
-
-  if (didChange) {
-    changedFields.push(field);
-  }
-
-  return nextValue;
-};
-
-const mergeAutofillObjectListField = (
-  currentItems = [],
-  autofillItems = [],
-  createEmptyItem,
-  maxItems,
-  field,
-  changedFields
-) => {
-  const nextItems = Array.from(
-    { length: maxItems },
-    (_, index) => currentItems[index] || createEmptyItem()
-  );
-  let didChange = false;
-
-  (Array.isArray(autofillItems) ? autofillItems : [])
-    .filter((item) => isAutofillValueFilled(item))
-    .slice(0, maxItems)
-    .forEach((autofillItem, autofillIndex) => {
-      const preferredIndex = isAutofillValueFilled(nextItems[autofillIndex])
-        ? nextItems.findIndex((item) => !isAutofillValueFilled(item))
-        : autofillIndex;
-      const targetIndex = preferredIndex >= 0 ? preferredIndex : -1;
-
-      if (targetIndex < 0) {
-        return;
-      }
-
-      const mergedItem = mergeAutofillObjectField(
-        nextItems[targetIndex],
-        autofillItem,
-        [],
-        field
-      );
-
-      if (JSON.stringify(mergedItem) !== JSON.stringify(nextItems[targetIndex])) {
-        nextItems[targetIndex] = mergedItem;
-        didChange = true;
-      }
-    });
-
-  if (didChange) {
-    changedFields.push(field);
-  }
-
-  return nextItems;
-};
-
-const mergeCandidateResumeAutofillProfile = (profile, autofillProfile = {}) => {
-  const changedFields = [];
-  const nextProfile = {
-    ...profile,
-  };
-
-  [
-    'fullName',
-    'email',
-    'phone',
-    'activeContactName',
-    'placeOfBirth',
-    'dateOfBirth',
-    'currentAddress',
-    'gender',
-    'age',
-    'profileSummary',
-    'employmentType',
-    'targetIndustry',
-    'linkedin',
-    'instagram',
-    'tiktok',
-    'otherSocial',
-    'salaryMin',
-    'salaryMax',
-  ].forEach((field) => {
-    nextProfile[field] = mergeAutofillScalarField(
-      nextProfile,
-      autofillProfile,
-      field,
-      changedFields
-    );
-  });
-
-  nextProfile.education = mergeAutofillObjectField(
-    nextProfile.education,
-    autofillProfile.education,
-    changedFields,
-    'education'
-  );
-  nextProfile.experiences = mergeAutofillObjectListField(
-    nextProfile.experiences,
-    autofillProfile.experiences,
-    createEmptyExperienceEntry,
-    MAX_VISIBLE_EXPERIENCE_ENTRIES,
-    'experiences',
-    changedFields
-  );
-  nextProfile.organizationActivities = mergeAutofillObjectListField(
-    nextProfile.organizationActivities,
-    autofillProfile.organizationActivities,
-    createEmptyOrganizationActivityEntry,
-    MAX_VISIBLE_ORGANIZATION_ENTRIES,
-    'organizationActivities',
-    changedFields
-  );
-  nextProfile.organizationActivity =
-    nextProfile.organizationActivities[0] || createEmptyOrganizationActivityEntry();
-  nextProfile.skills = mergeAutofillSkillListField(
-    nextProfile,
-    autofillProfile,
-    MAX_VISIBLE_SKILL_ENTRIES,
-    changedFields
-  );
-  nextProfile.strengths = mergeAutofillStringListField(
-    nextProfile,
-    autofillProfile,
-    'strengths',
-    3,
-    changedFields
-  );
-  nextProfile.achievements = mergeAutofillStringListField(
-    nextProfile,
-    autofillProfile,
-    'achievements',
-    3,
-    changedFields
-  );
-  nextProfile.preferredRoles = mergeAutofillStringListField(
-    nextProfile,
-    autofillProfile,
-    'preferredRoles',
-    5,
-    changedFields
-  );
-  nextProfile.preferredLocations = mergeAutofillStringListField(
-    nextProfile,
-    autofillProfile,
-    'preferredLocations',
-    5,
-    changedFields
-  );
-
-  return {
-    profile: nextProfile,
-    changedFields: createUniqueLabelList(changedFields),
-  };
-};
-
-const buildResumeAutofillSuccessMessage = (changedFields = [], missingRequiredFields = []) => {
-  if (changedFields.length === 0) {
-    return 'CV berhasil dipilih, tetapi belum ada field kosong yang bisa diisi otomatis.';
-  }
-
-  const previewFields = changedFields.slice(0, 5).join(', ');
-  const remainingCount = Math.max(0, changedFields.length - 5);
-  const suffix = remainingCount > 0 ? `, dan ${remainingCount} field lain` : '';
-  const missingSuffix =
-    missingRequiredFields.length > 0
-      ? ` Masih perlu cek: ${missingRequiredFields.slice(0, 3).join(', ')}.`
-      : '';
-
-  return `CV terbaca. Terisi otomatis: ${previewFields}${suffix}.${missingSuffix}`;
-};
 
 /**
  * Menghitung jumlah kata pada satu isian bebas untuk batas biografi singkat kandidat.
@@ -1214,8 +864,7 @@ const buildCandidateDashboardChecklistSections = (profile, completion) => {
 const CandidateDashboardPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, updateProfile, getCurrentUser, autofillCandidateProfileFromResume } =
-    useAuth();
+  const { user, logout, updateProfile, getCurrentUser } = useAuth();
   const {
     jobs,
     pagination: jobsPagination,
@@ -1275,56 +924,9 @@ const CandidateDashboardPage = () => {
   const [profilePhotoFile, setProfilePhotoFile] = useState(null);
   const [shouldClearProfilePhoto, setShouldClearProfilePhoto] = useState(false);
   const [resumeUploadFiles, setResumeUploadFiles] = useState([]);
-  const [isAutofillingResume, setIsAutofillingResume] = useState(false);
-  const [resumeAutofillProgress, setResumeAutofillProgress] = useState(0);
-  const [resumeAutofillSummary, setResumeAutofillSummary] = useState(null);
   const isSavingProfileRef = useRef(false);
-  const isAutofillingResumeRef = useRef(false);
-  const resumeAutofillProgressTimerRef = useRef(null);
-  const resumeAutofillRequestIdRef = useRef(0);
   const profileRef = useRef(profile);
   const candidateLocationDropdownRef = useRef(null);
-
-  const clearResumeAutofillProgressTimer = () => {
-    if (resumeAutofillProgressTimerRef.current && typeof window !== 'undefined') {
-      window.clearInterval(resumeAutofillProgressTimerRef.current);
-    }
-
-    resumeAutofillProgressTimerRef.current = null;
-  };
-
-  const waitResumeAutofillDelay = (duration) =>
-    typeof window !== 'undefined'
-      ? new Promise((resolve) => {
-          window.setTimeout(resolve, duration);
-        })
-      : Promise.resolve();
-
-  const startResumeAutofillProgress = () => {
-    clearResumeAutofillProgressTimer();
-    setResumeAutofillProgress(RESUME_AUTOFILL_PROGRESS_START);
-
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    resumeAutofillProgressTimerRef.current = window.setInterval(() => {
-      setResumeAutofillProgress((currentProgress) => {
-        if (currentProgress >= RESUME_AUTOFILL_PROGRESS_MAX_WHILE_READING) {
-          return currentProgress;
-        }
-
-        const remainingProgress =
-          RESUME_AUTOFILL_PROGRESS_MAX_WHILE_READING - currentProgress;
-        const nextStep = Math.max(1, Math.round(remainingProgress * 0.14));
-
-        return Math.min(
-          RESUME_AUTOFILL_PROGRESS_MAX_WHILE_READING,
-          currentProgress + nextStep
-        );
-      });
-    }, RESUME_AUTOFILL_PROGRESS_INTERVAL_MS);
-  };
 
   useEffect(() => {
     profileRef.current = profile;
@@ -1335,15 +937,6 @@ const CandidateDashboardPage = () => {
     setIsMobileNavOpen(false);
   }, [location.hash]);
 
-  useEffect(
-    () => () => {
-      resumeAutofillRequestIdRef.current += 1;
-      isAutofillingResumeRef.current = false;
-      clearResumeAutofillProgressTimer();
-    },
-    []
-  );
-
   useEffect(() => {
     const nextProfile = readCandidateProfile(user, { preferStoredDraft: false });
     setProfile(nextProfile);
@@ -1353,12 +946,6 @@ const CandidateDashboardPage = () => {
     setProfilePhotoFile(null);
     setShouldClearProfilePhoto(false);
     setResumeUploadFiles([]);
-    setIsAutofillingResume(false);
-    isAutofillingResumeRef.current = false;
-    clearResumeAutofillProgressTimer();
-    setResumeAutofillProgress(0);
-    setResumeAutofillSummary(null);
-    resumeAutofillRequestIdRef.current += 1;
   }, [user]);
 
   useEffect(() => {
@@ -1740,14 +1327,6 @@ const CandidateDashboardPage = () => {
   );
 
   const handleSectionChange = (section) => {
-    if (isAutofillingResumeRef.current || isAutofillingResume) {
-      setFeedback({
-        type: 'success',
-        message: 'Tunggu sampai CV selesai dibaca. Form akan terisi otomatis setelah proses selesai.',
-      });
-      return;
-    }
-
     setActiveSection(section);
     setIsMobileNavOpen(false);
     navigate(getCandidateSectionRoute(section));
@@ -2215,106 +1794,10 @@ const CandidateDashboardPage = () => {
     setFeedback(null);
   };
 
-  const handleResumeAutofill = async (resumeFile) => {
-    if (!resumeFile) {
-      return;
-    }
-
-    const requestId = resumeAutofillRequestIdRef.current + 1;
-    resumeAutofillRequestIdRef.current = requestId;
-    isAutofillingResumeRef.current = true;
-    setIsAutofillingResume(true);
-    startResumeAutofillProgress();
-    setResumeAutofillSummary(null);
-    setFeedback({
-      type: 'success',
-      message: 'Membaca isi CV untuk mengisi profil otomatis...',
-    });
-
-    try {
-      const [response] = await Promise.all([
-        autofillCandidateProfileFromResume(resumeFile),
-        waitResumeAutofillDelay(RESUME_AUTOFILL_MINIMUM_LOADING_MS),
-      ]);
-
-      if (resumeAutofillRequestIdRef.current !== requestId) {
-        return;
-      }
-
-      const autofillPayload = response?.autofill || {};
-      const mergeResult = mergeCandidateResumeAutofillProfile(
-        profileRef.current,
-        autofillPayload.profile || {}
-      );
-      const nextProfile = mergeResult.profile;
-      const storedAutofillProfile = saveCandidateProfile(user, nextProfile);
-      const missingRequiredFields =
-        getCandidateProfileCompletion(storedAutofillProfile).missingRequiredItems;
-
-      profileRef.current = storedAutofillProfile;
-      setProfile(storedAutofillProfile);
-      setVisibleExperienceCount(getVisibleExperienceCount(storedAutofillProfile));
-      setVisibleOrganizationCount(getVisibleOrganizationCount(storedAutofillProfile));
-      setVisibleSkillCount(getVisibleSkillCount(storedAutofillProfile));
-      setResumeAutofillSummary({
-        fileName: autofillPayload.source?.fileName || resumeFile.name || 'CV kandidat',
-        filledFields: mergeResult.changedFields,
-        missingRequiredFields,
-        textLength: Number(autofillPayload.source?.textLength || 0),
-        message: response?.message || '',
-      });
-      setFeedback({
-        type: mergeResult.changedFields.length > 0 ? 'success' : 'error',
-        message: buildResumeAutofillSuccessMessage(
-          mergeResult.changedFields,
-          missingRequiredFields
-        ),
-      });
-    } catch (error) {
-      if (resumeAutofillRequestIdRef.current !== requestId) {
-        return;
-      }
-
-      setResumeAutofillSummary({
-        fileName: resumeFile.name || 'CV kandidat',
-        filledFields: [],
-        missingRequiredFields: [],
-        textLength: 0,
-        message: error?.message || 'Autofill CV belum berhasil.',
-      });
-      setFeedback({
-        type: 'error',
-        message:
-          error?.message ||
-          'CV sudah dipilih, tetapi isi CV belum berhasil dibaca otomatis.',
-      });
-    } finally {
-      if (resumeAutofillRequestIdRef.current === requestId) {
-        clearResumeAutofillProgressTimer();
-        setResumeAutofillProgress(100);
-        await waitResumeAutofillDelay(RESUME_AUTOFILL_FINISH_DELAY_MS);
-
-        if (resumeAutofillRequestIdRef.current === requestId) {
-          isAutofillingResumeRef.current = false;
-          setIsAutofillingResume(false);
-        }
-      }
-    }
-  };
-
-  const handleFileChange = async (field, inputElement, maxFiles) => {
+  const handleFileChange = (field, inputElement, maxFiles) => {
     const nextFiles = Array.from(inputElement?.files || []).slice(0, maxFiles);
     const fileNames = nextFiles.map((file) => file.name);
     const primaryFile = nextFiles[0] || null;
-
-    if (field === 'resumeFiles') {
-      resumeAutofillRequestIdRef.current += 1;
-      isAutofillingResumeRef.current = false;
-      clearResumeAutofillProgressTimer();
-      setIsAutofillingResume(false);
-      setResumeAutofillProgress(0);
-      setResumeAutofillSummary(null);
-    }
 
     if (field === 'resumeFiles' && nextFiles.some((file) => !isPdfResumeFile(file))) {
       if (inputElement) {
@@ -2367,18 +1850,8 @@ const CandidateDashboardPage = () => {
                 name: primaryFile.name,
                 url: '',
               }
-            : null
+          : null
       );
-
-      if (primaryFile && isPdfResumeFile(primaryFile)) {
-        try {
-          await handleResumeAutofill(primaryFile);
-        } finally {
-          if (inputElement) {
-            inputElement.value = '';
-          }
-        }
-      }
 
       return;
     }
@@ -2448,7 +1921,7 @@ const CandidateDashboardPage = () => {
   };
 
   const handleSaveProfile = async () => {
-    if (!user || isSavingProfileRef.current || isAutofillingResume || isAutofillingResumeRef.current) {
+    if (!user || isSavingProfileRef.current) {
       return;
     }
 
@@ -2719,43 +2192,9 @@ const CandidateDashboardPage = () => {
 
         {activeSection === 'profile' && (
           <section
-            className={`workspace-section-stack candidate-profile-layout${
-              isAutofillingResume ? ' is-autofilling-resume' : ''
-            }`}
-            aria-busy={isAutofillingResume}
+            className="workspace-section-stack candidate-profile-layout"
           >
             <div className="candidate-profile-shell">
-              {isAutofillingResume && (
-                <div
-                  className="candidate-profile-autofill-blocker"
-                  role="status"
-                  aria-live="assertive"
-                >
-                  <div className="candidate-profile-autofill-dialog">
-                    <span className="candidate-profile-autofill-spinner" aria-hidden="true" />
-                    <strong>Membaca CV</strong>
-                    <p>
-                      Sistem sedang mengambil data dari CV. Tunggu sampai proses selesai, lalu form
-                      akan terisi otomatis.
-                    </p>
-                    <div
-                      className="candidate-profile-autofill-progress"
-                      role="progressbar"
-                      aria-label="Progress membaca CV"
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={resumeAutofillProgress}
-                    >
-                      <span style={{ width: `${resumeAutofillProgress}%` }} />
-                    </div>
-                    <small className="candidate-profile-autofill-percent">
-                      {resumeAutofillProgress >= 100
-                        ? '100% selesai membaca CV'
-                        : `${resumeAutofillProgress}% membaca data CV`}
-                    </small>
-                  </div>
-                </div>
-              )}
               <header className="candidate-profile-hero" data-reveal>
                 <span className="candidate-profile-kicker">Profil Siap Lamar</span>
                 <h1>Rapikan profil yang recruiter akan baca lebih dulu</h1>
@@ -3738,11 +3177,8 @@ const CandidateDashboardPage = () => {
                   <div className="candidate-profile-field">
                     <span>Unggah CV / Resume (PDF)</span>
                     <label
-                      className={`candidate-profile-upload-zone${
-                        isAutofillingResume ? ' is-loading' : ''
-                      }`}
+                      className="candidate-profile-upload-zone"
                       htmlFor="candidate-resume-upload"
-                      aria-busy={isAutofillingResume}
                     >
                       <span className="candidate-profile-upload-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none">
@@ -3755,15 +3191,15 @@ const CandidateDashboardPage = () => {
                           />
                         </svg>
                       </span>
-                      <strong>{isAutofillingResume ? 'Membaca CV...' : 'Pilih File CV'}</strong>
-                      <small>{isAutofillingResume ? 'Autofill berjalan' : 'Maks 2MB'}</small>
+                      <strong>Pilih File CV</strong>
+                      <small>Maks 2MB</small>
                     </label>
                     <input
                       id="candidate-resume-upload"
                       className="candidate-profile-upload-input"
                       type="file"
                       accept=".pdf,application/pdf"
-                      disabled={isAutofillingResume || isSavingProfile}
+                      disabled={isSavingProfile}
                       onChange={(event) => handleFileChange('resumeFiles', event.target, 1)}
                     />
                   </div>
@@ -3795,40 +3231,6 @@ const CandidateDashboardPage = () => {
                     <p className="candidate-profile-preview-hint">{resumePreviewHint}</p>
                   </div>
 
-                  {(isAutofillingResume || resumeAutofillSummary) && (
-                    <div
-                      className={`candidate-profile-autofill-panel${
-                        isAutofillingResume ? ' is-loading' : ''
-                      }`}
-                      aria-live="polite"
-                    >
-                      <strong>{isAutofillingResume ? 'Membaca isi CV' : 'Autofill CV'}</strong>
-                      <p>
-                        {isAutofillingResume
-                          ? 'Sistem sedang mengambil data dari CV untuk mengisi field profil yang kosong.'
-                          : resumeAutofillSummary?.filledFields?.length > 0
-                            ? buildResumeAutofillSuccessMessage(
-                                resumeAutofillSummary.filledFields,
-                                resumeAutofillSummary.missingRequiredFields
-                              )
-                            : resumeAutofillSummary?.message ||
-                              'Belum ada field profil yang bisa diisi otomatis dari CV ini.'}
-                      </p>
-                      {!isAutofillingResume &&
-                        resumeAutofillSummary?.filledFields?.length > 0 && (
-                          <small>
-                            Field terisi: {resumeAutofillSummary.filledFields.join(', ')}
-                          </small>
-                        )}
-                      {!isAutofillingResume &&
-                        resumeAutofillSummary?.missingRequiredFields?.length > 0 && (
-                          <small>
-                            Masih perlu cek:{' '}
-                            {resumeAutofillSummary.missingRequiredFields.join(', ')}
-                          </small>
-                        )}
-                    </div>
-                  )}
                 </div>
               </article>
 
@@ -3853,19 +3255,15 @@ const CandidateDashboardPage = () => {
                   type="button"
                   className="candidate-profile-primary-button"
                   onClick={handleSaveProfile}
-                  disabled={isSavingProfile || isAutofillingResume}
+                  disabled={isSavingProfile}
                 >
-                  {isAutofillingResume
-                    ? 'Membaca CV...'
-                    : isSavingProfile
-                      ? 'Menyimpan...'
-                      : 'Simpan Profil'}
+                  {isSavingProfile ? 'Menyimpan...' : 'Simpan Profil'}
                 </button>
                 <button
                   type="button"
                   className="candidate-profile-secondary-button"
                   onClick={() => handleSectionChange('jobs')}
-                  disabled={isSavingProfile || isAutofillingResume}
+                  disabled={isSavingProfile}
                 >
                   Lanjut ke Lowongan Kerja
                 </button>
