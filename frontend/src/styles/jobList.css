@@ -562,60 +562,28 @@
 }
 
 .job-apply-step-tabs {
-  --job-apply-step-count: 3;
   display: grid;
-  grid-template-columns: repeat(var(--job-apply-step-count), minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(6.4rem, 1fr));
   gap: 0.5rem;
+  overflow-x: auto;
   padding: 0 1.2rem 0.95rem;
-}
-
-.job-apply-step-tabs.is-four-step {
-  --job-apply-step-count: 4;
-}
-
-.job-apply-step-tabs.job-apply-step-tabs-floating {
-  position: fixed;
-  left: 50%;
-  bottom: calc(0.78rem + env(safe-area-inset-bottom, 0px));
-  z-index: 1180;
-  width: min(calc(100vw - 1.4rem), 33rem);
-  margin: 0;
-  padding: 0.42rem;
-  border: 1px solid rgba(91, 35, 79, 0.14);
-  border-radius: 1.1rem;
-  background: rgba(255, 250, 244, 0.94);
-  box-shadow: 0 18px 42px rgba(35, 17, 31, 0.2);
-  transform: translateX(-50%);
-  backdrop-filter: blur(18px);
-}
-
-.job-apply-modal.has-floating-step-nav .job-apply-form {
-  padding-bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
-}
-
-.job-apply-modal.job-apply-modal-standalone.has-floating-step-nav .job-apply-form.is-story-step {
-  padding-bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
-}
-
-.job-apply-modal.has-floating-step-nav .job-apply-actions:not(.is-story-step) {
-  bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
-  z-index: 1170;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
 }
 
 .job-apply-step-tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
   min-width: 0;
-  min-height: 2.78rem;
-  gap: 0.42rem;
-  padding: 0.58rem 0.68rem;
+  min-height: 4.65rem;
+  gap: 0.26rem;
+  padding: 0.82rem 0.88rem;
   border: 1px solid rgba(91, 35, 79, 0.1);
-  border-radius: 0.9rem;
+  border-radius: 1rem;
   background: rgba(255, 251, 247, 0.88);
   color: var(--gray-600);
-  text-align: center;
+  text-align: left;
   cursor: pointer;
+  scroll-snap-align: start;
   transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
 }
 
@@ -638,10 +606,9 @@
 }
 
 .job-apply-step-tab strong {
-  min-width: 0;
   color: var(--primary-dark);
-  font-size: 0.8rem;
-  line-height: 1.16;
+  font-size: 0.84rem;
+  line-height: 1.2;
 }
 
 .job-apply-step-tab.is-active {
@@ -652,18 +619,6 @@
 
 .job-apply-step-tab.is-done span {
   background: rgba(212, 170, 68, 0.18);
-}
-
-.job-apply-step-tab:disabled,
-.job-apply-step-tab.is-locked {
-  cursor: not-allowed;
-  opacity: 0.62;
-}
-
-.job-apply-step-tab:disabled:hover,
-.job-apply-step-tab.is-locked:hover {
-  border-color: rgba(91, 35, 79, 0.1);
-  transform: none;
 }
 
 .job-apply-profile-summary {
@@ -3112,17 +3067,10 @@
     backdrop-filter: none;
   }
 
-  .job-apply-step-tabs.job-apply-step-tabs-floating {
-    width: min(calc(100vw - 0.9rem), 28rem);
-    gap: 0.34rem;
-    padding: 0.34rem;
-    border-radius: 1rem;
-  }
-
   .job-apply-step-tab {
-    min-height: 2.5rem;
-    gap: 0.28rem;
-    padding: 0.4rem 0.34rem;
+    min-height: 4.1rem;
+    gap: 0.22rem;
+    padding: 0.66rem 0.68rem;
   }
 
   .job-apply-step-tab span {
@@ -3132,8 +3080,8 @@
   }
 
   .job-apply-step-tab strong {
-    font-size: 0.68rem;
-    line-height: 1.08;
+    font-size: 0.72rem;
+    line-height: 1.14;
   }
 
   .job-apply-story-secondary-button,
