@@ -3187,8 +3187,7 @@
   margin-top: 0.2rem;
 }
 
-.candidate-profile-primary-button,
-.candidate-profile-secondary-button {
+.candidate-profile-primary-button {
   width: 100%;
   min-height: 3.55rem;
   border-radius: 1rem;
@@ -3207,14 +3206,7 @@
   box-shadow: 0 16px 34px rgba(233, 169, 36, 0.24);
 }
 
-.candidate-profile-secondary-button {
-  border: 1px solid rgba(64, 33, 57, 0.72);
-  background: rgba(255, 252, 249, 0.98);
-  color: #2f162a;
-}
-
-.candidate-profile-primary-button:hover,
-.candidate-profile-secondary-button:hover {
+.candidate-profile-primary-button:hover {
   transform: translateY(-1px);
 }
 
@@ -3323,8 +3315,7 @@
     bottom: 5rem;
   }
 
-  .candidate-profile-primary-button,
-  .candidate-profile-secondary-button {
+  .candidate-profile-primary-button {
     min-height: 3.25rem;
   }
 }
