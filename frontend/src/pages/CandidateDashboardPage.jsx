@@ -622,13 +622,26 @@ const CANDIDATE_EMPLOYMENT_TYPE_OPTIONS = [
 ];
 
 const CANDIDATE_EDUCATION_LEVEL_OPTIONS = [
-  'SMA / SMK',
-  'D1 / D2',
+  'Tidak pernah sekolah',
+  'SD sederajat',
+  'SMP sederajat',
+  'SMA/SMK sederajat',
+  'D1/D2',
   'D3',
   'S1 - Sarjana',
   'S2 - Magister',
   'S3 - Doktor',
 ];
+const CANDIDATE_EDUCATION_LEVEL_LEGACY_MAP = {
+  'SMA / SMK': 'SMA/SMK sederajat',
+  'SMA/SMK': 'SMA/SMK sederajat',
+  'D1 / D2': 'D1/D2',
+};
+
+const normalizeCandidateEducationLevel = (value = '') => {
+  const trimmedValue = String(value || '').trim();
+  return CANDIDATE_EDUCATION_LEVEL_LEGACY_MAP[trimmedValue] || trimmedValue;
+};
 
 /**
  * Mengubah hash URL kandidat menjadi section kandidat yang valid.
@@ -1227,7 +1240,7 @@ const CandidateDashboardPage = () => {
     setProfile((currentProfile) => {
       const nextEducation = {
         ...currentProfile.education,
-        [field]: value,
+        [field]: field === 'degree' ? normalizeCandidateEducationLevel(value) : value,
       };
 
       if (
@@ -1607,6 +1620,10 @@ const CandidateDashboardPage = () => {
     setIsSavingProfile(true);
     const normalizedProfile = {
       ...profile,
+      education: {
+        ...profile.education,
+        degree: normalizeCandidateEducationLevel(profile.education?.degree),
+      },
       preferredLocations: profile.preferredLocations.map((item, index) =>
         index === 0 && !String(item || '').trim()
           ? String(profile.currentAddress || '').trim()
@@ -2397,7 +2414,7 @@ const CandidateDashboardPage = () => {
                       <label className="candidate-profile-field">
                         <span>Pendidikan Terakhir</span>
                         <select
-                          value={profile.education.degree || ''}
+                          value={normalizeCandidateEducationLevel(profile.education.degree) || ''}
                           onChange={(event) =>
                             handleEducationChange('degree', event.target.value)
                           }
