@@ -924,6 +924,20 @@ const CandidateDashboardPage = () => {
   }, [user]);
 
   useEffect(() => {
+    if (!feedback || feedback.type !== 'success') {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedback((currentFeedback) => (currentFeedback === feedback ? null : currentFeedback));
+    }, 6000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [feedback]);
+
+  useEffect(() => {
     if (!resumePreview?.url) {
       return undefined;
     }
@@ -1633,7 +1647,7 @@ const CandidateDashboardPage = () => {
       setFeedback({
         type: 'success',
         message: syncedCompletion.isReady
-          ? 'Profil Siap Lamar berhasil disimpan dan sudah siap dipakai untuk melamar.'
+          ? 'Selamat, data diri Anda telah berhasil tersimpan.'
           : 'Profil Siap Lamar berhasil disimpan. Lengkapi checklist minimum agar siap melamar.',
       });
     } catch (error) {
