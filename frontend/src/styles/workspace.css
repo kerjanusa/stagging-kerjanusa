@@ -838,26 +838,36 @@
 }
 
 .workspace-application-timeline {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+  overflow-x: auto;
+  padding: 0.08rem 0.02rem 0.28rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
 }
 
 .workspace-timeline-step {
-  display: grid;
-  justify-items: center;
+  flex: 1 0 8.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 0.42rem;
-  padding: 0.85rem 0.75rem;
-  border-radius: 1rem;
+  min-width: 0;
+  padding: 0.72rem 0.82rem;
+  border-radius: 999px;
   background: rgba(91, 35, 79, 0.05);
+  scroll-snap-align: start;
 }
 
 .workspace-timeline-step small {
+  min-width: 0;
   color: var(--gray-500);
   font-size: 0.76rem;
   font-weight: 700;
-  line-height: 1.45;
-  text-align: center;
+  line-height: 1.22;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .workspace-timeline-step.is-done {
@@ -870,6 +880,7 @@
 }
 
 .workspace-timeline-dot {
+  flex: 0 0 auto;
   width: 0.72rem;
   height: 0.72rem;
   border-radius: 999px;
@@ -912,7 +923,7 @@
   }
 
   .workspace-application-timeline {
-    grid-template-columns: 1fr;
+    gap: 0.48rem;
   }
 
   .workspace-application-summary-grid {

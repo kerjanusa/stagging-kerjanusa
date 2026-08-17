@@ -31,6 +31,12 @@ const SAVED_JOBS_STORAGE_PREFIX = 'candidate_saved_jobs';
 const JOB_ACTIVE_WINDOW_IN_DAYS = 30;
 const ONE_DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
 const JOB_APPLY_TOTAL_STEPS = 5;
+const JOB_APPLY_STEP_NAV_ITEMS = [
+  { step: 1, label: 'Detail' },
+  { step: 2, label: 'Dokumen' },
+  { step: 3, label: 'Screening' },
+  { step: 4, label: 'Review' },
+];
 const IDR_NUMBER_FORMATTER = new Intl.NumberFormat('id-ID');
 const RESUME_SKIP_OPTION = '__skip_resume__';
 
@@ -907,7 +913,11 @@ const JobApplyPage = () => {
         <span className="job-apply-page-route-label">Detail lowongan & lamaran</span>
       </div>
 
-      <div className="job-apply-modal job-apply-modal-standalone is-story-step">
+      <div
+        className={`job-apply-modal job-apply-modal-standalone is-story-step${
+          !isSuccessStep ? ' has-floating-step-nav' : ''
+        }`}
+      >
         <div className="job-apply-modal-header job-apply-modal-header-story">
           <button
             type="button"
@@ -931,21 +941,28 @@ const JobApplyPage = () => {
           </button>
         </div>
 
-        {!isSuccessStep && jobApplyStep > 1 && (
-          <div className="job-apply-step-tabs" aria-label="Tahapan melamar">
-            {[2, 3, 4].map((step) => (
+        {!isSuccessStep && (
+          <div
+            className={`job-apply-step-tabs job-apply-step-tabs-floating is-four-step${
+              jobApplyStep === 1 ? ' is-detail-step' : ' is-form-step'
+            }`}
+            aria-label="Tahapan melamar"
+          >
+            {JOB_APPLY_STEP_NAV_ITEMS.map(({ step, label }) => (
               <button
                 key={`job-apply-page-step-${step}`}
                 type="button"
                 className={`job-apply-step-tab${
                   jobApplyStep === step ? ' is-active' : ''
-                }${jobApplyStep > step ? ' is-done' : ''}`}
+                }${jobApplyStep > step ? ' is-done' : ''}${
+                  step > jobApplyStep ? ' is-locked' : ''
+                }`}
                 onClick={() => setJobApplyStep(step)}
+                disabled={step > jobApplyStep}
+                aria-current={jobApplyStep === step ? 'step' : undefined}
               >
                 <span>{step}</span>
-                <strong>
-                  {step === 2 ? 'Dokumen' : step === 3 ? 'Screening' : 'Review'}
-                </strong>
+                <strong>{label}</strong>
               </button>
             ))}
           </div>
