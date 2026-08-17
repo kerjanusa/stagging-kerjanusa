@@ -2917,13 +2917,6 @@ const CandidateDashboardPage = () => {
                 >
                   {isSavingProfile ? 'Menyimpan...' : 'Simpan Profil'}
                 </button>
-                <button
-                  type="button"
-                  className="candidate-profile-secondary-button"
-                  onClick={() => handleSectionChange('jobs')}
-                >
-                  Lanjut ke Lowongan Kerja
-                </button>
               </div>
             </div>
           </section>
