@@ -32,6 +32,91 @@ const CANDIDATE_SECTION_OPTIONS = [
   { value: 'messages', label: 'Chat', mobileLabel: 'Chat' },
 ];
 
+const CANDIDATE_TERMS_SECTIONS = [
+  {
+    title: '1. Ketentuan Akun dan Data Diri',
+    items: [
+      {
+        label: 'Keakuratan Informasi',
+        text: 'Pelamar wajib memberikan data diri, riwayat pendidikan, pengalaman kerja, portofolio, dan dokumen pendukung lainnya secara jujur, akurat, dan terbaru.',
+      },
+      {
+        label: 'Keamanan Akun',
+        text: 'Pelamar bertanggung jawab penuh atas kerahasiaan kata sandi dan seluruh aktivitas yang terjadi pada akun milik Pelamar.',
+      },
+      {
+        label: 'Akun Tunggal',
+        text: 'Setiap pelamar hanya diperbolehkan membuat dan mengelola 1 (satu) akun pribadi di platform.',
+      },
+    ],
+  },
+  {
+    title: '2. Penggunaan Platform dan Etika Pelamar',
+    items: [
+      {
+        label: 'Pendaftaran Lowongan',
+        text: 'Pelamar hanya diperbolehkan melamar lowongan kerja yang relevan dengan kualifikasi dan niat profesional.',
+      },
+      {
+        label: 'Pengiriman Informasi',
+        text: 'Pelamar dilarang mengunggah resume atau dokumen yang memuat konten ilegal, menyesatkan, melanggar hak cipta, atau mengandung unsur SARA.',
+      },
+      {
+        label: 'Interaksi Profesional',
+        text: 'Pelamar wajib berkomunikasi secara sopan dan profesional saat berinteraksi dengan pihak rekruter maupun tim layanan pelanggan platform.',
+      },
+    ],
+  },
+  {
+    title: '3. Privasi dan Akses Data Rekruter',
+    items: [
+      {
+        label: 'Pemberian Izin (Consent)',
+        text: 'Dengan melamar suatu lowongan atau mengaktifkan profil publik, Pelamar memberikan izin kepada platform untuk membagikan data profil dan CV kepada rekruter/perusahaan terdaftar.',
+      },
+      {
+        label: 'Batas Tanggung Jawab Data',
+        text: 'Platform menjaga keamanan data Pelamar sesuai UU Perlindungan Data Pribadi (UU PDP). Namun, penggunaan data oleh rekruter setelah diunduh atau diakses berada di luar kendali langsung platform.',
+      },
+    ],
+  },
+  {
+    title: '4. Bebas Biaya dan Kewaspadaan Penipuan',
+    items: [
+      {
+        label: 'Layanan Gratis',
+        text: 'Penggunaan platform untuk mencari lowongan dan mengirimkan lamaran tidak dipungut biaya apa pun dari Pelamar.',
+      },
+      {
+        label: 'Penipuan Lowongan Kerja',
+        text: 'Rekruter resmi tidak pernah memungut biaya administrasi, tiket pesawat, atau akomodasi. Pelamar diimbau untuk segera melaporkan lowongan yang mencurigakan atau meminta sejumlah uang.',
+      },
+    ],
+  },
+  {
+    title: '5. Pembatasan Tanggung Jawab Platform',
+    items: [
+      {
+        label: 'Proses Seleksi',
+        text: 'Platform tidak menjamin Pelamar akan dipanggil wawancara, menerima penawaran kerja, atau diterima bekerja di perusahaan impian.',
+      },
+      {
+        label: 'Kandungan Lowongan',
+        text: 'Platform berupaya melakukan verifikasi rekruter, namun tidak bertanggung jawab atas isi lowongan, kondisi kerja, atau perselisihan kontrak antara Pelamar dan perusahaan.',
+      },
+    ],
+  },
+  {
+    title: '6. Penangguhan dan Penghapusan Akun',
+    items: [
+      {
+        label: 'Pelanggaran Aturan',
+        text: 'Platform berhak memblokir atau menghapus akun Pelamar secara permanen jika terbukti memberikan informasi palsu, memalsukan dokumen, melakukan spamming, atau melanggar aturan platform.',
+      },
+    ],
+  },
+];
+
 /**
  * Mengambil ekstensi file dengan aman untuk validasi dokumen kandidat.
  */
@@ -795,6 +880,7 @@ const CandidateDashboardPage = () => {
   const [feedback, setFeedback] = useState(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isCandidateTermsModalOpen, setIsCandidateTermsModalOpen] = useState(false);
   const [isDetectingCurrentLocation, setIsDetectingCurrentLocation] = useState(false);
   const [applicationBucket, setApplicationBucket] = useState('active');
   const [applicationActionInFlightId, setApplicationActionInFlightId] = useState(null);
@@ -807,6 +893,27 @@ const CandidateDashboardPage = () => {
     setActiveSection(resolveCandidateSectionFromHash(location.hash));
     setIsMobileNavOpen(false);
   }, [location.hash]);
+
+  useEffect(() => {
+    if (!isCandidateTermsModalOpen) {
+      return undefined;
+    }
+
+    const handleTermsModalKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsCandidateTermsModalOpen(false);
+      }
+    };
+    const previousBodyOverflow = document.body.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleTermsModalKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.removeEventListener('keydown', handleTermsModalKeyDown);
+    };
+  }, [isCandidateTermsModalOpen]);
 
   useEffect(() => {
     const nextProfile = readCandidateProfile(user, { preferStoredDraft: false });
@@ -1012,6 +1119,15 @@ const CandidateDashboardPage = () => {
     setActiveSection(section);
     setIsMobileNavOpen(false);
     navigate(getCandidateSectionRoute(section));
+  };
+
+  const handleOpenCandidateTerms = () => {
+    setIsMobileNavOpen(false);
+    setIsCandidateTermsModalOpen(true);
+  };
+
+  const handleCloseCandidateTerms = () => {
+    setIsCandidateTermsModalOpen(false);
   };
 
   const handleOpenRecommendedJob = (job) => {
@@ -1613,18 +1729,30 @@ const CandidateDashboardPage = () => {
             className={`workspace-nav${isMobileNavOpen ? ' is-open' : ''}`}
             aria-label="Navigasi pelamar"
           >
-            {CANDIDATE_SECTION_OPTIONS.map((section) => (
-              <button
-                key={section.value}
-                type="button"
-                className={`workspace-nav-button${
-                  activeSection === section.value ? ' active' : ''
-                }`}
-                onClick={() => handleSectionChange(section.value)}
-              >
-                {section.label}
-              </button>
-            ))}
+            {!isMobileNavOpen && (
+              <div className="workspace-nav-section-links">
+                {CANDIDATE_SECTION_OPTIONS.map((section) => (
+                  <button
+                    key={section.value}
+                    type="button"
+                    className={`workspace-nav-button${
+                      activeSection === section.value ? ' active' : ''
+                    }`}
+                    onClick={() => handleSectionChange(section.value)}
+                  >
+                    {section.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="workspace-nav-button workspace-nav-terms-button"
+              onClick={handleOpenCandidateTerms}
+            >
+              Syarat & Kewajiban
+            </button>
 
             <div className="workspace-mobile-menu-footer">
               <div className="workspace-user-chip workspace-mobile-menu-user">
@@ -1679,6 +1807,56 @@ const CandidateDashboardPage = () => {
           </div>
         </div>
       </header>
+
+      {isCandidateTermsModalOpen && (
+        <div
+          className="candidate-terms-modal-backdrop"
+          role="presentation"
+          onClick={handleCloseCandidateTerms}
+        >
+          <section
+            className="candidate-terms-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="candidate-terms-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="candidate-terms-modal-head">
+              <div>
+                <span>Syarat & Kewajiban</span>
+                <h2 id="candidate-terms-modal-title">Ketentuan untuk Pelamar</h2>
+              </div>
+              <button
+                type="button"
+                className="candidate-terms-modal-close"
+                aria-label="Tutup syarat & kewajiban"
+                onClick={handleCloseCandidateTerms}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="candidate-terms-modal-body">
+              {CANDIDATE_TERMS_SECTIONS.map((section) => (
+                <article key={section.title} className="candidate-terms-section">
+                  <h3>{section.title}</h3>
+                  <ul>
+                    {section.items.map((item) => (
+                      <li key={item.label}>
+                        <strong>{item.label}:</strong> {item.text}
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+              <p className="candidate-terms-modal-note">
+                Catatan: ketentuan ini dapat disesuaikan kembali dengan kebijakan privasi dan
+                alur kerja aplikasi KerjaNusa.
+              </p>
+            </div>
+          </section>
+        </div>
+      )}
 
       <main className="workspace-shell workspace-main">
         {feedback && (
